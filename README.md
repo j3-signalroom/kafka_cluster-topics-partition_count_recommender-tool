@@ -4,7 +4,6 @@
 
 <!-- toc -->
 + [**1.0 Manually determining the number of partitions needed for a Kafka Consumer**](#10-manually-determining-the-number-of-partitions-needed-for-a-kafka-consumer)
-    - [**1.1 Conclusion**](#11-conclusion)
 - [**2.0 What is meant by the Kafka Consumer throughput?**](#20-what-is-meant-by-the-kafka-consumer-throughput)
     + [**2.1 Key Factors Affecting Kafka Consumer Throughput**](#21-key-factors-affecting-kafka-consumer-throughput)
     + [**2.2 Typical Kafka Consumer Throughput**](#22-typical-kafka-consumer-throughput)
@@ -29,8 +28,7 @@ To determine the number of partitions needed to support a throughput of **1GB/s*
 
     ![number-of-partitions-needed](.blog/images/number-of-partitions-needed.png)
 
-### 1.1 Conclusion
-You should have **41 partitions** to ensure that the consumer can achieve the required throughput of **1GB/s** while consuming at a rate of **25MB/s** per partition. This will allow the workload to be distributed across partitions so that multiple consumers can work in parallel to meet the throughput requirement.
+The **41 partitions** ensure that the consumer can achieve the required throughput of **1GB/s** while consuming at a rate of **25MB/s** per partition. This will allow the workload to be distributed across partitions so that multiple consumers can work in parallel to meet the throughput requirement.
 
 ## 2.0 What is meant by the Kafka Consumer throughput?
 
