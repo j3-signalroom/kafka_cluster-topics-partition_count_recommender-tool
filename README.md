@@ -11,6 +11,15 @@
 + [**3.0 Resources**](#30-resources)
 <!-- tocstop -->
 
+## 1.0 
+Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
+
+```shell
+bootstrap_server_uri=<YOUR_BOOTSTRAP_SERVER_URI>
+kafka_api_key=<YOUR_KAFKA_API_KEY>
+kafka_api_secret=<YOUR_KAFKA_API_SECRET>
+```
+
 ## 1.0 Manually determining the number of partitions needed for a Kafka Consumer
 
 For example, you have a consumer that consumes at **25MB/s**, but the the consumer requirement is a throughput of **1GB/s**.  How many partitions should you have?

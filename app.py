@@ -26,9 +26,9 @@ def main():
     try:
         # Initialize analyzer
         analyzer = KafkaTopicsAnalyzer(
-            bootstrap_servers=os.getenv("BOOTSTRAP_SERVER_URI"),
-            sasl_username=os.getenv("KAFKA_API_KEY"),
-            sasl_password=os.getenv("KAFKA_API_SECRET")
+            bootstrap_server_uri=os.getenv("bootstrap_server_uri"),
+            kafka_api_key=os.getenv("kafka_api_key"),
+            kafka_api_secret=os.getenv("kafka_api_secret")
         )
         
         # Analyze all topics
