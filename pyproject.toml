@@ -1,5 +1,5 @@
 [project]
-name = "kafka-cluster-topics-partition-count-recommender-app"
+name = "kafka-cluster-topics-partition-count_recommender-app"
 version = "0.01.00.000"
 description = "Kafka Cluster Topics Partition Count Recommender Application"
 readme = "README.md"
