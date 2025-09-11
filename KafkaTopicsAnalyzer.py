@@ -42,7 +42,7 @@ class KafkaTopicsAnalyzer:
         # Consumer config for sampling records
         self.consumer_config = {
             **self.config,
-            'group.id': f'topics-analyzer-{int(time.time())}',
+            'group.id': f'topics-partition-count-recommender-{int(time.time())}',
             'auto.offset.reset': 'earliest',
             'enable.auto.commit': False,
             'session.timeout.ms': 30000,
