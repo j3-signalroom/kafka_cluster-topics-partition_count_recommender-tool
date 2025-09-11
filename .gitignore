@@ -6,8 +6,10 @@ dist/
 wheels/
 *.egg-info
 
-# Virtual environments
+# Virtual environment(s)
 .venv
 
 .DS_Store
 *.log
+.env
+*.json
