@@ -16,6 +16,8 @@
 Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
 
 ```shell
+cloud_api_key=<YOUR_CLOUD_API_KEY>
+cloud_api_secret=<YOUR_CLOUD_API_SECRET>
 bootstrap_server_uri=<YOUR_BOOTSTRAP_SERVER_URI>
 kafka_api_key=<YOUR_KAFKA_API_KEY>
 kafka_api_secret=<YOUR_KAFKA_API_SECRET>
