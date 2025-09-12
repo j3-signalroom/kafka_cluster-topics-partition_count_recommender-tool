@@ -172,9 +172,6 @@ class KafkaTopicsAnalyzer:
 
                 total_size = key_size + value_size + headers_size
                 record_sizes.append(total_size)
-                
-                if len(record_sizes) % 10 == 0:
-                    logging.info(f"    Sampled {len(record_sizes)} records...")
             
             if record_sizes:
                 avg_size = sum(record_sizes) / len(record_sizes)
