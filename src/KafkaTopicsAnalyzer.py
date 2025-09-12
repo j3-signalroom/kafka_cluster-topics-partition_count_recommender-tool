@@ -1,8 +1,9 @@
 import time
 from typing import Dict, List, Tuple
-from confluent_kafka.admin import AdminClient, ConfigResource
+from confluent_kafka.admin import AdminClient
 from confluent_kafka import Consumer, TopicPartition
 import logging
+
 from utilities import setup_logging
 
 
@@ -47,7 +48,63 @@ class KafkaTopicsAnalyzer:
             'fetch.min.bytes': 1
         }
 
-    def get_topics_metadata(self) -> Dict:
+    def analyze_all_topics(self, include_internal: bool = False, sample_records: bool = True, sample_size: int = 1000, topic_filter: str | None = None) -> List[Dict]:
+        """Analyze all topics in the cluster.
+        
+        Args:
+            include_internal (bool, optional): Whether to include internal topics. Defaults to False.
+            sample_records (bool, optional): Whether to sample records for average size. Defaults to True.
+            sample_size (int, optional): Number of records to sample per topic. Defaults to 1000.
+            topic_filter (Optional[str], optional): If provided, only topics containing this string will be analyzed. Defaults to None.
+        
+        Returns:
+            List[Dict]: List of analysis results for each topic.
+        """
+        logging.info("Connecting to Kafka cluster and fetching metadata...")
+        
+        # Get cluster metadata
+        metadata = self._get_topics_metadata()
+        if not metadata:
+            return []
+        
+        # Filter topics
+        topics_to_analyze = {}
+        for topic_name, topic_metadata in metadata.topics.items():
+            # Skip internal topics if not requested
+            if not include_internal and topic_name.startswith('_'):
+                continue
+                
+            # Apply topic filter if provided
+            if topic_filter and topic_filter.lower() not in topic_name.lower():
+                continue
+                
+            topics_to_analyze[topic_name] = topic_metadata
+
+        logging.info(f"Found {len(topics_to_analyze)} topics to analyze")
+
+        # Analyze topics
+        results = []
+        for topic_name, topic_metadata in topics_to_analyze.items():
+            try:
+                result = self._analyze_topic(topic_name, topic_metadata, sample_records, sample_size)
+                results.append(result)
+            except Exception as e:
+                print(f"Error analyzing topic {topic_name}: {e}")
+
+                # Add basic info even if analysis fails
+                results.append({
+                    'topic_name': topic_name,
+                    'partition_count': len(topic_metadata.partitions),
+                    'total_messages': 0,
+                    'avg_bytes_per_record': None,
+                    'partition_details': [],
+                    'is_internal': topic_name.startswith('_'),
+                    'error': str(e)
+                })
+        
+        return results
+    
+    def _get_topics_metadata(self) -> Dict:
         """Get cluster metadata including topics and partitions.
         
         Returns:
@@ -60,34 +117,7 @@ class KafkaTopicsAnalyzer:
             logger.error(f"Error getting topics metadata: {e}")
             return None
 
-    def get_topic_configs(self, topic_names: List[str]) -> Dict:
-        """Get configuration for topics that belong to the cluster.
-        
-        Args:
-            topic_names (List[str]): List of topic names to get configurations for.
-            
-        Returns:
-            Dict: A dictionary with topic names as keys and their configurations as values.
-        """
-        try:
-            resources = [ConfigResource(ConfigResource.Type.TOPIC, topic) for topic in topic_names]
-            configs = self.admin_client.describe_configs(resources, request_timeout=30)
-            
-            result = {}
-            for topic, future in configs.items():
-                try:
-                    config = future.result()
-                    result[topic.name] = dict(config)
-                except Exception as e:
-                    logger.logging.error(f"Error getting config for topic {topic.name}: {e}")
-                    result[topic.name] = {}
-            
-            return result
-        except Exception as e:
-            logging.error(f"Error getting topic configurations: {e}")
-            return {}
-
-    def get_partition_offsets(self, topic: str, partitions: List[int]) -> Dict[int, Tuple[int, int]]:
+    def _get_partition_offsets(self, topic: str, partitions: List[int]) -> Dict[int, Tuple[int, int]]:
         """Get low and high watermarks for partitions.
         
         Args:
@@ -121,7 +151,7 @@ class KafkaTopicsAnalyzer:
         finally:
             consumer.close()
 
-    def sample_record_sizes(self, topic: str, sample_size: int, timeout_seconds: int = 30) -> float | None:
+    def _sample_record_sizes(self, topic: str, sample_size: int, timeout_seconds: int = 30) -> float | None:
         """Sample records from a topic to calculate average record size.
         
         Args:
@@ -186,7 +216,7 @@ class KafkaTopicsAnalyzer:
         finally:
             consumer.close()
 
-    def analyze_topic(self, topic_name: str, topic_metadata, sample_records: bool = True, sample_size: int = 1000) -> Dict:
+    def _analyze_topic(self, topic_name: str, topic_metadata, sample_records: bool = True, sample_size: int = 1000) -> Dict:
         """Analyze a single topic.
         
         Args:
@@ -203,7 +233,7 @@ class KafkaTopicsAnalyzer:
         partition_count = len(partitions)
         
         # Get partition offsets to calculate total messages
-        partition_offsets = self.get_partition_offsets(topic_name, partitions)
+        partition_offsets = self._get_partition_offsets(topic_name, partitions)
         
         total_messages = 0
         partition_details = []
@@ -225,7 +255,7 @@ class KafkaTopicsAnalyzer:
         # Sample record sizes if requested and topic has messages
         avg_record_size = None
         if sample_records and total_messages > 0:
-            avg_record_size = self.sample_record_sizes(topic_name, min(sample_size, total_messages))
+            avg_record_size = self._sample_record_sizes(topic_name, min(sample_size, total_messages))
         elif total_messages == 0:
             logging.warning(f"  Topic '{topic_name}' is empty - no records to sample")
             avg_record_size = 0.0
@@ -238,57 +268,3 @@ class KafkaTopicsAnalyzer:
             'partition_details': partition_details,
             'is_internal': topic_name.startswith('_')
         }
-
-    def analyze_all_topics(self, include_internal: bool = False, sample_records: bool = True, sample_size: int = 1000, topic_filter: str | None = None) -> List[Dict]:
-        """Analyze all topics in the cluster.
-        
-        Args:
-            include_internal (bool, optional): Whether to include internal topics. Defaults to False.
-            sample_records (bool, optional): Whether to sample records for average size. Defaults to True.
-            topic_filter (Optional[str], optional): If provided, only topics containing this string will be analyzed. Defaults to None.
-        
-        Returns:
-            List[Dict]: List of analysis results for each topic.
-        """
-        logging.info("Connecting to Kafka cluster and fetching metadata...")
-        
-        # Get cluster metadata
-        metadata = self.get_topics_metadata()
-        if not metadata:
-            return []
-        
-        # Filter topics
-        topics_to_analyze = {}
-        for topic_name, topic_metadata in metadata.topics.items():
-            # Skip internal topics if not requested
-            if not include_internal and topic_name.startswith('_'):
-                continue
-                
-            # Apply topic filter if provided
-            if topic_filter and topic_filter.lower() not in topic_name.lower():
-                continue
-                
-            topics_to_analyze[topic_name] = topic_metadata
-
-        logging.info(f"Found {len(topics_to_analyze)} topics to analyze")
-
-        # Analyze topics
-        results = []
-        for topic_name, topic_metadata in topics_to_analyze.items():
-            try:
-                result = self.analyze_topic(topic_name, topic_metadata, sample_records, sample_size)
-                results.append(result)
-            except Exception as e:
-                print(f"Error analyzing topic {topic_name}: {e}")
-                # Add basic info even if analysis fails
-                results.append({
-                    'topic_name': topic_name,
-                    'partition_count': len(topic_metadata.partitions),
-                    'total_messages': 0,
-                    'avg_bytes_per_record': None,
-                    'partition_details': [],
-                    'is_internal': topic_name.startswith('_'),
-                    'error': str(e)
-                })
-        
-        return results
