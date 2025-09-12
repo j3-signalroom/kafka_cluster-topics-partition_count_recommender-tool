@@ -5,6 +5,7 @@ import os
 from typing import Final
 
 from KafkaTopicsAnalyzer import KafkaTopicsAnalyzer
+from utilities import setup_logging
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -19,10 +20,8 @@ __status__     = "dev"
 DEFAULT_SAMPLE_SIZE: Final[int] = 1000
 DEFAULT_CHARACTER_REPEAT: Final[int] = 100
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+
+logger = setup_logging()
 
 
 def main():

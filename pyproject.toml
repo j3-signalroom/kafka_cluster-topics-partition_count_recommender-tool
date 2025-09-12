@@ -10,11 +10,32 @@ dependencies = [
     "pytest>=8.4.2",
 ]
 
+[tool.setuptools]
+packages = ["src"]
+
+# Logging configuration
 [tool.logging]
-file = "kafka-cluster-topics-partition-count-recommender-app.log"
-level = "INFO"
+version = 1
+disable_existing_loggers = false
+
+[tool.logging.formatters.default]
 format = "%(asctime)s - %(levelname)s - %(funcName)s - %(message)s"
-date_format = "%Y-%m-%d %H:%M:%S"
+datefmt = "%Y-%m-%d %H:%M:%S"
+
+[tool.logging.handlers.file]
+class = "logging.FileHandler"
+filename = "kafka-cluster-topics-partition-count-recommender-app.log"
+formatter = "default"
+level = "INFO"
+
+[tool.logging.handlers.console]
+class = "logging.StreamHandler"
+formatter = "default"
+level = "DEBUG"
+
+[tool.logging.loggers.root]
+level = "INFO"
+handlers = ["file", "console"]
 
 [tool.pytest.ini_options]
 log_file = "kafka-cluster-topics-partition-count-recommender-app-test.log"

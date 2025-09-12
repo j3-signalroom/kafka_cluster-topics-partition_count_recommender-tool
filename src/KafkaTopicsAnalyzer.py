@@ -3,6 +3,7 @@ from typing import Dict, List, Tuple
 from confluent_kafka.admin import AdminClient, ConfigResource
 from confluent_kafka import Consumer, TopicPartition
 import logging
+from utilities import setup_logging
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -14,9 +15,7 @@ __status__     = "dev"
 
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger = setup_logging()
 
 
 class KafkaTopicsAnalyzer:
@@ -80,7 +79,7 @@ class KafkaTopicsAnalyzer:
                     config = future.result()
                     result[topic.name] = dict(config)
                 except Exception as e:
-                    logging.error(f"Error getting config for topic {topic.name}: {e}")
+                    logger.logging.error(f"Error getting config for topic {topic.name}: {e}")
                     result[topic.name] = {}
             
             return result
