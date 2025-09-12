@@ -1,5 +1,5 @@
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 from confluent_kafka.admin import AdminClient, ConfigResource
 from confluent_kafka import Consumer, TopicPartition
 import logging
@@ -21,27 +21,26 @@ logger.setLevel(logging.INFO)
 
 class KafkaTopicsAnalyzer:
     def __init__(self, bootstrap_server_uri: str, kafka_api_key: str, kafka_api_secret: str):
-        """Initialize Kafka Topics analyzer with Admin API
+        """Connect to the Kafka Cluster with the AdminClient.
 
         Args:
             bootstrap_server_uri (string): Kafka Cluster URI
             kafka_api_key (string): Your Confluent Cloud Kafka API key
             kafka_api_secret (string): Your Confluent Cloud Kafka API secret
         """
-        self.config = {
+        # Instantiate the AdminClient with the provided credentials
+        config = {
             'bootstrap.servers': bootstrap_server_uri,
             'security.protocol': "SASL_SSL",
             'sasl.mechanism': "PLAIN",
             'sasl.username': kafka_api_key,
             'sasl.password': kafka_api_secret,
         }
+        self.admin_client = AdminClient(config)
         
-        # Initialize Admin client
-        self.admin_client = AdminClient(self.config)
-        
-        # Consumer config for sampling records
-        self.consumer_config = {
-            **self.config,
+        # Setup the Kafka Consumer config for sampling records later
+        self.kafka_consumer_config = {
+            **config,
             'group.id': f'topics-partition-count-recommender-{int(time.time())}',
             'auto.offset.reset': 'earliest',
             'enable.auto.commit': False,
@@ -56,7 +55,7 @@ class KafkaTopicsAnalyzer:
             Dict: Cluster metadata including topics and partitions.
         """
         try:
-            metadata = self.admin_client.list_topics(timeout=30)
+            metadata = self.admin_client.list_topics(timeout=60)
             return metadata
         except Exception as e:
             logger.error(f"Error getting topics metadata: {e}")
@@ -99,7 +98,7 @@ class KafkaTopicsAnalyzer:
         Returns:
             Dict[int, Tuple[int, int]]: A dictionary with partition IDs as keys and tuples of (low, high) offsets as values.
         """
-        consumer = Consumer(self.consumer_config)
+        consumer = Consumer(self.kafka_consumer_config)
         
         try:
             # Create TopicPartition objects
@@ -123,18 +122,18 @@ class KafkaTopicsAnalyzer:
         finally:
             consumer.close()
 
-    def sample_record_sizes(self, topic: str, sample_size: int = 100, timeout_seconds: int = 30) -> Optional[float]:
+    def sample_record_sizes(self, topic: str, sample_size: int, timeout_seconds: int = 30) -> float | None:
         """Sample records from a topic to calculate average record size.
         
         Args:
             topic (str): Topic name to sample from.
-            sample_size (int, optional): Number of records to sample. Defaults to 100.
+            sample_size (int): Number of records to sample.
             timeout_seconds (int, optional): Maximum time to wait for sampling. Defaults to 30
         
         Returns:
-            Optional[float]: Average record size in bytes, or None if no records found.
+            float | None: Average record size in bytes, or None if no records found.
         """
-        consumer = Consumer(self.consumer_config)
+        consumer = Consumer(self.kafka_consumer_config)
         
         try:
             # Subscribe to topic
@@ -156,10 +155,21 @@ class KafkaTopicsAnalyzer:
                     continue
                 
                 # Calculate total message size (key + value + headers)
-                key_size = len(msg.key()) if msg.key() else 0
-                value_size = len(msg.value()) if msg.value() else 0
-                headers_size = sum(len(k) + len(v) for k, v in (msg.headers() or []))
-                
+                try:
+                    key_size = len(msg.key()) if msg.key() else 0
+                except:  # noqa: E722
+                    key_size = 0
+
+                try:
+                    value_size = len(msg.value()) if msg.value() else 0
+                except:  # noqa: E722
+                    value_size = 0
+
+                try:
+                    headers_size = sum(len(k) + len(v) for k, v in (msg.headers() or []))
+                except:  # noqa: E722
+                    headers_size = 0
+
                 total_size = key_size + value_size + headers_size
                 record_sizes.append(total_size)
                 
@@ -180,7 +190,7 @@ class KafkaTopicsAnalyzer:
         finally:
             consumer.close()
 
-    def analyze_topic(self, topic_name: str, topic_metadata, sample_records: bool = True) -> Dict:
+    def analyze_topic(self, topic_name: str, topic_metadata, sample_records: bool = True, sample_size: int = 1000) -> Dict:
         """Analyze a single topic.
         
         Args:
@@ -219,8 +229,7 @@ class KafkaTopicsAnalyzer:
         # Sample record sizes if requested and topic has messages
         avg_record_size = None
         if sample_records and total_messages > 0:
-            sample_size = min(100, total_messages)  # Don't sample more than available
-            avg_record_size = self.sample_record_sizes(topic_name, sample_size)
+            avg_record_size = self.sample_record_sizes(topic_name, min(sample_size, total_messages))
         elif total_messages == 0:
             logging.warning(f"  Topic '{topic_name}' is empty - no records to sample")
             avg_record_size = 0.0
@@ -234,7 +243,7 @@ class KafkaTopicsAnalyzer:
             'is_internal': topic_name.startswith('_')
         }
 
-    def analyze_all_topics(self, include_internal: bool = False, sample_records: bool = True, topic_filter: Optional[str] = None) -> List[Dict]:
+    def analyze_all_topics(self, include_internal: bool = False, sample_records: bool = True, sample_size: int = 1000, topic_filter: str | None = None) -> List[Dict]:
         """Analyze all topics in the cluster.
         
         Args:
@@ -271,7 +280,7 @@ class KafkaTopicsAnalyzer:
         results = []
         for topic_name, topic_metadata in topics_to_analyze.items():
             try:
-                result = self.analyze_topic(topic_name, topic_metadata, sample_records)
+                result = self.analyze_topic(topic_name, topic_metadata, sample_records, sample_size)
                 results.append(result)
             except Exception as e:
                 print(f"Error analyzing topic {topic_name}: {e}")
