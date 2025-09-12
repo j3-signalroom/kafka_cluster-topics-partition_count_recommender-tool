@@ -2,6 +2,7 @@ import json
 import logging
 from dotenv import load_dotenv
 import os
+from typing import Final
 
 from KafkaTopicsAnalyzer import KafkaTopicsAnalyzer
 
@@ -14,6 +15,10 @@ __email__      = "j3@thej3.com"
 __status__     = "dev"
 
 
+# Default configuration constants
+DEFAULT_SAMPLE_SIZE: Final[int] = 1000
+DEFAULT_CHARACTER_REPEAT: Final[int] = 100
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -24,18 +29,19 @@ def main():
     load_dotenv()
  
     try:
-        # Initialize analyzer
+        # Initialize recommender
         analyzer = KafkaTopicsAnalyzer(
             bootstrap_server_uri=os.getenv("bootstrap_server_uri"),
             kafka_api_key=os.getenv("kafka_api_key"),
             kafka_api_secret=os.getenv("kafka_api_secret")
         )
-        
+
         # Analyze all topics
         results = analyzer.analyze_all_topics(
-            include_internal=os.getenv("INCLUDE_INTERNAL_TOPICS", "False") == "True",
-            sample_records=os.getenv("SAMPLE_RECORDS", "True") == "True",
-            topic_filter=os.getenv("TOPIC_FILTER")
+            include_internal=os.getenv("include_internal_topics", "False") == "True",
+            sample_records=os.getenv("sample_records", "True") == "True",
+            sample_size=int(os.getenv("sample_size", DEFAULT_SAMPLE_SIZE)),
+            topic_filter=os.getenv("topic_filter")
         )
         
         if not results:
@@ -43,14 +49,14 @@ def main():
             return
         
         # Display results
-        logging.info("\n" + "=" * 100)
+        logging.info("\n" + "=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("KAFKA TOPICS ANALYSIS RESULTS")
-        logging.info("=" * 100)
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
 
         # Table header
         header = f"{'Topic Name':<40} {'Partitions':<12} {'Messages':<15} {'Avg Bytes/Rec':<15} {'Status':<15}"
         logging.info(header)
-        logging.info("-" * 100)
+        logging.info("-" * DEFAULT_CHARACTER_REPEAT)
         
         # Sort results by topic name
         for result in sorted(results, key=lambda x: x['topic_name']):
@@ -86,11 +92,11 @@ def main():
         total_messages = sum(r.get('total_messages', 0) for r in results)
         active_topics = len([r for r in results if r.get('total_messages', 0) > 0])
 
-        logging.info("\n" + "=" * 100)
+        logging.info("\n" + "=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("SUMMARY STATISTICS")
-        logging.info("=" * 100)
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info(f"Total Topics: {total_topics}")
-        logging.info(f"Active Topics: {active_topics} ({active_topics/total_topics*100:.1f}%)")
+        logging.info(f"Active Topics: {active_topics} ({active_topics/total_topics*DEFAULT_CHARACTER_REPEAT:.1f}%)")
         logging.info(f"Total Partitions: {total_partitions}")
         logging.info(f"Total Messages: {total_messages:,}")
         logging.info(f"Average Partitions per Topic: {total_partitions/total_topics:.2f}")

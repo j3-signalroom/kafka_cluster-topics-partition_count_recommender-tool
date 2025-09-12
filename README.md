@@ -19,6 +19,10 @@ Create the `.env` file and add the following environment variables, filling them
 bootstrap_server_uri=<YOUR_BOOTSTRAP_SERVER_URI>
 kafka_api_key=<YOUR_KAFKA_API_KEY>
 kafka_api_secret=<YOUR_KAFKA_API_SECRET>
+include_internal_topics=<True|False>
+sample_records=<True|False>
+sample_size=<NUMBER_OF_RECORDS_TO_SAMPLE_PER_TOPIC>
+topic_filter=<OPTIONAL_TOPIC_FILTER>
 ```
 
 ```shell
