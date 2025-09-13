@@ -28,8 +28,7 @@ topic_filter=<OPTIONAL_TOPIC_FILTER>
 ```
 
 ```shell
-cd src
-uv run python app.py
+uv run python src/app.py
 ```
 
 ```shell
