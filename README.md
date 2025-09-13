@@ -1,19 +1,35 @@
 # Kafka Topics Partition Count Recommender Application
+The Kafka Cluster Topics Partition Count Recommender Application delivers data-driven precision to Kafka topic sizing. By analyzing historical consumption patterns, bytes and records per topic at specific points in time, it calculates daily averages of bytes-per-record and record counts, combining them to measure consumer throughput. Over a rolling 7–14 day window, the application pinpoints peak throughput, scales it by a factor X to project future demand, and then translates that requirement into an optimal partition count. The result: an intelligent, automated recommendation engine that ensures each Kafka topic has the correct number of partitions to sustain workload throughput and future growth reliably.
 
 **Table of Contents**
 
 <!-- toc -->
-+ [**1.0 Run the Recommender**](#10-run-the-recommender)
-+ [**2.0 Manually determining the number of partitions needed for a Kafka Consumer**](#20-manually-determining-the-number-of-partitions-needed-for-a-kafka-consumer)
-+ [**3.0 What is meant by the Kafka Consumer throughput?**](#30-what-is-meant-by-the-kafka-consumer-throughput)
-    + [**3.1 Key Factors Affecting Kafka Consumer Throughput**](#31-key-factors-affecting-kafka-consumer-throughput)
-    + [**3.2 Typical Kafka Consumer Throughput**](#32-typical-kafka-consumer-throughput)
-    + [**3.3 Strategies to Improve Consumer Throughput**](#33-strategies-to-improve-consumer-throughput)
-+ [**4.0 Resources**](#40-resources)
+- [**1.0 Let's Run It!**](#10-lets-run-it)
+   + [**1.1 Did you notice we prepended `uv run` to `python src/app.py`?**](#11-did-you-notice-we-prepended-uv-run-to-python-srcapppy)
+   + [**1.2 Troubleshoot Connectivity Issues (if any)**](#12-troubleshoot-connectivity-issues-if-any)
+- [**2.0 Manually determining the number of partitions needed for a Kafka Consumer**](#20-manually-determining-the-number-of-partitions-needed-for-a-kafka-consumer)
+- [**3.0 What is meant by the Kafka Consumer throughput?**](#30-what-is-meant-by-the-kafka-consumer-throughput)
+   + [**3.1 Key Factors Affecting Kafka Consumer Throughput**](#31-key-factors-affecting-kafka-consumer-throughput)
+   + [**3.2 Typical Kafka Consumer Throughput**](#32-typical-kafka-consumer-throughput)
+   + [**3.3 Strategies to Improve Consumer Throughput**](#33-strategies-to-improve-consumer-throughput)
+- [**4.0 Resources**](#40-resources)
 <!-- tocstop -->
 
-## 1.0 Run the Recommender
-Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
+## 1.0 Let's Run It!
+1. Get your Confluent Cloud API key pair by executing the following Confluent CLI command to generate the Cloud API Key (click [here](.blog/why-do-you-need-the-confluent-cloud-api-key.md#2-integration-with-cicd-pipelines) to learn why you need it):
+
+    ```shell
+    confluent api-key create --resource "cloud" 
+    ```
+
+    The API Key pair allows Terraform to provision, manage, and update Confluent Cloud resources as defined in your infrastructure code, maintaining a secure, automated deployment pipeline.
+
+2. Clone the repo:
+    ```bash
+    git clone https://github.com/j3-signalroom/kafka-cluster-topics-partition_count_recommender-app.git
+    ```
+
+3. Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
 
 ```shell
 BOOTSTRAP_SERVER_URI=<YOUR_BOOTSTRAP_SERVER_URI>
@@ -28,9 +44,30 @@ SAMPLE_SIZE=1000
 TOPIC_FILTER=
 ```
 
+4. Here you go, run the application:
 ```shell
 uv run python src/app.py
 ```
+
+### 1.1 Did you notice we prepended `uv run` to `python src/app.py`?
+You maybe asking yourself why.  Well, `uv` is an incredibly fast Python package installer and dependency resolver, written in [**Rust**](https://github.blog/developer-skills/programming-languages-and-frameworks/why-rust-is-the-most-admired-language-among-developers/), and designed to seamlessly replace `pip`, `pipx`, `poetry`, `pyenv`, `twine`, `virtualenv`, and more in your workflows. By prefixing `uv run` to a command, you're ensuring that the command runs in an optimal Python environment.
+
+Now, let's go a little deeper into the magic behind `uv run`:
+- When you use it with a file ending in `.py` or an HTTP(S) URL, `uv` treats it as a script and runs it with a Python interpreter. In other words, `uv run file.py` is equivalent to `uv run python file.py`. If you're working with a URL, `uv` even downloads it temporarily to execute it. Any inline dependency metadata is installed into an isolated, temporary environment—meaning zero leftover mess! When used with `-`, the input will be read from `stdin`, and treated as a Python script.
+- If used in a project directory, `uv` will automatically create or update the project environment before running the command.
+- Outside of a project, if there's a virtual environment present in your current directory (or any parent directory), `uv` runs the command in that environment. If no environment is found, it uses the interpreter's environment.
+
+So what does this mean when we put `uv run` before `python src/app.py`? It means `uv` takes care of all the setup—fast and seamless—right in your local environment. If you think AI/ML is magic, the work the folks at [Astral](https://astral.sh/) have done with `uv` is pure wizardry!
+
+Curious to learn more about [Astral](https://astral.sh/)'s `uv`? Check these out:
+- Documentation: Learn about [`uv`](https://docs.astral.sh/uv/).
+- Video: [`uv` IS THE FUTURE OF PYTHON PACKING!](https://www.youtube.com/watch?v=8UuW8o4bHbw).
+
+If you have connectivity issues, you can verify connectivity using the following command:
+
+### 1.2 Troubleshoot Connectivity Issues (if any)
+
+To verify connectivity to your Kafka cluster, you can use the `kafka-topics.sh` command-line tool. First, create a `client.properties` file with your Kafka credentials:
 
 ```shell
 # For SASL_SSL (most common for cloud services)
