@@ -16,15 +16,16 @@
 Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
 
 ```shell
-cloud_api_key=<YOUR_CLOUD_API_KEY>
-cloud_api_secret=<YOUR_CLOUD_API_SECRET>
-bootstrap_server_uri=<YOUR_BOOTSTRAP_SERVER_URI>
-kafka_api_key=<YOUR_KAFKA_API_KEY>
-kafka_api_secret=<YOUR_KAFKA_API_SECRET>
-include_internal_topics=<True|False>
-sample_records=<True|False>
-sample_size=<NUMBER_OF_RECORDS_TO_SAMPLE_PER_TOPIC>
-topic_filter=<OPTIONAL_TOPIC_FILTER>
+BOOTSTRAP_SERVER_URI=<YOUR_BOOTSTRAP_SERVER_URI>
+CONFLUENT_CLOUD_API_KEY=<YOUR_CONFLUENT_CLOUD_API_KEY>
+CONFLUENT_CLOUD_API_SECRET=<YOUR_CONFLUENT_CLOUD_API_SECRET>
+INCLUDE_INTERNAL_TOPICS=False
+KAFKA_API_KEY=<YOUR_KAFKA_API_KEY>
+KAFKA_API_SECRET=<YOUR_KAFKA_API_SECRET>
+KAFKA_CLUSTER_ID=<YOUR_KAFKA_CLUSTER_ID>
+SAMPLE_RECORDS=True
+SAMPLE_SIZE=1000
+TOPIC_FILTER=
 ```
 
 ```shell
