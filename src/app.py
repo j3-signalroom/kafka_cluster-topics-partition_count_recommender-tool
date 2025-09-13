@@ -22,11 +22,12 @@ __status__     = "dev"
 DEFAULT_SAMPLE_SIZE: Final[int] = 1000
 DEFAULT_CHARACTER_REPEAT: Final[int] = 100
 
-
+# Setup logging
 logger = setup_logging()
 
 
 def main():
+    # Load environment variables from .env file
     load_dotenv()
  
     try:
