@@ -79,10 +79,10 @@ def main():
             avg_size = result.get('avg_bytes_per_record')
 
             http_status_code, error_message, bytes_query_result = metrics_client.get_topic_total(KafkaMetric.RECEIVED_BYTES, kafka_cluster_id, kafka_topic_name, query_start_time, query_end_time)
-            total_bytes_str = f"{bytes_query_result.get('total', 0):.2f}" if bytes_query_result else "N/A"
+            total_bytes_str = f"{bytes_query_result.get('total', 0):,.0f}" if bytes_query_result else "N/A"
 
             http_status_code, error_message, records_query_result = metrics_client.get_topic_total(KafkaMetric.RECEIVED_RECORDS, kafka_cluster_id, kafka_topic_name, query_start_time, query_end_time)
-            total_records_str = f"{records_query_result.get('total', 0):,}" if records_query_result else "N/A"
+            total_records_str = f"{records_query_result.get('total', 0):,.0f}" if records_query_result else "N/A"
 
             # Format average size
             if avg_size is None:
@@ -90,7 +90,7 @@ def main():
             elif avg_size == 0:
                 avg_size_str = "Empty"
             else:
-                avg_size_str = f"{avg_size:.2f}"
+                avg_size_str = f"{avg_size:,.0f}"
             
             # Status
             if 'error' in result:
