@@ -20,7 +20,7 @@ __status__     = "dev"
 
 # Default configuration constants
 DEFAULT_SAMPLE_SIZE: Final[int] = 1000
-DEFAULT_CHARACTER_REPEAT: Final[int] = 100
+DEFAULT_CHARACTER_REPEAT: Final[int] = 140
 
 # Setup logging
 logger = setup_logging()
@@ -60,7 +60,7 @@ def main():
             return
         
         # Display results
-        logging.info("\n" + "=" * DEFAULT_CHARACTER_REPEAT)
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("KAFKA TOPICS ANALYSIS RESULTS")
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
 
@@ -111,14 +111,14 @@ def main():
         total_messages = sum(r.get('total_messages', 0) for r in results)
         active_topics = len([r for r in results if r.get('total_messages', 0) > 0])
 
-        logging.info("\n" + "=" * DEFAULT_CHARACTER_REPEAT)
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("SUMMARY STATISTICS")
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info(f"Total Topics: {total_topics}")
         logging.info(f"Active Topics: {active_topics} ({active_topics/total_topics*DEFAULT_CHARACTER_REPEAT:.1f}%)")
         logging.info(f"Total Partitions: {total_partitions}")
         logging.info(f"Total Messages: {total_messages:,}")
-        logging.info(f"Average Partitions per Topic: {total_partitions/total_topics:.2f}")
+        logging.info(f"Average Partitions per Topic: {total_partitions/total_topics:.0f}")
 
         # Export detailed results to JSON
         output_file = 'kafka_topics_analysis.json'
