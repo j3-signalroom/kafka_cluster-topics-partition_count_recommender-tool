@@ -1,5 +1,5 @@
 # Kafka Topics Partition Count Recommender Application
-The **Kafka Cluster Topics Partition Count Recommender Application** provides data-driven accuracy for Kafka topic sizing. By examining past consumption trends, including bytes and records per topic at specific times, it calculates daily averages of bytes per record and record counts, then combines them to assess consumer throughput. Over a rolling seven-day period, the application identifies peak throughput, scales it by a factor of X to forecast future demand, and converts that into an optimal number of partitions. The result is an intelligent, automated recommendation system that guarantees each Kafka topic has the right number of partitions to handle current workload and support future growth effectively.
+The **Kafka Cluster Topics Partition Count Recommender Application** offers data-driven accuracy for Kafka topic sizing. By analyzing past consumption trends, that is, the average consumption records in bytes, it uses this information to determine consumer throughput. Then, over a rolling seven-day period, it identifies the peak consumption of records in bytes, scaling that number by a factor of X to forecast future demand and calculate the required throughput. Next, it divides the required throughput by the consumer throughput and rounds the result to the nearest whole number to determine the optimal number of partitions. The result is an intelligent, automated recommendation system that ensures each Kafka topic has the appropriate number of partitions to handle current workload and support future growth effectively.
 
 **Table of Contents**
 
@@ -52,11 +52,11 @@ The **Kafka Cluster Topics Partition Count Recommender Application** provides da
    KAFKA_API_KEY_AWS_SECRETS=<YOUR_KAFKA_API_KEY_AWS_SECRETS>
    ```
 
-   If you are using **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and provide the necessary AWS details. Otherwise, set it to `False` and provide the secrets directly in the `.env` file.  For instance, if you set `USE_AWS_SECRETS_MANAGER` to `True`, the application will fetch the secrets from AWS Secrets Manager using the names provided in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`.  The code expects the `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` to be stored in JSON format with keys `confluent_cloud_api_key` and `confluent_cloud_api_secret`, and the `KAFKA_API_KEY_AWS_SECRETS` to be stored in JSON format with keys `kafka_cluster_id`, `bootstrap.servers`, `sasl.username` and `sasl.password`.
+   If you use **AWS Secrets Manager** to handle your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and provide the required AWS details. Otherwise, set it to `False` and include the secrets directly in the `.env` file. For example, if you set `USE_AWS_SECRETS_MANAGER` to `True`, the application will retrieve secrets from AWS Secrets Manager using the names specified in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`. The code expects `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` to be stored in JSON format with keys `confluent_cloud_api_key` and `confluent_cloud_api_secret`, and `KAFKA_API_KEY_AWS_SECRETS` to be in JSON format with keys `kafka_cluster_id`, `bootstrap.servers`, `sasl.username`, and `sasl.password`.
 
 ### 1.2 Run the Application
 
-Navigate to the Root Directory**
+**Navigate to the Project Root Directory**
 Open your Terminal and navigate to the root folder of the `kafka-cluster-topics-partition_count_recommender-app/` repository that you have cloned. You can do this by executing:
 
 ```shell
