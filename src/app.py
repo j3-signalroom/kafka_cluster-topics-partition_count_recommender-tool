@@ -33,9 +33,9 @@ def main():
  
     try:
         required_consumption_throughput_factor = int(os.getenv("REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR", "5"))
-        metrics_config = {}
-
+        
         # Check if using AWS Secrets Manager for credentials retrieval
+        metrics_config = {}
         if os.getenv("USE_AWS_SECRETS_MANAGER", "False") == "True":
             # Retrieve Confluent Cloud API Key/Secret from AWS Secrets Manager
             cc_secrets_path = os.getenv("CONFLUENT_CLOUD_API_KEY_AWS_SECRETS")
@@ -51,10 +51,12 @@ def main():
             kafka_secrets_path = os.getenv("KAFKA_API_KEY_AWS_SECRETS")
             settings, error_message = get_secrets(os.environ['AWS_REGION_NAME'], kafka_secrets_path)
             if settings == {}:
-                bootstrap_server_uri=os.getenv("BOOTSTRAP_SERVER_URI"),
-                kafka_api_key=os.getenv("KAFKA_API_KEY"),
+                kafka_cluster_id = os.getenv("KAFKA_CLUSTER_ID")
+                bootstrap_server_uri=os.getenv("BOOTSTRAP_SERVER_URI")
+                kafka_api_key=os.getenv("KAFKA_API_KEY")
                 kafka_api_secret=os.getenv("KAFKA_API_SECRET")
             else:
+                kafka_cluster_id = settings.get("kafka_cluster_id")
                 bootstrap_server_uri=settings.get("bootstrap.servers")
                 kafka_api_key=settings.get("sasl.username")
                 kafka_api_secret=settings.get("sasl.password")
@@ -62,11 +64,10 @@ def main():
             # Use environment variables directly
             metrics_config[METRICS_CONFIG["confluent_cloud_api_key"]] = os.getenv("CONFLUENT_CLOUD_API_KEY")
             metrics_config[METRICS_CONFIG["confluent_cloud_api_secret"]] = os.getenv("CONFLUENT_CLOUD_API_SECRET")
-            bootstrap_server_uri=os.getenv("BOOTSTRAP_SERVER_URI"),
-            kafka_api_key=os.getenv("KAFKA_API_KEY"),
+            kafka_cluster_id = os.getenv("KAFKA_CLUSTER_ID")
+            bootstrap_server_uri=os.getenv("BOOTSTRAP_SERVER_URI")
+            kafka_api_key=os.getenv("KAFKA_API_KEY")
             kafka_api_secret=os.getenv("KAFKA_API_SECRET")
-
-        kafka_cluster_id = os.getenv("KAFKA_CLUSTER_ID")
 
         # Instantiate the MetricsClient class.
         metrics_client = MetricsClient(metrics_config)
