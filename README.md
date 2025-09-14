@@ -56,10 +56,22 @@ The **Kafka Cluster Topics Partition Count Recommender Application** provides da
 
 ### 1.2 Run the Application
 
-Here you go, run the application:
+Navigate to the Root Directory**
+Open your Terminal and navigate to the root folder of the `kafka-cluster-topics-partition_count_recommender-app/` repository that you have cloned. You can do this by executing:
+
+```shell
+cd path/to/kafka-cluster-topics-partition_count_recommender-app/
+```
+
+> Replace `path/to/` with the actual path where your repository is located.
+
+Then enter the following command below to run the application:
 ```shell
 uv run python src/app.py
 ```
+
+For example, below is a screenshot of the application running successfully:
+![screenshot-of-application-run](.blog/images/screenshot-of-application-run.png)
 
 #### 1.2.1 Did you notice we prefix `uv run` to `python src/app.py`?
 You maybe asking yourself why.  Well, `uv` is an incredibly fast Python package installer and dependency resolver, written in [**Rust**](https://github.blog/developer-skills/programming-languages-and-frameworks/why-rust-is-the-most-admired-language-among-developers/), and designed to seamlessly replace `pip`, `pipx`, `poetry`, `pyenv`, `twine`, `virtualenv`, and more in your workflows. By prefixing `uv run` to a command, you're ensuring that the command runs in an optimal Python environment.
