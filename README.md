@@ -59,8 +59,28 @@ Create the `.env` file and add the following environment variables, filling them
    KAFKA_API_KEY_AWS_SECRETS=<YOUR_KAFKA_API_KEY_AWS_SECRETS>
    ```
 
+The environment variables are defined as follows:
+
+| Environment Variable Name  | Description |
+| ----------------------------------------| ----------- |
+| `BOOTSTRAP_SERVER_URI` | Tshe bootstrap server URI for your Kafka cluster (e.g., `pkc-xxxxxx.us-east-1.aws.confluent.cloud:9092`). |
+| `CONFLUENT_CLOUD_API_KEY` | Your Confluent Cloud API key. |
+| `CONFLUENT_CLOUD_API_SECRET` | Your Confluent Cloud API secret. |
+| `INCLUDE_INTERNAL_TOPICS` | Set to `True` if you want to include internal topics in the analysis; otherwise, set to `False`. |
+| `KAFKA_API_KEY` | Your Kafka API key. |
+| `KAFKA_API_SECRET` | Your Kafka API secret. |
+| `KAFKA_CLUSTER_ID` | The ID of your Kafka cluster (e.g., `lkc-123xyz`). |
+| `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` | A multiplier to scale the peak consumption for future demand forecasting (e.g., `1.5` for 150%). |
+| `SAMPLE_RECORDS` | Set to `True` if you want to sample records for analysis; otherwise, set to `False`. |
+| `SAMPLE_SIZE` | The number of records to sample if `SAMPLE_RECORDS` is set to `True` (e.g., `1000`). |
+| `TOPIC_FILTER` | A comma-separated list of topic names to include in the analysis. Leave empty to include all topics. |
+| `USE_AWS_SECRETS_MANAGER` | Set to `True` if you want to use AWS Secrets Manager to manage your secrets; otherwise, set to `False`. |
+| `AWS_REGION_NAME` | The AWS region where your secrets are stored (e.g., `us-east-1`). |
+| `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` | The name of the AWS Secrets Manager secrets that contains your Confluent Cloud API key and secret. |
+| `KAFKA_API_KEY_AWS_SECRETS` | The name of the AWS Secrets Manager secrets that contains your Kafka Cluster API key, API secret, Kafka Cluster ID, and bootstrap server URI. |
+
 #### 1.2.2 Using the AWS Secrets Manager (optional)
-If you are using **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and provide the necessary AWS details. Otherwise, set it to `False` and provide the secrets directly in the `.env` file.  For instance, if you set `USE_AWS_SECRETS_MANAGER` to `True`, the application will fetch the secrets from AWS Secrets Manager using the names provided in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`.  The code expects the `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` to be stored in JSON format with keys `confluent_cloud_api_key` and `confluent_cloud_api_secret`, and the `KAFKA_API_KEY_AWS_SECRETS` to be stored in JSON format with keys `kafka_cluster_id`, `bootstrap.servers`, `sasl.username` and `sasl.password`.
+If you use **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and the application will retrieve the secrets from AWS Secrets Manager using the names provided in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`.  The code expects the `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` to be stored in JSON format with keys `confluent_cloud_api_key` and `confluent_cloud_api_secret`, and the `KAFKA_API_KEY_AWS_SECRETS` to be stored in JSON format with keys `kafka_cluster_id`, `bootstrap.servers`, `sasl.username` and `sasl.password`.
 
 ### 1.3 Run the Application
 
