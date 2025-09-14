@@ -19,7 +19,7 @@ The **Kafka Cluster Topics Partition Count Recommender Application** offers data
    + [**3.3 Strategies to Improve Consumer Throughput**](#33-strategies-to-improve-consumer-throughput)
 - [**4.0 Resources**](#40-resources)
    + [**4.1 Optimization Guides**](#41-optimization-guides)
-   + [**4.2 Confluent Cloud Telemetry API**](#42-confluent-cloud-telemetry-api)
+   + [**4.2 Confluent Cloud Metrics API**](#42-confluent-cloud-metrics-api)
    + [**4.3 Confluent Kafka Python Client**](#43-confluent-kafka-python-client)
 <!-- tocstop -->
 
@@ -37,6 +37,10 @@ Since this project was built using [**`uv`**](https://docs.astral.sh/uv/), plea
    ```
 
 ### 1.2 Configure the Application
+
+Now, you need to set up the application by creating a `.env` file in the project’s root directory. This file will hold all the essential environment variables needed for the application to connect to your Confluent Cloud Kafka cluster and operate properly. Additionally, you can opt to use **AWS Secrets Manager** to handle your secrets.
+
+> **Note**: _Your Confluent Cloud API key, secret, and Kafka Cluster ID are needed to access the [Confluent Cloud Metrics API](https://api.telemetry.confluent.cloud/docs#section/Authentication) and retrieve topic metrics._
 
 #### 1.2.1 Create the `.env` file
 Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
@@ -218,10 +222,10 @@ By optimizing these factors, Kafka consumers can achieve higher throughput tailo
 - [Optimize Confluent Cloud Clients for Throughput](https://docs.confluent.io/cloud/current/client-apps/optimizing/throughput.html#optimize-ccloud-clients-for-throughput)
 - [Choose and Change the Partition Count in Kafka](https://docs.confluent.io/kafka/operations-tools/partition-determination.html#choose-and-change-the-partition-count-in-ak)
 
-### 4.2 Confluent Cloud Telemetry API
-- [Confluent Cloud Telemetry API](https://api.telemetry.confluent.cloud/docs)
-- [Confluent Cloud Telemetry API - Datasets](https://api.telemetry.confluent.cloud/docs/descriptors/datasets/cloud)
-- [Confluent Cloud Telemetry API - Metrics](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#ccloud-metrics)
+### 4.2 Confluent Cloud Metrics API
+- [Confluent Cloud Metrics API](https://api.telemetry.confluent.cloud/docs)
+- [Confluent Cloud Metrics API: Metrics Reference](https://api.telemetry.confluent.cloud/docs/descriptors/datasets/cloud)
+- [Confluent Cloud Metrics](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#ccloud-metrics)
 
 ### 4.3 Confluent Kafka Python Client
 - [Confluent Kafka Python Client Documentation](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html)
