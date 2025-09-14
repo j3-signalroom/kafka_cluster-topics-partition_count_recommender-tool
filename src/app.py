@@ -112,9 +112,9 @@ def main():
             partition_count = result['partition_count']
             total_messages = result.get('total_messages', 0)
 
-            http_status_code, error_message, bytes_query_result = metrics_client.get_topic_min_max_daily_total(KafkaMetric.RECEIVED_BYTES, kafka_cluster_id, kafka_topic_name)
+            http_status_code, error_message, bytes_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_BYTES, kafka_cluster_id, kafka_topic_name)
 
-            consumer_throughput = bytes_query_result.get('min_total', 0)
+            consumer_throughput = bytes_query_result.get('avg_total', 0)
             required_throughput = bytes_query_result.get('max_total', 0) * required_consumption_throughput_factor
             recommended_partition_count = round(required_throughput / consumer_throughput)
             total_recommended_partitions += recommended_partition_count if recommended_partition_count > 0 else 0
