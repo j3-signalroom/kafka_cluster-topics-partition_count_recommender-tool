@@ -1,13 +1,15 @@
 # Kafka Topics Partition Count Recommender Application
-The Kafka Cluster Topics Partition Count Recommender Application delivers data-driven precision to Kafka topic sizing. By analyzing historical consumption patterns, bytes and records per topic at specific points in time, it calculates daily averages of bytes-per-record and record counts, combining them to measure consumer throughput. Over a rolling 7 day window, the application pinpoints peak throughput, scales it by a factor X to project future demand, and then translates that requirement into an optimal partition count. The result: an intelligent, automated recommendation engine that ensures each Kafka topic has the correct number of partitions to sustain workload throughput and future growth reliably.
+The **Kafka Cluster Topics Partition Count Recommender Application** provides data-driven accuracy for Kafka topic sizing. By examining past consumption trends, including bytes and records per topic at specific times, it calculates daily averages of bytes per record and record counts, then combines them to assess consumer throughput. Over a rolling seven-day period, the application identifies peak throughput, scales it by a factor X to forecast future demand, and converts that into an optimal number of partitions. The result is an intelligent, automated recommendation system that guarantees each Kafka topic has the right number of partitions to handle current workload and support future growth effectively.
 
 **Table of Contents**
 
 <!-- toc -->
-- [**1.0 Let's Run It!**](#10-lets-run-it)
-   + [**1.1 Did you notice we prepended `uv run` to `python src/app.py`?**](#11-did-you-notice-we-prepended-uv-run-to-python-srcapppy)
-   + [**1.2 Troubleshoot Connectivity Issues (if any)**](#12-troubleshoot-connectivity-issues-if-any)
-- [**2.0 Manually determining the number of partitions needed for a Kafka Consumer**](#20-manually-determining-the-number-of-partitions-needed-for-a-kafka-consumer)
+- [**1.0 To get started**](#10-to-get-started)
+   + [**1.1 Setup the Application**](#11-setup-the-application)
+   + [**1.2 Run the Application**](#12-run-the-application)
+      - [**1.2.1 Did you notice we prefix `uv run` to `python src/app.py`?**](#121-did-you-notice-we-prefix-uv-run-to-python-srcapppy)
+      - [**1.2.2 Troubleshoot Connectivity Issues (if any)**](#122-troubleshoot-connectivity-issues-if-any) 
+- [**2.0 How the app calculates the recommended partition count**](#20-how-the-app-calculates-the-recommended-partition-count)
 - [**3.0 What is meant by the Kafka Consumer throughput?**](#30-what-is-meant-by-the-kafka-consumer-throughput)
    + [**3.1 Key Factors Affecting Kafka Consumer Throughput**](#31-key-factors-affecting-kafka-consumer-throughput)
    + [**3.2 Typical Kafka Consumer Throughput**](#32-typical-kafka-consumer-throughput)
@@ -18,47 +20,48 @@ The Kafka Cluster Topics Partition Count Recommender Application delivers data-d
    + [**4.3 Confluent Kafka Python Client**](#43-confluent-kafka-python-client)
 <!-- tocstop -->
 
-## 1.0 Let's Run It!
-1. Get your Confluent Cloud API key pair by executing the following Confluent CLI command to generate the Cloud API Key (click [here](.blog/why-do-you-need-the-confluent-cloud-api-key.md#2-integration-with-cicd-pipelines) to learn why you need it):
+## 1.0 To get started
 
+### 1.1 Setup the Application
+1. Clone the repo:
     ```shell
-    confluent api-key create --resource "cloud" 
-    ```
-
-    The API Key pair allows Terraform to provision, manage, and update Confluent Cloud resources as defined in your infrastructure code, maintaining a secure, automated deployment pipeline.
-
-2. Clone the repo:
-    ```bash
     git clone https://github.com/j3-signalroom/kafka-cluster-topics-partition_count_recommender-app.git
     ```
 
+2. Since this project was built using [**`uv`**](https://docs.astral.sh/uv/), please [install](https://docs.astral.sh/uv/getting-started/installation/) it, and then run the following command to install all the project dependencies:
+   ```shell
+   uv sync
+   ```
 3. Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
+   ```shell
+   BOOTSTRAP_SERVER_URI=<YOUR_BOOTSTRAP_SERVER_URI>
+   CONFLUENT_CLOUD_API_KEY=<YOUR_CONFLUENT_CLOUD_API_KEY>
+   CONFLUENT_CLOUD_API_SECRET=<YOUR_CONFLUENT_CLOUD_API_SECRET>
+   INCLUDE_INTERNAL_TOPICS=False
+   KAFKA_API_KEY=<YOUR_KAFKA_API_KEY>
+   KAFKA_API_SECRET=<YOUR_KAFKA_API_SECRET>
+   KAFKA_CLUSTER_ID=<YOUR_KAFKA_CLUSTER_ID>
+   REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR=<YOUR_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR>
+   SAMPLE_RECORDS=<True|False>
+   SAMPLE_SIZE=1000
+   TOPIC_FILTER=
 
-```shell
-BOOTSTRAP_SERVER_URI=<YOUR_BOOTSTRAP_SERVER_URI>
-CONFLUENT_CLOUD_API_KEY=<YOUR_CONFLUENT_CLOUD_API_KEY>
-CONFLUENT_CLOUD_API_SECRET=<YOUR_CONFLUENT_CLOUD_API_SECRET>
-INCLUDE_INTERNAL_TOPICS=False
-KAFKA_API_KEY=<YOUR_KAFKA_API_KEY>
-KAFKA_API_SECRET=<YOUR_KAFKA_API_SECRET>
-KAFKA_CLUSTER_ID=<YOUR_KAFKA_CLUSTER_ID>
-REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR=<YOUR_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR>
-SAMPLE_RECORDS=<True|False>
-SAMPLE_SIZE=1000
-TOPIC_FILTER=
+   USE_AWS_SECRETS_MANAGER=<True|False>
+   AWS_REGION_NAME=<YOUR_AWS_REGION_NAME>
+   CONFLUENT_CLOUD_API_KEY_AWS_SECRETS=<YOUR_CONFLUENT_CLOUD_API_KEY_AWS_SECRETS>
+   KAFKA_API_KEY_AWS_SECRETS=<YOUR_KAFKA_API_KEY_AWS_SECRETS>
+   ```
 
-USE_AWS_SECRETS_MANAGER=<True|False>
-AWS_REGION_NAME=<YOUR_AWS_REGION_NAME>
-CONFLUENT_CLOUD_API_KEY_AWS_SECRETS=<YOUR_CONFLUENT_CLOUD_API_KEY_AWS_SECRETS>
-KAFKA_API_KEY_AWS_SECRETS=<YOUR_KAFKA_API_KEY_AWS_SECRETS>
-```
+   If you are using **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and provide the necessary AWS details. Otherwise, set it to `False` and provide the secrets directly in the `.env` file.  For instance, if you set `USE_AWS_SECRETS_MANAGER` to `True`, the application will fetch the secrets from AWS Secrets Manager using the names provided in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`.  The code expects the `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` to be stored in JSON format with keys `confluent_cloud_api_key` and `confluent_cloud_api_secret`, and the `KAFKA_API_KEY_AWS_SECRETS` to be stored in JSON format with keys `kafka_cluster_id`, `bootstrap.servers`, `sasl.username` and `sasl.password`.
 
-4. Here you go, run the application:
+### 1.2 Run the Application
+
+Here you go, run the application:
 ```shell
 uv run python src/app.py
 ```
 
-### 1.1 Did you notice we prepended `uv run` to `python src/app.py`?
+#### 1.2.1 Did you notice we prefix `uv run` to `python src/app.py`?
 You maybe asking yourself why.  Well, `uv` is an incredibly fast Python package installer and dependency resolver, written in [**Rust**](https://github.blog/developer-skills/programming-languages-and-frameworks/why-rust-is-the-most-admired-language-among-developers/), and designed to seamlessly replace `pip`, `pipx`, `poetry`, `pyenv`, `twine`, `virtualenv`, and more in your workflows. By prefixing `uv run` to a command, you're ensuring that the command runs in an optimal Python environment.
 
 Now, let's go a little deeper into the magic behind `uv run`:
@@ -74,7 +77,7 @@ Curious to learn more about [Astral](https://astral.sh/)'s `uv`? Check these out
 
 If you have connectivity issues, you can verify connectivity using the following command:
 
-### 1.2 Troubleshoot Connectivity Issues (if any)
+#### 1.2.2 Troubleshoot Connectivity Issues (if any)
 
 To verify connectivity to your Kafka cluster, you can use the `kafka-topics.sh` command-line tool. First, create a `client.properties` file with your Kafka credentials:
 
@@ -94,7 +97,7 @@ ssl.endpoint.identification.algorithm=https
 ./kafka-topics.sh --list --bootstrap-server <YOUR_BOOTSTRAP_SERVER_URI> --command-config ./client.properties
 ```
 
-## 2.0 Manually determining the number of partitions needed for a Kafka Consumer
+## 2.0 How the app calculates the recommended partition count
 
 For example, you have a consumer that consumes at **25MB/s**, but the the consumer requirement is a throughput of **1GB/s**.  How many partitions should you have?
 
