@@ -6,9 +6,12 @@ The **Kafka Cluster Topics Partition Count Recommender Application** offers data
 <!-- toc -->
 - [**1.0 To get started**](#10-to-get-started)
    + [**1.1 Setup the Application**](#11-setup-the-application)
-   + [**1.2 Run the Application**](#12-run-the-application)
-      - [**1.2.1 Did you notice we prefix `uv run` to `python src/app.py`?**](#121-did-you-notice-we-prefix-uv-run-to-python-srcapppy)
-      - [**1.2.2 Troubleshoot Connectivity Issues (if any)**](#122-troubleshoot-connectivity-issues-if-any) 
+   + [**1.2 Configure the Application**](#12-configure-the-application)
+      - [**1.2.1 Create the `.env` file**](#121-create-the-env-file)
+      - [**1.2.2 Using the AWS Secrets Manager (optional)**](#122-using-the-aws-secrets-manager-optional)
+   + [**1.3 Run the Application**](#13-run-the-application)
+      - [**1.3.1 Did you notice we prefix `uv run` to `python src/app.py`?**](#131-did-you-notice-we-prefix-uv-run-to-python-srcapppy)
+      - [**1.3.2 Troubleshoot Connectivity Issues (if any)**](#132-troubleshoot-connectivity-issues-if-any)
 - [**2.0 How the app calculates the recommended partition count**](#20-how-the-app-calculates-the-recommended-partition-count)
 - [**3.0 What is meant by the Kafka Consumer throughput?**](#30-what-is-meant-by-the-kafka-consumer-throughput)
    + [**3.1 Key Factors Affecting Kafka Consumer Throughput**](#31-key-factors-affecting-kafka-consumer-throughput)
@@ -23,16 +26,20 @@ The **Kafka Cluster Topics Partition Count Recommender Application** offers data
 ## 1.0 To get started
 
 ### 1.1 Setup the Application
-1. Clone the repo:
+Clone the repo:
     ```shell
     git clone https://github.com/j3-signalroom/kafka-cluster-topics-partition_count_recommender-app.git
     ```
 
-2. Since this project was built using [**`uv`**](https://docs.astral.sh/uv/), please [install](https://docs.astral.sh/uv/getting-started/installation/) it, and then run the following command to install all the project dependencies:
+Since this project was built using [**`uv`**](https://docs.astral.sh/uv/), please [install](https://docs.astral.sh/uv/getting-started/installation/) it, and then run the following command to install all the project dependencies:
    ```shell
    uv sync
    ```
-3. Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
+
+### 1.2 Configure the Application
+
+#### 1.2.1 Create the `.env` file
+Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
    ```shell
    BOOTSTRAP_SERVER_URI=<YOUR_BOOTSTRAP_SERVER_URI>
    CONFLUENT_CLOUD_API_KEY=<YOUR_CONFLUENT_CLOUD_API_KEY>
@@ -52,9 +59,10 @@ The **Kafka Cluster Topics Partition Count Recommender Application** offers data
    KAFKA_API_KEY_AWS_SECRETS=<YOUR_KAFKA_API_KEY_AWS_SECRETS>
    ```
 
-   If you use **AWS Secrets Manager** to handle your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and provide the required AWS details. Otherwise, set it to `False` and include the secrets directly in the `.env` file. For example, if you set `USE_AWS_SECRETS_MANAGER` to `True`, the application will retrieve secrets from AWS Secrets Manager using the names specified in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`. The code expects `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` to be stored in JSON format with keys `confluent_cloud_api_key` and `confluent_cloud_api_secret`, and `KAFKA_API_KEY_AWS_SECRETS` to be in JSON format with keys `kafka_cluster_id`, `bootstrap.servers`, `sasl.username`, and `sasl.password`.
+#### 1.2.2 Using the AWS Secrets Manager (optional)
+If you are using **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and provide the necessary AWS details. Otherwise, set it to `False` and provide the secrets directly in the `.env` file.  For instance, if you set `USE_AWS_SECRETS_MANAGER` to `True`, the application will fetch the secrets from AWS Secrets Manager using the names provided in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`.  The code expects the `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` to be stored in JSON format with keys `confluent_cloud_api_key` and `confluent_cloud_api_secret`, and the `KAFKA_API_KEY_AWS_SECRETS` to be stored in JSON format with keys `kafka_cluster_id`, `bootstrap.servers`, `sasl.username` and `sasl.password`.
 
-### 1.2 Run the Application
+### 1.3 Run the Application
 
 **Navigate to the Project Root Directory**
 Open your Terminal and navigate to the root folder of the `kafka-cluster-topics-partition_count_recommender-app/` repository that you have cloned. You can do this by executing:
@@ -70,10 +78,7 @@ Then enter the following command below to run the application:
 uv run python src/app.py
 ```
 
-For example, below is a screenshot of the application running successfully:
-![screenshot-of-application-run](.blog/images/screenshot-of-application-run.png)
-
-#### 1.2.1 Did you notice we prefix `uv run` to `python src/app.py`?
+#### 1.3.1 Did you notice we prefix `uv run` to `python src/app.py`?
 You maybe asking yourself why.  Well, `uv` is an incredibly fast Python package installer and dependency resolver, written in [**Rust**](https://github.blog/developer-skills/programming-languages-and-frameworks/why-rust-is-the-most-admired-language-among-developers/), and designed to seamlessly replace `pip`, `pipx`, `poetry`, `pyenv`, `twine`, `virtualenv`, and more in your workflows. By prefixing `uv run` to a command, you're ensuring that the command runs in an optimal Python environment.
 
 Now, let's go a little deeper into the magic behind `uv run`:
@@ -89,7 +94,7 @@ Curious to learn more about [Astral](https://astral.sh/)'s `uv`? Check these out
 
 If you have connectivity issues, you can verify connectivity using the following command:
 
-#### 1.2.2 Troubleshoot Connectivity Issues (if any)
+#### 1.3.2 Troubleshoot Connectivity Issues (if any)
 
 To verify connectivity to your Kafka cluster, you can use the `kafka-topics.sh` command-line tool. First, create a `client.properties` file with your Kafka credentials:
 
@@ -197,6 +202,3 @@ By optimizing these factors, Kafka consumers can achieve higher throughput tailo
 
 ### 4.3 Confluent Kafka Python Client
 - [Confluent Kafka Python Client Documentation](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html)
-
-
-
