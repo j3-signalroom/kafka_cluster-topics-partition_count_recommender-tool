@@ -20,16 +20,18 @@ __status__     = "dev"
 
 # Default configuration constants
 DEFAULT_SAMPLE_SIZE: Final[int] = 1000
-DEFAULT_CHARACTER_REPEAT: Final[int] = 100
+DEFAULT_CHARACTER_REPEAT: Final[int] = 150
 
-
+# Setup logging
 logger = setup_logging()
 
 
 def main():
+    # Load environment variables from .env file
     load_dotenv()
  
     try:
+        required_consumption_throughput_factor = int(os.getenv("REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR", "5"))
         metrics_config = {}
         metrics_config[METRICS_CONFIG["confluent_cloud_api_key"]] = os.getenv("CONFLUENT_CLOUD_API_KEY")
         metrics_config[METRICS_CONFIG["confluent_cloud_api_secret"]] = os.getenv("CONFLUENT_CLOUD_API_SECRET")
@@ -59,38 +61,36 @@ def main():
             return
         
         # Display results
-        logging.info("\n" + "=" * DEFAULT_CHARACTER_REPEAT)
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("KAFKA TOPICS ANALYSIS RESULTS")
+        logging.info(f"Analysis Timestamp: {datetime.now().isoformat()}")
+        logging.info(f"Kafka Cluster ID: {kafka_cluster_id}")
+        logging.info(f"Required Consumption Throughput Factor: {required_consumption_throughput_factor}")
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
 
         # Table header
-        header = f"{'Topic Name':<40} {'Partitions':<12} {'Messages':<15} {'Avg Bytes/Rec':<15} {'Total Bytes':<15} {'Total Records':<15} {'Status':<15}"
+        header = f"{'Topic Name':<40} {'Messages':<12} {'Partitions':<12} {'Required Throughput':<21} {'Consumer Throughput':<21} {'Recommended Partitions':<25} {'Status':<10}"
         logging.info(header)
         logging.info("-" * DEFAULT_CHARACTER_REPEAT)
         
-        query_start_time =  datetime.fromisoformat("2025-09-13T00:00:00+00:00")
-        query_end_time = datetime.fromisoformat("2025-09-13T23:59:59+00:00")
+        total_recommended_partitions = 0
 
         # Sort results by topic name
         for result in sorted(results, key=lambda x: x['topic_name']):
             kafka_topic_name = result['topic_name']
             partition_count = result['partition_count']
             total_messages = result.get('total_messages', 0)
-            avg_size = result.get('avg_bytes_per_record')
 
-            http_status_code, error_message, bytes_query_result = metrics_client.get_topic_total(KafkaMetric.RECEIVED_BYTES, kafka_cluster_id, kafka_topic_name, query_start_time, query_end_time)
-            total_bytes_str = f"{bytes_query_result.get('total', 0):.2f}" if bytes_query_result else "N/A"
+            http_status_code, error_message, bytes_query_result = metrics_client.get_topic_min_max_daily_total(KafkaMetric.RECEIVED_BYTES, kafka_cluster_id, kafka_topic_name)
 
-            http_status_code, error_message, records_query_result = metrics_client.get_topic_total(KafkaMetric.RECEIVED_RECORDS, kafka_cluster_id, kafka_topic_name, query_start_time, query_end_time)
-            total_records_str = f"{records_query_result.get('total', 0):,}" if records_query_result else "N/A"
+            consumer_throughput = bytes_query_result.get('min_total', 0)
+            required_throughput = bytes_query_result.get('max_total', 0) * required_consumption_throughput_factor
+            recommended_partition_count = round(required_throughput / consumer_throughput)
+            total_recommended_partitions += recommended_partition_count if recommended_partition_count > 0 else 0
 
-            # Format average size
-            if avg_size is None:
-                avg_size_str = "N/A"
-            elif avg_size == 0:
-                avg_size_str = "Empty"
-            else:
-                avg_size_str = f"{avg_size:.2f}"
+            consumer_throughput_str = f"{consumer_throughput:,.0f}"
+            required_throughput_str = f"{required_throughput:,.0f}"
+            recommended_partition_count_str = f"{recommended_partition_count:,.0f}" if recommended_partition_count > 0 else "N/A"
             
             # Status
             if 'error' in result:
@@ -102,7 +102,7 @@ def main():
             
             # Format numbers with commas
             messages_str = f"{total_messages:,}"
-            logging.info(f"{kafka_topic_name:<40} {partition_count:<12} {messages_str:<15} {avg_size_str:<15} {total_bytes_str:<15} {total_records_str:<15} {status:<15}")
+            logging.info(f"{kafka_topic_name:<40} {messages_str:<12} {partition_count:<12} {required_throughput_str:<21} {consumer_throughput_str:<21} {recommended_partition_count_str:<25} {status:<10}")
 
         # Summary statistics
         total_topics = len(results)
@@ -110,17 +110,19 @@ def main():
         total_messages = sum(r.get('total_messages', 0) for r in results)
         active_topics = len([r for r in results if r.get('total_messages', 0) > 0])
 
-        logging.info("\n" + "=" * DEFAULT_CHARACTER_REPEAT)
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("SUMMARY STATISTICS")
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info(f"Total Topics: {total_topics}")
-        logging.info(f"Active Topics: {active_topics} ({active_topics/total_topics*DEFAULT_CHARACTER_REPEAT:.1f}%)")
+        logging.info(f"Active Topics: {active_topics} ({active_topics/total_topics*100:.1f}%)")
         logging.info(f"Total Partitions: {total_partitions}")
+        logging.info(f"Total Recommended Partitions: {total_recommended_partitions}")
         logging.info(f"Total Messages: {total_messages:,}")
-        logging.info(f"Average Partitions per Topic: {total_partitions/total_topics:.2f}")
+        logging.info(f"Average Partitions per Topic: {total_partitions/total_topics:.0f}")
+        logging.info(f"Average Recommended Partitions per Topic: {total_recommended_partitions/total_topics:.0f}")
 
         # Export detailed results to JSON
-        output_file = 'kafka_topics_analysis.json'
+        output_file = "kafka-cluster-topics-partition-count-recommender-app.json"
         with open(output_file, 'w') as f:
             json.dump(results, f, indent=2, default=str)
         

@@ -13,6 +13,9 @@ The Kafka Cluster Topics Partition Count Recommender Application delivers data-d
    + [**3.2 Typical Kafka Consumer Throughput**](#32-typical-kafka-consumer-throughput)
    + [**3.3 Strategies to Improve Consumer Throughput**](#33-strategies-to-improve-consumer-throughput)
 - [**4.0 Resources**](#40-resources)
+   + [**4.1 Optimization Guides**](#41-optimization-guides)
+   + [**4.2 Confluent Cloud Telemetry API**](#42-confluent-cloud-telemetry-api)
+   + [**4.3 Confluent Kafka Python Client**](#43-confluent-kafka-python-client)
 <!-- tocstop -->
 
 ## 1.0 Let's Run It!
@@ -39,6 +42,7 @@ INCLUDE_INTERNAL_TOPICS=False
 KAFKA_API_KEY=<YOUR_KAFKA_API_KEY>
 KAFKA_API_SECRET=<YOUR_KAFKA_API_SECRET>
 KAFKA_CLUSTER_ID=<YOUR_KAFKA_CLUSTER_ID>
+REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR=<YOUR_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR>
 SAMPLE_RECORDS=True
 SAMPLE_SIZE=1000
 TOPIC_FILTER=
@@ -161,7 +165,18 @@ The throughput of a **Kafka consumer** refers to the rate at which it can read d
 By optimizing these factors, Kafka consumers can achieve higher throughput tailored to the specific use case and infrastructure.
 
 ## 4.0 Resources
-- [Confluent Kafka Python Client Documentation](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html)
+
+### 4.1 Optimization Guides
 - [Optimize Confluent Cloud Clients for Throughput](https://docs.confluent.io/cloud/current/client-apps/optimizing/throughput.html#optimize-ccloud-clients-for-throughput)
 - [Choose and Change the Partition Count in Kafka](https://docs.confluent.io/kafka/operations-tools/partition-determination.html#choose-and-change-the-partition-count-in-ak)
+
+### 4.2 Confluent Cloud Telemetry API
+- [Confluent Cloud Telemetry API](https://api.telemetry.confluent.cloud/docs)
+- [Confluent Cloud Telemetry API - Datasets](https://api.telemetry.confluent.cloud/docs/descriptors/datasets/cloud)
+- [Confluent Cloud Telemetry API - Metrics](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#ccloud-metrics)
+
+### 4.3 Confluent Kafka Python Client
+- [Confluent Kafka Python Client Documentation](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html)
+
+
 
