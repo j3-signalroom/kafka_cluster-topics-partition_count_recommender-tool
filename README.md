@@ -1,5 +1,5 @@
 # Kafka Topics Partition Count Recommender Application
-The Kafka Cluster Topics Partition Count Recommender Application delivers data-driven precision to Kafka topic sizing. By analyzing historical consumption patterns, bytes and records per topic at specific points in time, it calculates daily averages of bytes-per-record and record counts, combining them to measure consumer throughput. Over a rolling 7–14 day window, the application pinpoints peak throughput, scales it by a factor X to project future demand, and then translates that requirement into an optimal partition count. The result: an intelligent, automated recommendation engine that ensures each Kafka topic has the correct number of partitions to sustain workload throughput and future growth reliably.
+The Kafka Cluster Topics Partition Count Recommender Application delivers data-driven precision to Kafka topic sizing. By analyzing historical consumption patterns, bytes and records per topic at specific points in time, it calculates daily averages of bytes-per-record and record counts, combining them to measure consumer throughput. Over a rolling 7 day window, the application pinpoints peak throughput, scales it by a factor X to project future demand, and then translates that requirement into an optimal partition count. The result: an intelligent, automated recommendation engine that ensures each Kafka topic has the correct number of partitions to sustain workload throughput and future growth reliably.
 
 **Table of Contents**
 
@@ -43,9 +43,14 @@ KAFKA_API_KEY=<YOUR_KAFKA_API_KEY>
 KAFKA_API_SECRET=<YOUR_KAFKA_API_SECRET>
 KAFKA_CLUSTER_ID=<YOUR_KAFKA_CLUSTER_ID>
 REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR=<YOUR_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR>
-SAMPLE_RECORDS=True
+SAMPLE_RECORDS=<True|False>
 SAMPLE_SIZE=1000
 TOPIC_FILTER=
+
+USE_AWS_SECRETS_MANAGER=<True|False>
+AWS_REGION_NAME=<YOUR_AWS_REGION_NAME>
+CONFLUENT_CLOUD_API_KEY_AWS_SECRETS=<YOUR_CONFLUENT_CLOUD_API_KEY_AWS_SECRETS>
+KAFKA_API_KEY_AWS_SECRETS=<YOUR_KAFKA_API_KEY_AWS_SECRETS>
 ```
 
 4. Here you go, run the application:

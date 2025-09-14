@@ -8,6 +8,7 @@ from typing import Final
 from KafkaTopicsAnalyzer import KafkaTopicsAnalyzer
 from utilities import setup_logging
 from cc_clients_python_lib.metrics_client import MetricsClient, METRICS_CONFIG, KafkaMetric
+from aws_clients_python_lib.secrets_manager import get_secrets
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -33,8 +34,37 @@ def main():
     try:
         required_consumption_throughput_factor = int(os.getenv("REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR", "5"))
         metrics_config = {}
-        metrics_config[METRICS_CONFIG["confluent_cloud_api_key"]] = os.getenv("CONFLUENT_CLOUD_API_KEY")
-        metrics_config[METRICS_CONFIG["confluent_cloud_api_secret"]] = os.getenv("CONFLUENT_CLOUD_API_SECRET")
+
+        # Check if using AWS Secrets Manager for credentials retrieval
+        if os.getenv("USE_AWS_SECRETS_MANAGER", "False") == "True":
+            # Retrieve Confluent Cloud API Key/Secret from AWS Secrets Manager
+            cc_secrets_path = os.getenv("CONFLUENT_CLOUD_API_KEY_AWS_SECRETS")
+            settings, error_message = get_secrets(os.environ['AWS_REGION_NAME'], cc_secrets_path)
+            if settings == {}:
+                metrics_config[METRICS_CONFIG["confluent_cloud_api_key"]] = os.getenv("CONFLUENT_CLOUD_API_KEY")
+                metrics_config[METRICS_CONFIG["confluent_cloud_api_secret"]] = os.getenv("CONFLUENT_CLOUD_API_SECRET")
+            else:
+                metrics_config[METRICS_CONFIG["confluent_cloud_api_key"]] = settings.get("confluent_cloud_api_key")
+                metrics_config[METRICS_CONFIG["confluent_cloud_api_secret"]] = settings.get("confluent_cloud_api_secret")
+
+            # Retrieve Kafka API Key/Secret from AWS Secrets Manager
+            kafka_secrets_path = os.getenv("KAFKA_API_KEY_AWS_SECRETS")
+            settings, error_message = get_secrets(os.environ['AWS_REGION_NAME'], kafka_secrets_path)
+            if settings == {}:
+                bootstrap_server_uri=os.getenv("BOOTSTRAP_SERVER_URI"),
+                kafka_api_key=os.getenv("KAFKA_API_KEY"),
+                kafka_api_secret=os.getenv("KAFKA_API_SECRET")
+            else:
+                bootstrap_server_uri=settings.get("bootstrap.servers")
+                kafka_api_key=settings.get("sasl.username")
+                kafka_api_secret=settings.get("sasl.password")
+        else:
+            # Use environment variables directly
+            metrics_config[METRICS_CONFIG["confluent_cloud_api_key"]] = os.getenv("CONFLUENT_CLOUD_API_KEY")
+            metrics_config[METRICS_CONFIG["confluent_cloud_api_secret"]] = os.getenv("CONFLUENT_CLOUD_API_SECRET")
+            bootstrap_server_uri=os.getenv("BOOTSTRAP_SERVER_URI"),
+            kafka_api_key=os.getenv("KAFKA_API_KEY"),
+            kafka_api_secret=os.getenv("KAFKA_API_SECRET")
 
         kafka_cluster_id = os.getenv("KAFKA_CLUSTER_ID")
 
@@ -43,9 +73,9 @@ def main():
 
         # Initialize recommender
         analyzer = KafkaTopicsAnalyzer(
-            bootstrap_server_uri=os.getenv("BOOTSTRAP_SERVER_URI"),
-            kafka_api_key=os.getenv("KAFKA_API_KEY"),
-            kafka_api_secret=os.getenv("KAFKA_API_SECRET")
+            bootstrap_server_uri=bootstrap_server_uri,
+            kafka_api_key=kafka_api_key,
+            kafka_api_secret=kafka_api_secret
         )
 
         # Analyze all topics
