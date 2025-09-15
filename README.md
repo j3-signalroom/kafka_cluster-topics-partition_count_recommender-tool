@@ -217,11 +217,11 @@ The throughput of a **Kafka consumer** refers to the rate at which it can read d
 ##### 2.1.1.10 System Resources
 - CPU, memory, and disk I/O on the consumer’s machine affect how fast it can process data.
 
-### 2.2 Typical Consumer Throughput:
+### 2.2 Typical Consumer Throughput
 - **Single Partition Throughput**: A single consumer reading from a single partition can typically achieve **10-50 MB/s** or higher, depending on message size, compression, and hardware.
 - **Multi-Partition Throughput**: For a consumer group reading from multiple partitions, throughput can scale linearly with the number of partitions (subject to other system limits).
 
-### 2.3 Seven Strategies to Improve Consumer Throughput:
+### 2.3 Seven Strategies to Improve Consumer Throughput
 1. **Increase Partitions**: Scale partitions to allow more parallelism.
 2. **Add Consumers**: Add more consumers in the consumer group to distribute the load.
 3. **Optimize Fetch Settings**: Tune `fetch.min.bytes`, `fetch.max.bytes`, and `fetch.max.wait.ms`.
