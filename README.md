@@ -28,7 +28,7 @@ The **Kafka Cluster Topics Partition Count Recommender Application** offers data
 ### 1.1 Setup the Application
 Clone the repo:
     ```shell
-    git clone https://github.com/j3-signalroom/kafka-cluster-topics-partition_count_recommender-app.git
+    git clone https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app.git
     ```
 
 Since this project was built using [**`uv`**](https://docs.astral.sh/uv/), please [install](https://docs.astral.sh/uv/getting-started/installation/) it, and then run the following command to install all the project dependencies:
@@ -89,10 +89,10 @@ If you use **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECR
 ### 1.3 Run the Application
 
 **Navigate to the Project Root Directory**
-Open your Terminal and navigate to the root folder of the `kafka-cluster-topics-partition_count_recommender-app/` repository that you have cloned. You can do this by executing:
+Open your Terminal and navigate to the root folder of the `kafka_cluster-topics-partition_count_recommender-app/` repository that you have cloned. You can do this by executing:
 
 ```shell
-cd path/to/kafka-cluster-topics-partition_count_recommender-app/
+cd path/to/kafka_cluster-topics-partition_count_recommender-app/
 ```
 
 > Replace `path/to/` with the actual path where your repository is located.
