@@ -26,7 +26,7 @@ The **Kafka Cluster Topics Partition Count Recommender Application** offers data
          + [**2.1.1.9 Consumer Poll Frequency**](#2119-consumer-poll-frequency)
          + [**2.1.1.10 System Resources**](#21110-system-resources)
    + [**2.2 Typical Consumer Throughput**](#22-typical-consumer-throughput)
-   + [**2.3 Strategies to Improve Consumer Throughput**](#23-strategies-to-improve-consumer-throughput)
+   + [**2.3 Seven Strategies to Improve Consumer Throughput**](#23-seven-strategies-to-improve-consumer-throughput)
 - [**3.0 Resources**](#30-resources)
    + [**3.1 Optimization Guides**](#31-optimization-guides)
    + [**3.2 Confluent Cloud Metrics API**](#32-confluent-cloud-metrics-api)
@@ -221,7 +221,7 @@ The throughput of a **Kafka consumer** refers to the rate at which it can read d
 - **Single Partition Throughput**: A single consumer reading from a single partition can typically achieve **10-50 MB/s** or higher, depending on message size, compression, and hardware.
 - **Multi-Partition Throughput**: For a consumer group reading from multiple partitions, throughput can scale linearly with the number of partitions (subject to other system limits).
 
-### 2.3 Strategies to Improve Consumer Throughput:
+### 2.3 Seven Strategies to Improve Consumer Throughput:
 1. **Increase Partitions**: Scale partitions to allow more parallelism.
 2. **Add Consumers**: Add more consumers in the consumer group to distribute the load.
 3. **Optimize Fetch Settings**: Tune `fetch.min.bytes`, `fetch.max.bytes`, and `fetch.max.wait.ms`.
