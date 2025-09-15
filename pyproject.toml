@@ -1,6 +1,6 @@
 [project]
 name = "kafka-cluster-topics-partition-count_recommender-app"
-version = "0.03.00.000"
+version = "0.04.00.000"
 description = "Kafka Cluster Topics Partition Count Recommender Application"
 readme = "README.md"
 requires-python = ">=3.13"
