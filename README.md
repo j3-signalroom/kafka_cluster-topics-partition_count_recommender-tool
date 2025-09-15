@@ -227,8 +227,8 @@ The throughput of a **Kafka consumer** refers to the rate at which it can read d
 3. **Optimize Fetch Settings**: Tune `fetch.min.bytes`, `fetch.max.bytes`, and `fetch.max.wait.ms`.
 4. **Batch Processing**: Use `max.poll.records` to fetch and process larger batches.
 5. **Compression**: Enable compression to reduce the amount of data transferred.
-6. **Efficient Serialization**: Use optimized serializers and deserializers.
-7. **Allocate Resources**: Ensure consumers run on high-performance hardware with sufficient network bandwidth.
+6. **Efficient SerDe**: Use optimized serializers and deserializers.
+7. **Horizontal Scaling**: Ensure consumers run on high-performance hardware with sufficient network bandwidth.
 
 By optimizing these factors, Kafka consumers can achieve higher throughput tailored to the specific use case and infrastructure.
 
