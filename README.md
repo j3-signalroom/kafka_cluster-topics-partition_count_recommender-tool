@@ -50,7 +50,7 @@ Since this project was built using [**`uv`**](https://docs.astral.sh/uv/), plea
 
 Now, you need to set up the application by creating a `.env` file in the project’s root directory. This file will hold all the essential environment variables needed for the application to connect to your Confluent Cloud Kafka cluster and operate properly. Additionally, you can opt to use **AWS Secrets Manager** to handle your secrets.
 
-> **Note**: _Your Confluent Cloud API key, secret, and Kafka Cluster ID are needed to access the [Confluent Cloud Metrics API](https://api.telemetry.confluent.cloud/docs#section/Authentication) and retrieve topic metrics._
+> **Note**: _Your Confluent Cloud API Key and Secret, and Kafka Cluster ID are needed to access the [Confluent Cloud Metrics API](https://api.telemetry.confluent.cloud/docs#section/Authentication) and retrieve topic metrics.  Moreover, your Bootstrap Server URI, and Kafka API Key and Secret are needed to access designated Kafka Cluster._
 
 #### 1.2.1 Create the `.env` file
 Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
@@ -78,11 +78,11 @@ The environment variables are defined as follows:
 | Environment Variable Name  | Description |
 | ----------------------------------------| ----------- |
 | `BOOTSTRAP_SERVER_URI` | Tshe bootstrap server URI for your Kafka cluster (e.g., `pkc-xxxxxx.us-east-1.aws.confluent.cloud:9092`). |
-| `CONFLUENT_CLOUD_API_KEY` | Your Confluent Cloud API key. |
-| `CONFLUENT_CLOUD_API_SECRET` | Your Confluent Cloud API secret. |
+| `CONFLUENT_CLOUD_API_KEY` | Your Confluent Cloud API Key. |
+| `CONFLUENT_CLOUD_API_SECRET` | Your Confluent Cloud API Secret. |
 | `INCLUDE_INTERNAL_TOPICS` | Set to `True` if you want to include internal topics in the analysis; otherwise, set to `False`. |
-| `KAFKA_API_KEY` | Your Kafka API key. |
-| `KAFKA_API_SECRET` | Your Kafka API secret. |
+| `KAFKA_API_KEY` | Your Kafka API Key. |
+| `KAFKA_API_SECRET` | Your Kafka API Secret. |
 | `KAFKA_CLUSTER_ID` | The ID of your Kafka cluster (e.g., `lkc-123xyz`). |
 | `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` | A multiplier to scale the peak consumption for future demand forecasting (e.g., `1.5` for 150%). |
 | `SAMPLE_RECORDS` | Set to `True` if you want to sample records for analysis; otherwise, set to `False`. |
@@ -90,8 +90,8 @@ The environment variables are defined as follows:
 | `TOPIC_FILTER` | A comma-separated list of topic names to include in the analysis. Leave empty to include all topics. |
 | `USE_AWS_SECRETS_MANAGER` | Set to `True` if you want to use AWS Secrets Manager to manage your secrets; otherwise, set to `False`. |
 | `AWS_REGION_NAME` | The AWS region where your secrets are stored (e.g., `us-east-1`). |
-| `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` | The name of the AWS Secrets Manager secrets that contains your Confluent Cloud API key and secret. |
-| `KAFKA_API_KEY_AWS_SECRETS` | The name of the AWS Secrets Manager secrets that contains your Kafka Cluster API key, API secret, Kafka Cluster ID, and bootstrap server URI. |
+| `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` | The name of the AWS Secrets Manager secrets that contains your Confluent Cloud API Key and secret. |
+| `KAFKA_API_KEY_AWS_SECRETS` | The name of the AWS Secrets Manager secrets that contains your Kafka Cluster API Key, API Secret, Kafka Cluster ID, and bootstrap server URI. |
 
 #### 1.2.2 Using the AWS Secrets Manager (optional)
 If you use **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and the application will retrieve the secrets from AWS Secrets Manager using the names provided in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`.  The code expects the `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` to be stored in JSON format with keys `confluent_cloud_api_key` and `confluent_cloud_api_secret`, and the `KAFKA_API_KEY_AWS_SECRETS` to be stored in JSON format with keys `kafka_cluster_id`, `bootstrap.servers`, `sasl.username` and `sasl.password`.
