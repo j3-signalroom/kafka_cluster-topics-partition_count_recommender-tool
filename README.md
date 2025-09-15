@@ -63,7 +63,7 @@ Create the `.env` file and add the following environment variables, filling them
    KAFKA_API_SECRET=<YOUR_KAFKA_API_SECRET>
    KAFKA_CLUSTER_ID=<YOUR_KAFKA_CLUSTER_ID>
    REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR=<YOUR_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR>
-   SAMPLE_RECORDS=<True|False>
+   USE_SAMPLE_RECORDS=<True|False>
    SAMPLE_SIZE=1000
    TOPIC_FILTER=
 
@@ -85,8 +85,8 @@ The environment variables are defined as follows:
 | `KAFKA_API_SECRET` | Your Kafka API Secret. |
 | `KAFKA_CLUSTER_ID` | The ID of your Kafka cluster (e.g., `lkc-123xyz`). |
 | `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` | A multiplier to scale the peak consumption for future demand forecasting (e.g., `1.5` for 150%). |
-| `SAMPLE_RECORDS` | Set to `True` if you want to sample records for analysis; otherwise, set to `False`. |
-| `SAMPLE_SIZE` | The number of records to sample if `SAMPLE_RECORDS` is set to `True` (e.g., `1000`). |
+| `USE_SAMPLE_RECORDS` | Set to `True` if you want to sample records for analysis; otherwise, set to `False`. |
+| `SAMPLE_SIZE` | The number of records to sample if `USE_SAMPLE_RECORDS` is set to `True` (e.g., `1000`). |
 | `TOPIC_FILTER` | A comma-separated list of topic names to include in the analysis. Leave empty to include all topics. |
 | `USE_AWS_SECRETS_MANAGER` | Set to `True` if you want to use AWS Secrets Manager to manage your secrets; otherwise, set to `False`. |
 | `AWS_REGION_NAME` | The AWS region where your secrets are stored (e.g., `us-east-1`). |

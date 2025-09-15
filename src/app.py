@@ -82,7 +82,7 @@ def main():
         # Analyze all topics
         results = analyzer.analyze_all_topics(
             include_internal=os.getenv("INCLUDE_INTERNAL_TOPICS", "False") == "True",
-            sample_records=os.getenv("SAMPLE_RECORDS", "True") == "True",
+            sample_records=os.getenv("USE_SAMPLE_RECORDS", "True") == "True",
             sample_size=int(os.getenv("SAMPLE_SIZE", DEFAULT_SAMPLE_SIZE)),
             topic_filter=os.getenv("TOPIC_FILTER")
         )
