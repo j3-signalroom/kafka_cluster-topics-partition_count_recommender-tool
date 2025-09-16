@@ -13,7 +13,7 @@ The **Kafka Cluster Topics Partition Count Recommender Application** offers data
       - [**1.3.1 Did you notice we prefix `uv run` to `python src/app.py`?**](#131-did-you-notice-we-prefix-uv-run-to-python-srcapppy)
       - [**1.3.2 Troubleshoot Connectivity Issues (if any)**](#132-troubleshoot-connectivity-issues-if-any)
 - [**2.0 How the app calculates the recommended partition count**](#20-how-the-app-calculates-the-recommended-partition-count)
-   + [**2.1 Consumer Throughput Considerations**](#21-consumer-throughput-considerations)
+   + [**2.1 Unlocking High-Performance Consumer Throughput**](#21-unlocking-high-performance-consumer-throughput)
       - [**2.1.1 Key Factors Affecting Consumer Throughput**](#211-key-factors-affecting-consumer-throughput)
          + [**2.1.1.1 Partitions**](#2111-partitions)
          + [**2.1.1.2 Consumer Parallelism**](#2112-consumer-parallelism)
@@ -179,7 +179,7 @@ To determine the number of partitions needed to support a throughput of **1.22GB
 
 The **50 partitions** ensure that the consumer can achieve the required throughput of **1.22GB/s** while consuming at a rate of **25MB/s** per partition. This will allow the workload to be distributed across partitions so that multiple consumers can work in parallel to meet the throughput requirement.
 
-### 2.1 Consumer Throughput Considerations
+### 2.1 Unlocking High-Performance Consumer Throughput
 
 The throughput of a **Kafka consumer** refers to the rate at which it can read data from Kafka topics, typically measured in terms of **megabytes per second (MB/s)** or **records per second**. Consumer throughput depends on several factors, including the configuration of Kafka, the consumer application, and the underlying infrastructure.
 
