@@ -1,0 +1,75 @@
+sequenceDiagram
+    participant Main as main()
+    participant Env as Environment/.env
+    participant AWS as AWS Secrets Manager
+    participant MC as MetricsClient
+    participant KTA as KafkaTopicsAnalyzer
+    participant Kafka as Kafka Cluster
+    participant FS as File System
+
+    Main->>Env: load_dotenv()
+    Main->>Env: Get configuration variables
+    
+    alt USE_AWS_SECRETS_MANAGER == "True"
+        Main->>AWS: get_secrets(cc_secrets_path)
+        AWS-->>Main: Confluent Cloud API credentials
+        Main->>AWS: get_secrets(kafka_secrets_path)
+        AWS-->>Main: Kafka API credentials
+    else Environment Variables
+        Main->>Env: Get credentials directly
+    end
+
+    rect rgb(173, 216, 230)
+        Note over Main,MC: Metrics API-based Analysis Setup
+        alt use_sample_records == False
+            Main->>MC: MetricsClient(metrics_config)
+            MC-->>Main: MetricsClient instance
+        end
+    end
+
+    Main->>KTA: KafkaTopicsAnalyzer(bootstrap_server_uri, kafka_api_key, kafka_api_secret)
+    KTA-->>Main: Analyzer instance
+
+    Main->>KTA: analyze_all_topics(include_internal, use_sample_records, sample_size, topic_filter)
+    KTA->>Kafka: Connect and retrieve topics
+    KTA->>Kafka: Get partition counts
+    
+    rect rgb(255, 218, 185)
+        Note over KTA,Kafka: Sample-based Analysis
+        alt use_sample_records == True
+            KTA->>Kafka: Sample records from topics
+            Kafka-->>KTA: Sample data
+            KTA->>KTA: Calculate avg_bytes_per_record
+        end
+    end
+    
+    KTA-->>Main: Analysis results
+
+    loop For each topic result
+        rect rgb(255, 218, 185)
+            Note over Main: Sample-based Calculations
+            alt use_sample_records == True
+                Main->>Main: Calculate throughput from samples
+            end
+        end
+        rect rgb(173, 216, 230)
+            Note over Main,MC: Metrics API-based Calculations
+            alt use_sample_records == False
+                Main->>MC: get_topic_daily_aggregated_totals(RECEIVED_BYTES, cluster_id, topic_name)
+                MC->>Kafka: Query metrics
+                Kafka-->>MC: Bytes metrics data
+                MC-->>Main: Aggregated metrics
+            end
+        end
+        
+        Main->>Main: Calculate recommended partition count
+        Main->>Main: Format and log results
+    end
+
+    Main->>Main: Calculate summary statistics
+    Main->>Main: Log summary
+
+    Main->>FS: Export results to JSON file
+    FS-->>Main: File saved
+
+    Note over Main: Process complete with recommendations

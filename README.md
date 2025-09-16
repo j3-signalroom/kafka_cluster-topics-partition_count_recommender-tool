@@ -13,6 +13,7 @@ The **Kafka Cluster Topics Partition Count Recommender Application** offers data
       - [**1.3.1 Did you notice we prefix `uv run` to `python src/app.py`?**](#131-did-you-notice-we-prefix-uv-run-to-python-srcapppy)
       - [**1.3.2 Troubleshoot Connectivity Issues (if any)**](#132-troubleshoot-connectivity-issues-if-any)
 - [**2.0 How the app calculates the recommended partition count**](#20-how-the-app-calculates-the-recommended-partition-count)
+   + [**2.1 End-to-End Application Workflow**](#21-end-to-end-application-workflow)
 - [**3.0 Unlocking High-Performance Consumer Throughput**](#30-unlocking-high-performance-consumer-throughput)
    + [**3.1 Key Factors Affecting Consumer Throughput**](#31-key-factors-affecting-consumer-throughput)
       - [**3.1.1 Partitions**](#311-partitions)
@@ -194,6 +195,9 @@ To determine the number of partitions needed to support a throughput of **1.22GB
     ![number-of-partitions-needed](.blog/images/number-of-partitions-needed.png)
 
 The **50 partitions** ensure that the consumer can achieve the required throughput of **1.22GB/s** while consuming at a rate of **25MB/s** per partition. This will allow the workload to be distributed across partitions so that multiple consumers can work in parallel to meet the throughput requirement.
+
+#### 2.1 End-to-End Application Workflow
+![app-sequence-diagram](.blog/images/app-sequence-diagram.png)
 
 ### 3.0 Unlocking High-Performance Consumer Throughput
 
