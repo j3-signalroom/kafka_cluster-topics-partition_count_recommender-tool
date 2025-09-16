@@ -5,7 +5,7 @@ The **Kafka Cluster Topics Partition Count Recommender Application** offers data
 
 <!-- toc -->
 - [**1.0 To get started**](#10-to-get-started)
-   + [**1.1 Setup the Application**](#11-setup-the-application)
+   + [**1.1 Download the Application**](#11-download-the-application)
    + [**1.2 Configure the Application**](#12-configure-the-application)
       - [**1.2.1 Create the `.env` file**](#121-create-the-env-file)
       - [**1.2.2 Using the AWS Secrets Manager (optional)**](#122-using-the-aws-secrets-manager-optional)
@@ -35,7 +35,7 @@ The **Kafka Cluster Topics Partition Count Recommender Application** offers data
 
 ## 1.0 To get started
 
-### 1.1 Setup the Application
+### 1.1 Download the Application
 Clone the repo:
     ```shell
     git clone https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app.git
@@ -48,9 +48,9 @@ Since this project was built using [**`uv`**](https://docs.astral.sh/uv/), plea
 
 ### 1.2 Configure the Application
 
-Now, you need to set up the application by creating a `.env` file in the project’s root directory. This file will hold all the essential environment variables needed for the application to connect to your Confluent Cloud Kafka cluster and operate properly. Additionally, you can opt to use **AWS Secrets Manager** to handle your secrets.
+Now, you need to set up the application by creating a `.env` file in the root directory of your project. This file will store all the essential environment variables required for the application to connect to your Confluent Cloud Kafka cluster and function correctly. Additionally, you can choose to use **AWS Secrets Manager** to manage your secrets.
 
-> **Note**: _Your Confluent Cloud API Key and Secret, and Kafka Cluster ID are needed to access the [Confluent Cloud Metrics API](https://api.telemetry.confluent.cloud/docs#section/Authentication) and retrieve topic metrics.  Moreover, your Bootstrap Server URI, and Kafka API Key and Secret are needed to access designated Kafka Cluster._
+> **Note**: _Your Confluent Cloud API Key, Secret, and Kafka Cluster ID are required to access the [Confluent Cloud Metrics API](https://api.telemetry.confluent.cloud/docs#section/Authentication) and retrieve topic metrics. Additionally, your Bootstrap Server URI, along with your Kafka API Key and Secret, are necessary to access the designated Kafka Cluster._
 
 #### 1.2.1 Create the `.env` file
 Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
@@ -195,12 +195,14 @@ The throughput of a **Kafka consumer** refers to the rate at which it can read d
 - **`fetch.max.bytes`**: Maximum amount of data returned in a single fetch response. A higher value allows fetching larger batches of messages, improving throughput.
 - **`fetch.max.wait.ms`**: Maximum time the broker waits before responding to a fetch request. A higher value can increase batch sizes and throughput but may increase latency.
 
+For more details, see the [Confluent Cloud Client Optimization Guide - Consumer Fetching](https://docs.confluent.io/cloud/current/client-apps/optimizing/throughput.html#consumer-fetching).
+
 ##### 2.1.1.4 Batch Size
 - Consumers process messages in batches for better efficiency. Larger batches reduce processing overhead but require sufficient memory.
 - Configuration: **`max.poll.records`** controls the number of records fetched in a single poll.
 
 ##### 2.1.1.5 Message Size
-- Larger messages can reduce throughput if the network or storage systems are bottlenecks. Use compression (e.g., `gzip`, `snappy`) to optimize data transfer.
+- Larger messages can reduce throughput if the network or storage systems are bottlenecks. Use compression (e.g., `lz4`, `snappy`) to optimize data transfer.
 
 ##### 2.1.1.6 Network Bandwidth
 - Network speed between Kafka brokers and consumers is critical. A consumer running on a limited-bandwidth network will see reduced throughput.
