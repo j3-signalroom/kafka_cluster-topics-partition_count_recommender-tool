@@ -48,12 +48,12 @@ class KafkaTopicsAnalyzer:
             'fetch.min.bytes': 1
         }
 
-    def analyze_all_topics(self, include_internal: bool = False, sample_records: bool = True, sample_size: int = 1000, topic_filter: str | None = None) -> List[Dict]:
+    def analyze_all_topics(self, include_internal: bool = False, use_sample_records: bool = True, sample_size: int = 1000, topic_filter: str | None = None) -> List[Dict]:
         """Analyze all topics in the cluster.
         
         Args:
             include_internal (bool, optional): Whether to include internal topics. Defaults to False.
-            sample_records (bool, optional): Whether to sample records for average size. Defaults to True.
+            use_sample_records (bool, optional): Whether to sample records for average size. Defaults to True.
             sample_size (int, optional): Number of records to sample per topic. Defaults to 1000.
             topic_filter (Optional[str], optional): If provided, only topics containing this string will be analyzed. Defaults to None.
         
@@ -86,10 +86,10 @@ class KafkaTopicsAnalyzer:
         results = []
         for topic_name, topic_metadata in topics_to_analyze.items():
             try:
-                result = self._analyze_topic(topic_name, topic_metadata, sample_records, sample_size)
+                result = self._analyze_topic(topic_name, topic_metadata, use_sample_records, sample_size)
                 results.append(result)
             except Exception as e:
-                print(f"Error analyzing topic {topic_name}: {e}")
+                logging.error(f"Error analyzing topic {topic_name}: {e}")
 
                 # Add basic info even if analysis fails
                 results.append({
@@ -199,8 +199,7 @@ class KafkaTopicsAnalyzer:
                 except:  # noqa: E722
                     headers_size = 0
 
-                total_size = key_size + value_size + headers_size
-                record_sizes.append(total_size)
+                record_sizes.append(key_size + value_size + headers_size)
             
             if record_sizes:
                 avg_size = sum(record_sizes) / len(record_sizes)
@@ -216,13 +215,13 @@ class KafkaTopicsAnalyzer:
         finally:
             consumer.close()
 
-    def _analyze_topic(self, topic_name: str, topic_metadata, sample_records: bool = True, sample_size: int = 1000) -> Dict:
+    def _analyze_topic(self, topic_name: str, topic_metadata, use_sample_records: bool = True, sample_size: int = 1000) -> Dict:
         """Analyze a single topic.
         
         Args:
             topic_name (str): Name of the topic to analyze.
             topic_metadata: Metadata object for the topic.
-            sample_records (bool, optional): Whether to sample records for average size. Defaults to True
+            use_sample_records (bool, optional): Whether to sample records for average size. Defaults to True
             
         Returns:
             Dict: Analysis results including partition count, total messages, average record size, etc.
@@ -254,7 +253,7 @@ class KafkaTopicsAnalyzer:
         
         # Sample record sizes if requested and topic has messages
         avg_record_size = None
-        if sample_records and total_messages > 0:
+        if use_sample_records and total_messages > 0:
             avg_record_size = self._sample_record_sizes(topic_name, min(sample_size, total_messages))
         elif total_messages == 0:
             logging.warning(f"  Topic '{topic_name}' is empty - no records to sample")

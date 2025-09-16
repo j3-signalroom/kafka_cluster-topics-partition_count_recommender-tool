@@ -33,6 +33,7 @@ def main():
  
     try:
         required_consumption_throughput_factor = int(os.getenv("REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR", "5"))
+        use_sample_records=os.getenv("USE_SAMPLE_RECORDS", "True") == "True"
         
         # Check if using AWS Secrets Manager for credentials retrieval
         metrics_config = {}
@@ -69,8 +70,13 @@ def main():
             kafka_api_key=os.getenv("KAFKA_API_KEY")
             kafka_api_secret=os.getenv("KAFKA_API_SECRET")
 
-        # Instantiate the MetricsClient class.
-        metrics_client = MetricsClient(metrics_config)
+        if use_sample_records:
+            logging.info(f"Using sample records for analysis with sample size: {os.getenv('SAMPLE_SIZE', DEFAULT_SAMPLE_SIZE)}")
+        else:
+            logging.info("Using Metrics API for analysis.")
+
+            # Instantiate the MetricsClient class.
+            metrics_client = MetricsClient(metrics_config)
 
         # Initialize recommender
         analyzer = KafkaTopicsAnalyzer(
@@ -79,10 +85,10 @@ def main():
             kafka_api_secret=kafka_api_secret
         )
 
-        # Analyze all topics
+        # Analyze all topics        
         results = analyzer.analyze_all_topics(
             include_internal=os.getenv("INCLUDE_INTERNAL_TOPICS", "False") == "True",
-            sample_records=os.getenv("USE_SAMPLE_RECORDS", "True") == "True",
+            use_sample_records=use_sample_records,
             sample_size=int(os.getenv("SAMPLE_SIZE", DEFAULT_SAMPLE_SIZE)),
             topic_filter=os.getenv("TOPIC_FILTER")
         )
@@ -112,10 +118,15 @@ def main():
             partition_count = result['partition_count']
             total_messages = result.get('total_messages', 0)
 
-            http_status_code, error_message, bytes_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_BYTES, kafka_cluster_id, kafka_topic_name)
+            if use_sample_records:
+                consumer_throughput = result.get('avg_bytes_per_record', 0) * total_messages
+                required_throughput = consumer_throughput * required_consumption_throughput_factor
+            else:
+                http_status_code, error_message, bytes_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_BYTES, kafka_cluster_id, kafka_topic_name)
+                consumer_throughput = bytes_query_result.get('avg_total', 0)
+                required_throughput = bytes_query_result.get('max_total', 0) * required_consumption_throughput_factor
 
-            consumer_throughput = bytes_query_result.get('avg_total', 0)
-            required_throughput = bytes_query_result.get('max_total', 0) * required_consumption_throughput_factor
+            # Calculate recommended partition count
             recommended_partition_count = round(required_throughput / consumer_throughput)
             total_recommended_partitions += recommended_partition_count if recommended_partition_count > 0 else 0
 

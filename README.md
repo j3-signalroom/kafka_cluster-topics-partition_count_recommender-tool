@@ -126,8 +126,13 @@ Then enter the following command below to run the application:
 uv run python src/app.py
 ```
 
-For example, below is a screenshot of the application running successfully:
-![screenshot-of-application-run](.blog/images/screenshot-of-application-run.png)
+If `USE_SAMPLE_RECORDS` environment variable is set to `True`, the application will sample records from each topic to calculate the average record size in bytes.  For example, below is a screenshot of the application running successfully:
+
+![sample-records-run](.blog/images/sample-records-run.png)
+
+If `USE_SAMPLE_RECORDS` is set to `False`, the application will use the Confluent Cloud Metrics API to retrieve the average and peak consumption in bytes over a rolling seven-day period.  For example, below is a screenshot of the application running successfully:
+
+![metrics-api-run](.blog/images/metrics-api-run.png)
 
 #### 1.3.1 Did you notice we prefix `uv run` to `python src/app.py`?
 You maybe asking yourself why.  Well, `uv` is an incredibly fast Python package installer and dependency resolver, written in [**Rust**](https://github.blog/developer-skills/programming-languages-and-frameworks/why-rust-is-the-most-admired-language-among-developers/), and designed to seamlessly replace `pip`, `pipx`, `poetry`, `pyenv`, `twine`, `virtualenv`, and more in your workflows. By prefixing `uv run` to a command, you're ensuring that the command runs in an optimal Python environment.
