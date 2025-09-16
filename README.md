@@ -223,7 +223,7 @@ For more details, see the [Confluent Cloud Client Optimization Guide - Consumer 
 - CPU, memory, and disk I/O on the consumer’s machine affect how fast it can process data.
 
 ### 3.2 Typical Consumer Throughput
-- **Single Partition Throughput**: A single consumer reading from a single partition can typically achieve **10-50 MB/s** or higher, depending on message size, compression, and hardware.
+- **Single Partition Throughput**: A single consumer reading from a single partition can typically achieve **10-50 MB/s** or higher, depending on record size, compression, and hardware.
 - **Multi-Partition Throughput**: For a consumer group reading from multiple partitions, throughput can scale linearly with the number of partitions (subject to other system limits).
 
 ### 3.3 Seven Strategies to Improve Consumer Throughput
@@ -232,7 +232,7 @@ For more details, see the [Confluent Cloud Client Optimization Guide - Consumer 
 3. **Optimize Fetch Settings**: Tune `fetch.min.bytes`, `fetch.max.bytes`, and `fetch.max.wait.ms`.
 4. **Batch Processing**: Use `max.poll.records` to fetch and process larger batches.
 5. **Compression**: Enable compression to reduce the amount of data transferred.
-6. **Efficient SerDe**: Use optimized serializers and deserializers.
+6. **Efficient SerDe (Serialization/Deserialization)**: Use optimized serializers and deserializers.
 7. **Horizontal Scaling**: Ensure consumers run on high-performance hardware with sufficient network bandwidth.
 
 By optimizing these factors, Kafka consumers can achieve higher throughput tailored to the specific use case and infrastructure.
