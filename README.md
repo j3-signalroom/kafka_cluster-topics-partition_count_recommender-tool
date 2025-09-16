@@ -136,7 +136,7 @@ If you have Kafka connectivity issues, you can verify connectivity using the fol
 
 #### 1.3.2 Troubleshoot Connectivity Issues (if any)
 
-To verify connectivity to your Kafka cluster, you can use the `kafka-topics.sh` command-line tool. First, create a `client.properties` file with your Kafka credentials:
+To verify connectivity to your Kafka cluster, you can use the `kafka-topics.sh` command-line tool.  First, download the Kafka binaries from the [Apache Kafka website](https://kafka.apache.org/downloads) and extract them. Navigate to the `bin` directory of the extracted Kafka folder. Second, create a `client.properties` file with your Kafka credentials:
 
 ```shell
 # For SASL_SSL (most common for cloud services)
@@ -150,9 +150,12 @@ sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule require
 ssl.endpoint.identification.algorithm=https
 ```
 
+Finally, run the following command to list all topics in your Kafka cluster:
 ```shell
 ./kafka-topics.sh --list --bootstrap-server <YOUR_BOOTSTRAP_SERVER_URI> --command-config ./client.properties
 ```
+
+If the connection is successful, you should see a list of topics in your Kafka cluster. If you encounter any errors, double-check your credentials and network connectivity.
 
 ## 2.0 How the app calculates the recommended partition count
 The app uses the Kafka `AdminClient` to retrieve all Kafka Topics (based on the `TOPIC_FILTER` specified) stored in your Kafka Cluster, including the original partition count per topic. Then, it iterates through each Kafka Topic, calling the Confluent Cloud Metrics RESTful API to retrieve the topic’s average (i.e., the _Consumer Throughput_) and peak consumption in bytes over a rolling seven-day period. Next, it calculates the required throughput by multiplying the peak consumption by the `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` (i.e., the _Required Throughput_). Finally, it divides the required throughput by the consumer throughput and rounds the result to the nearest whole number to determine the optimal number of partitions.
