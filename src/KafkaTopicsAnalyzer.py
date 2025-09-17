@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 import time
 from typing import Dict, List, Tuple
 from confluent_kafka.admin import AdminClient
@@ -5,6 +6,7 @@ from confluent_kafka import Consumer, TopicPartition
 import logging
 
 from utilities import setup_logging
+from constants import DEFAULT_SAMPLING_DAYS, DEFAULT_SAMPLING_BATCH_SIZE
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -45,16 +47,18 @@ class KafkaTopicsAnalyzer:
             'auto.offset.reset': 'earliest',
             'enable.auto.commit': False,
             'session.timeout.ms': 30000,
-            'fetch.min.bytes': 1
+            'fetch.min.bytes': 1,
+            'enable.metrics.push': False
         }
 
-    def analyze_all_topics(self, include_internal: bool = False, use_sample_records: bool = True, sample_size: int = 1000, topic_filter: str | None = None) -> List[Dict]:
+    def analyze_all_topics(self, include_internal: bool = False, use_sample_records: bool = True, sampling_days: int = DEFAULT_SAMPLING_DAYS, sampling_batch_size: int = DEFAULT_SAMPLING_BATCH_SIZE, topic_filter: str | None = None) -> List[Dict]:
         """Analyze all topics in the cluster.
         
         Args:
             include_internal (bool, optional): Whether to include internal topics. Defaults to False.
             use_sample_records (bool, optional): Whether to sample records for average size. Defaults to True.
-            sample_size (int, optional): Number of records to sample per topic. Defaults to 1000.
+            sampling_days (int, optional): Number of days to look back for sampling. Defaults to 7.
+            sampling_batch_size (int, optional): Number of records to process per batch when sampling. Defaults to 1000.
             topic_filter (Optional[str], optional): If provided, only topics containing this string will be analyzed. Defaults to None.
         
         Returns:
@@ -63,7 +67,7 @@ class KafkaTopicsAnalyzer:
         logging.info("Connecting to Kafka cluster and fetching metadata...")
         
         # Get cluster metadata
-        metadata = self._get_topics_metadata()
+        metadata = self.__get_topics_metadata()
         if not metadata:
             return []
         
@@ -84,27 +88,46 @@ class KafkaTopicsAnalyzer:
 
         # Analyze topics
         results = []
-        for topic_name, topic_metadata in topics_to_analyze.items():
-            try:
-                result = self._analyze_topic(topic_name, topic_metadata, use_sample_records, sample_size)
-                results.append(result)
-            except Exception as e:
-                logging.error(f"Error analyzing topic {topic_name}: {e}")
 
-                # Add basic info even if analysis fails
+        if use_sample_records:
+            # Calculate the ISO 8601 formatted begin timestamp of the rolling window
+            utc_now = datetime.now(timezone.utc)
+            rolling_start = utc_now - timedelta(days=sampling_days)
+            iso_start_time = datetime.fromisoformat(rolling_start.strftime('%Y-%m-%dT%H:%M:%S+00:00'))
+            start_time_epoch_ms = int(rolling_start.timestamp() * 1000)
+
+            logging.info(f"Using rolling {sampling_days} day(s) window starting from {iso_start_time.isoformat()}")
+            
+            for topic_name, topic_metadata in topics_to_analyze.items():
+                try:
+                    result = self.__analyze_topic(topic_name, topic_metadata, sampling_batch_size, start_time_epoch_ms)
+                    results.append(result)
+                except Exception as e:
+                    logging.error(f"Failed to analyze topic {topic_name} because {e}")
+
+                    # Add basic info even if analysis fails
+                    results.append({
+                        'topic_name': topic_name,
+                        'partition_count': len(topic_metadata.partitions),
+                        'total_record_count': 0,
+                        'avg_bytes_per_record': 0.0,
+                        'partition_details': [],
+                        'is_internal': topic_name.startswith('_'),
+                        'error': str(e)
+                    })
+        else:
+            for topic_name, topic_metadata in topics_to_analyze.items():
                 results.append({
                     'topic_name': topic_name,
                     'partition_count': len(topic_metadata.partitions),
-                    'total_messages': 0,
-                    'avg_bytes_per_record': None,
+                    'total_record_count': 0,
+                    'avg_bytes_per_record': 0.0,
                     'partition_details': [],
-                    'is_internal': topic_name.startswith('_'),
-                    'error': str(e)
-                })
-        
+                    'is_internal': topic_name.startswith('_')
+                })        
         return results
     
-    def _get_topics_metadata(self) -> Dict:
+    def __get_topics_metadata(self) -> Dict:
         """Get cluster metadata including topics and partitions.
         
         Returns:
@@ -117,11 +140,11 @@ class KafkaTopicsAnalyzer:
             logger.error(f"Error getting topics metadata: {e}")
             return None
 
-    def _get_partition_offsets(self, topic: str, partitions: List[int]) -> Dict[int, Tuple[int, int]]:
-        """Get low and high watermarks for partitions.
+    def __get_partition_offsets(self, topic_name: str, partitions: List[int]) -> Dict[int, Tuple[int, int]]:
+        """Get low and high watermarks for the topic's partitions.
         
         Args:
-            topic (str): Topic name.
+            topic_name (str): Topic name.
             partitions (List[int]): List of partition IDs. 
 
         Returns:
@@ -130,139 +153,225 @@ class KafkaTopicsAnalyzer:
         consumer = Consumer(self.kafka_consumer_config)
         
         try:
-            # Create TopicPartition objects
-            topic_partitions = [TopicPartition(topic, p) for p in partitions]
+            # Create Topic's TopicPartition objects
+            topic_partitions = [TopicPartition(topic_name, partition) for partition in partitions]
             
             # Get high watermarks for all partitions
             partition_offsets = {}
-            for tp in topic_partitions:
+            for topic_partition in topic_partitions:
                 try:
-                    low, high = consumer.get_watermark_offsets(tp, timeout=10)
-                    partition_offsets[tp.partition] = (low, high)
+                    low, high = consumer.get_watermark_offsets(topic_partition, timeout=10)
+                    partition_offsets[topic_partition.partition] = (low, high)
                 except Exception as e:
-                    logging.error(f"Error getting offsets for {topic} partition {tp.partition}: {e}")
-                    partition_offsets[tp.partition] = (0, 0)
+                    logging.error(f"Failed retrieving low and high offsets for {topic_name}'s partition {topic_partition.partition} because {e}")
+                    partition_offsets[topic_partition.partition] = (0, 0)
             
             return partition_offsets
             
         except Exception as e:
-            logging.error(f"Error getting partition offsets for topic {topic}: {e}")
+            logging.error(f"Error getting partition offsets for topic {topic_name}: {e}")
             return {}
         finally:
             consumer.close()
 
-    def _sample_record_sizes(self, topic: str, sample_size: int, timeout_seconds: int = 30) -> float | None:
-        """Sample records from a topic to calculate average record size.
+    def __get_record_timestamp(self, topic_name: str, partition: int, offset: int) -> int:
+        """Get the timestamp of a specific record by topic, partition, and offset.
         
         Args:
-            topic (str): Topic name to sample from.
-            sample_size (int): Number of records to sample.
-            timeout_seconds (int, optional): Maximum time to wait for sampling. Defaults to 30
+            topic_name (str): Topic name.
+            partition (int): Partition number.
+            offset (int): Offset of the record.
+            
+        Returns:
+            int: Timestamp of the record in milliseconds since epoch, or None if not found.
+        """
+        # Create a consumer to fetch the record
+        consumer = Consumer(self.kafka_consumer_config)
+        topic_partition = TopicPartition(topic_name, partition, offset)
+        consumer.assign([topic_partition])
+        consumer.seek(topic_partition)
+        record = consumer.poll(timeout=15.0)
+        consumer.close()
+
+        if record is None:
+            return None  # No message found
+        if record.error():
+            logging.error(f"Failed retrieving record because of {record.error()}")
+            return None
+
+        _, record_timestamp = record.timestamp()
+        return record_timestamp
+    
+    def __get_record_timestamp_from_offset(self, topic_name: str, partition: int, timestamp_ms: int) -> int:
+        """Get the offset of the first record with a timestamp greater than or equal to the specified timestamp.
+
+        Args:
+            topic_name (str): Topic name.
+            partition (int): Partition number.
+            timestamp_ms (int): Timestamp in milliseconds since epoch.
+
+        Returns:
+            int: Offset of the record, or None if not found.
+        """
+        consumer = Consumer(self.kafka_consumer_config)
+        topic_partition = TopicPartition(topic_name, partition, timestamp_ms)
+        result = consumer.offsets_for_times([topic_partition], timeout=15.0)
+        consumer.close()
+
+        if result and result[0].offset != -1:
+            return result[0].offset
+        return None
+
+    def __sample_record_sizes(self, topic_name: str, sampling_batch_size: int, partition_details: List[Dict]) -> float | None:
+        """Sample record sizes from the specified partitions to calculate average record size.
         
+        Args:
+            topic_name (str): Topic name to process.
+            sampling_batch_size (int): Number of records to process per batch when sampling.
+            partition_details (List[Dict]): Details of the partitions to process.
+
         Returns:
             float | None: Average record size in bytes, or None if no records found.
         """
-        consumer = Consumer(self.kafka_consumer_config)
+        total_size = 0
+        total_count = 0
         
-        try:
-            # Subscribe to topic
-            consumer.subscribe([topic])
+        for partition_detail in partition_details:
+            consumer = Consumer(self.kafka_consumer_config)
             
-            record_sizes = []
-            start_time = time.time()
-            
-            logging.info(f"  Sampling {sample_size} records from topic '{topic}'...")
-            
-            while len(record_sizes) < sample_size and (time.time() - start_time) < timeout_seconds:
-                msg = consumer.poll(1.0)
+            try:
+                partition_number = partition_detail["partition_number"]
+                start_offset = partition_detail["offset_start"]
+                end_offset = partition_detail["offset_end"]
                 
-                if msg is None:
+                total_offsets = end_offset - start_offset
+                
+                if total_offsets <= 0:
                     continue
+                
+                logging.debug(f"    Streaming {total_offsets} records from partition {partition_number}")
+                
+                # Create TopicPartition and assign it
+                topic_partition = TopicPartition(topic_name, partition_number, start_offset)
+                consumer.assign([topic_partition])
+                consumer.seek(topic_partition)
+                
+                current_offset = start_offset
+                batch_count = 0
+                partition_record_count = 0
+                
+                while current_offset < end_offset:
+                    batch_records_processed = 0
+                    batch_start_offset = current_offset
                     
-                if msg.error():
-                    logging.error(f"    Consumer error: {msg.error()}")
-                    continue
-                
-                # Calculate total message size (key + value + headers)
-                try:
-                    key_size = len(msg.key()) if msg.key() else 0
-                except:  # noqa: E722
-                    key_size = 0
-
-                try:
-                    value_size = len(msg.value()) if msg.value() else 0
-                except:  # noqa: E722
-                    value_size = 0
-
-                try:
-                    headers_size = sum(len(k) + len(v) for k, v in (msg.headers() or []))
-                except:  # noqa: E722
-                    headers_size = 0
-
-                record_sizes.append(key_size + value_size + headers_size)
+                    # Process one batch
+                    while batch_records_processed < sampling_batch_size and current_offset < end_offset:
+                        record = consumer.poll(timeout=5.0)
+                        
+                        if record is None:
+                            current_offset += 1
+                            continue
+                        
+                        if record.error():
+                            current_offset += 1
+                            continue
+                        
+                        # Calculate record size
+                        try:
+                            key_size = len(record.key()) if record.key() else 0
+                            value_size = len(record.value()) if record.value() else 0
+                            headers_size = sum(len(k) + len(v) for k, v in (record.headers() or []))
+                            record_size = key_size + value_size + headers_size
+                        except:  # noqa: E722
+                            record_size = 0
+                        
+                        # Update running totals (streaming approach - saves memory)
+                        total_size += record_size
+                        total_count += 1
+                        
+                        current_offset = record.offset() + 1
+                        batch_records_processed += 1
+                        partition_record_count += 1
+                    
+                    batch_count += 1
+                    
+                    # Log progress
+                    if batch_records_processed > 0:
+                        current_avg = total_size / total_count if total_count > 0 else 0
+                        progress_pct = (partition_record_count / total_offsets) * 100
+                        logging.debug(f"      Streaming batch {batch_count}: {batch_records_processed} records "
+                                f"(offsets {batch_start_offset}-{current_offset-1}), "
+                                f"progress: {progress_pct:.1f}%, running avg: {current_avg:.2f} bytes")
             
-            if record_sizes:
-                avg_size = sum(record_sizes) / len(record_sizes)
-                logging.info(f"    Average record size: {avg_size:.2f} bytes (from {len(record_sizes)} samples)")
-                return avg_size
-            else:
-                logging.warning(f"    No records found in topic '{topic}' during sampling period")
-                return None
-                
-        except Exception as e:
-            logging.error(f"  Error sampling records from topic {topic}: {e}")
+            except Exception as e:
+                logging.error(f"    Error streaming partition {partition_detail.get('partition_number', 'unknown')}: {e}")
+            finally:
+                consumer.close()
+        
+        if total_count > 0:
+            avg_size = total_size / total_count
+            logging.info(f"    Final streaming average: {avg_size:.2f} bytes from {total_count} records")
+            return avg_size
+        else:
+            logging.warning(f"    No records found in topic '{topic_name}'")
             return None
-        finally:
-            consumer.close()
 
-    def _analyze_topic(self, topic_name: str, topic_metadata, use_sample_records: bool = True, sample_size: int = 1000) -> Dict:
+    def __analyze_topic(self, topic_name: str, topic_metadata, sampling_batch_size: int, start_time_epoch_ms: int) -> Dict:
         """Analyze a single topic.
         
         Args:
             topic_name (str): Name of the topic to analyze.
             topic_metadata: Metadata object for the topic.
-            use_sample_records (bool, optional): Whether to sample records for average size. Defaults to True
+            sampling_batch_size (int): Number of records to process per batch when sampling.
+            start_time_epoch_ms (int): Start time in epoch milliseconds for the rolling window.
             
         Returns:
             Dict: Analysis results including partition count, total messages, average record size, etc.
         """
-        logging.info(f"\nAnalyzing topic: {topic_name}")
+        logging.info(f"Analyzing topic: {topic_name}")
         
         partitions = list(topic_metadata.partitions.keys())
         partition_count = len(partitions)
         
         # Get partition offsets to calculate total messages
-        partition_offsets = self._get_partition_offsets(topic_name, partitions)
+        partition_offsets = self.__get_partition_offsets(topic_name, partitions)
         
-        total_messages = 0
+        total_record_count = 0
         partition_details = []
         
-        for partition_id, (low, high) in partition_offsets.items():
-            message_count = high - low
-            total_messages += message_count
+        for partition_number, (low, high) in partition_offsets.items():
+            record_count = high - low
+            total_record_count += record_count
+                
+            # Get the earliest offset in the partition whose record timestamp is >= start_time_epoch_ms
+            offset_at_start_time = self.__get_record_timestamp_from_offset(topic_name, partition_number, start_time_epoch_ms)
+
+            if offset_at_start_time is None:
+                offset_at_start_time = high
             
             partition_details.append({
-                'partition_id': partition_id,
-                'low_watermark': low,
-                'high_watermark': high,
-                'message_count': message_count
+                "partition_number": partition_number,
+                "offset_start": offset_at_start_time,
+                "offset_end": high,
+                "record_count": record_count
             })
         
-        logging.info(f"  Partitions: {partition_count}")
-        logging.info(f"  Total messages: {total_messages:,}")
-        
+        logging.debug(f"  Partitions: {partition_count}")
+        logging.debug(f"  Total record count: {total_record_count:,.0f}")
+
+
         # Sample record sizes if requested and topic has messages
         avg_record_size = None
-        if use_sample_records and total_messages > 0:
-            avg_record_size = self._sample_record_sizes(topic_name, min(sample_size, total_messages))
-        elif total_messages == 0:
+        if total_record_count > 0:
+            avg_record_size = self.__sample_record_sizes(topic_name, sampling_batch_size, partition_details)
+        elif total_record_count == 0:
             logging.warning(f"  Topic '{topic_name}' is empty - no records to sample")
             avg_record_size = 0.0
         
         return {
             'topic_name': topic_name,
             'partition_count': partition_count,
-            'total_messages': total_messages,
+            'total_record_count': total_record_count,
             'avg_bytes_per_record': avg_record_size,
             'partition_details': partition_details,
             'is_internal': topic_name.startswith('_')
