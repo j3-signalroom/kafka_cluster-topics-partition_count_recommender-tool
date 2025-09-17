@@ -47,7 +47,8 @@ class KafkaTopicsAnalyzer:
             'auto.offset.reset': 'earliest',
             'enable.auto.commit': False,
             'session.timeout.ms': 30000,
-            'fetch.min.bytes': 1
+            'fetch.min.bytes': 1,
+            'enable.metrics.push': False
         }
 
     def analyze_all_topics(self, include_internal: bool = False, use_sample_records: bool = True, sampling_days: int = DEFAULT_SAMPLING_DAYS, sampling_batch_size: int = DEFAULT_SAMPLING_BATCH_SIZE, topic_filter: str | None = None) -> List[Dict]:
