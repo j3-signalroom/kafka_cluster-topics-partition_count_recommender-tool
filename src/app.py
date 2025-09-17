@@ -103,17 +103,12 @@ def main():
         logging.info(f"Analysis Timestamp: {datetime.now().isoformat()}")
         logging.info(f"Kafka Cluster ID: {kafka_cluster_id}")
         logging.info(f"Required Consumption Throughput Factor: {required_consumption_throughput_factor}")
-        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
-
-        # Table header
-        header = f"{'Topic Name':<40} {'Messages':<12} {'Partitions':<12} {'Required Throughput':<21} {'Consumer Throughput':<21} {'Recommended Partitions':<25} {'Status':<10}"
-        logging.info(header)
-        logging.info("-" * DEFAULT_CHARACTER_REPEAT)
         
         total_recommended_partitions = 0
         total_record_count = 0
 
         # Sort results by topic name
+        topic_details = []
         for result in sorted(results, key=lambda x: x['topic_name']):
             kafka_topic_name = result['topic_name']
             partition_count = result['partition_count']
@@ -150,7 +145,15 @@ def main():
             
             # Format numbers with commas
             messages_str = f"{record_count:,.0f}"
-            logging.info(f"{kafka_topic_name:<40} {messages_str:<12} {partition_count:<12} {required_throughput_str:<21} {consumer_throughput_str:<21} {recommended_partition_count_str:<25} {status:<10}")
+            topic_details.append(f"{kafka_topic_name:<40} {messages_str:<12} {partition_count:<12} {required_throughput_str:<21} {consumer_throughput_str:<21} {recommended_partition_count_str:<25} {status:<10}")
+
+
+        # Table header and details        
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
+        logging.info(f"{'Topic Name':<40} {'Messages':<12} {'Partitions':<12} {'Required Throughput':<21} {'Consumer Throughput':<21} {'Recommended Partitions':<25} {'Status':<10}")
+        logging.info("-" * DEFAULT_CHARACTER_REPEAT)
+        for detail in topic_details:
+            logging.info(detail)    
 
         # Summary statistics
         total_topics = len(results)
