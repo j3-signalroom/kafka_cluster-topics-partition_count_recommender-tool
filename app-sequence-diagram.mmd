@@ -5,71 +5,90 @@ sequenceDiagram
     participant MC as MetricsClient
     participant KTA as KafkaTopicsAnalyzer
     participant Kafka as Kafka Cluster
-    participant FS as File System
+    participant File as JSON Output File
 
     Main->>Env: load_dotenv()
     Main->>Env: Get configuration variables
     
     alt USE_AWS_SECRETS_MANAGER == "True"
-        Main->>AWS: get_secrets(cc_secrets_path)
-        AWS-->>Main: Confluent Cloud API credentials
-        Main->>AWS: get_secrets(kafka_secrets_path)
-        AWS-->>Main: Kafka API credentials
-    else Environment Variables
-        Main->>Env: Get credentials directly
+        Main->>AWS: get_secrets(confluent_cloud_secrets)
+        AWS-->>Main: API credentials or empty dict
+        Main->>AWS: get_secrets(kafka_secrets)
+        AWS-->>Main: Kafka credentials or empty dict
+        alt Secrets retrieved successfully
+            Note over Main: Use AWS secrets
+        else Secrets empty
+            Main->>Env: Fallback to environment variables
+        end
+    else
+        Main->>Env: Use environment variables directly
     end
 
-    rect rgb(173, 216, 230)
-        Note over Main,MC: Metrics API-based Analysis Setup
-        alt use_sample_records == False
-            Main->>MC: MetricsClient(metrics_config)
-            MC-->>Main: MetricsClient instance
-        end
-    end
-
-    Main->>KTA: KafkaTopicsAnalyzer(bootstrap_server_uri, kafka_api_key, kafka_api_secret)
-    KTA-->>Main: Analyzer instance
-
-    Main->>KTA: analyze_all_topics(include_internal, use_sample_records, sample_size, topic_filter)
-    KTA->>Kafka: Connect and retrieve topics
-    KTA->>Kafka: Get partition counts
-    
-    rect rgb(255, 218, 185)
-        Note over KTA,Kafka: Sample-based Analysis
-        alt use_sample_records == True
-            KTA->>Kafka: Sample records from topics
-            Kafka-->>KTA: Sample data
-            KTA->>KTA: Calculate avg_bytes_per_record
-        end
-    end
-    
-    KTA-->>Main: Analysis results
-
-    loop For each topic result
-        rect rgb(255, 218, 185)
-            Note over Main: Sample-based Calculations
-            alt use_sample_records == True
-                Main->>Main: Calculate throughput from samples
-            end
-        end
+    alt use_sample_records == False
         rect rgb(173, 216, 230)
-            Note over Main,MC: Metrics API-based Calculations
-            alt use_sample_records == False
-                Main->>MC: get_topic_daily_aggregated_totals(RECEIVED_BYTES, cluster_id, topic_name)
-                MC->>Kafka: Query metrics
-                Kafka-->>MC: Bytes metrics data
-                MC-->>Main: Aggregated metrics
-            end
+            Note over Main,MC: METRICS API ANALYSIS PATH
+            Main->>MC: MetricsClient(metrics_config)
+            Note over MC: Initialize Confluent Cloud API client
         end
-        
-        Main->>Main: Calculate recommended partition count
-        Main->>Main: Format and log results
     end
 
-    Main->>Main: Calculate summary statistics
-    Main->>Main: Log summary
+    Main->>KTA: KafkaTopicsAnalyzer(bootstrap_server, api_key, api_secret)
+    
+    Main->>KTA: analyze_all_topics(params)
+    KTA->>Kafka: Connect to Kafka cluster
+    KTA->>Kafka: List all topics
+    Kafka-->>KTA: Topic list
+    
+    loop For each topic
+        KTA->>Kafka: Get topic metadata (partitions)
+        Kafka-->>KTA: Partition count
+        
+        alt use_sample_records == True
+            rect rgb(144, 238, 144)
+                Note over KTA,Kafka: SAMPLE RECORDS ANALYSIS PATH
+                KTA->>Kafka: Sample records from topic
+                Kafka-->>KTA: Sample data
+                KTA->>KTA: Calculate avg_bytes_per_record
+                KTA->>KTA: Calculate total_record_count
+            end
+        else
+            rect rgb(173, 216, 230)
+                Note over KTA: METRICS API PATH - Skip sampling
+            end
+        end
+    end
+    
+    KTA-->>Main: Analysis results array
 
-    Main->>FS: Export results to JSON file
-    FS-->>Main: File saved
+    alt results empty
+        Main->>Main: Log error and return
+    else
+        loop For each result
+            alt use_sample_records == True
+                rect rgb(144, 238, 144)
+                    Note over Main: SAMPLE RECORDS THROUGHPUT CALCULATION
+                    Main->>Main: Calculate throughput from samples
+                end
+            else
+                rect rgb(173, 216, 230)
+                    Note over Main,MC: METRICS API THROUGHPUT CALCULATION
+                    Main->>MC: get_topic_daily_aggregated_totals(RECEIVED_BYTES)
+                    MC->>MC: Query Confluent Cloud Metrics API
+                    MC-->>Main: Bytes throughput data
+                    Main->>MC: get_topic_daily_aggregated_totals(RECEIVED_RECORDS)
+                    MC->>MC: Query Confluent Cloud Metrics API  
+                    MC-->>Main: Records count data
+                end
+            end
+            Main->>Main: Calculate recommended partition count
+        end
 
-    Note over Main: Process complete with recommendations
+        Main->>Main: Sort results by topic name
+        Main->>Main: Format and log analysis table
+        Main->>Main: Calculate summary statistics
+        Main->>Main: Log summary statistics
+        
+        Main->>File: Export results to JSON
+        File-->>Main: File written successfully
+        Main->>Main: Log completion message
+    end

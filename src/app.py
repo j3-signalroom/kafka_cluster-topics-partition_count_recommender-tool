@@ -147,7 +147,6 @@ def main():
             messages_str = f"{record_count:,.0f}"
             topic_details.append(f"{kafka_topic_name:<40} {messages_str:<12} {partition_count:<12} {required_throughput_str:<21} {consumer_throughput_str:<21} {recommended_partition_count_str:<25} {status:<10}")
 
-
         # Table header and details        
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info(f"{'Topic Name':<40} {'Messages':<12} {'Partitions':<12} {'Required Throughput':<21} {'Consumer Throughput':<21} {'Recommended Partitions':<25} {'Status':<10}")
