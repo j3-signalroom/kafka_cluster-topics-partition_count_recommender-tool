@@ -67,6 +67,7 @@ Create the `.env` file and add the following environment variables, filling them
    REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR=<YOUR_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR>
 
    USE_SAMPLE_RECORDS=<True|False>
+   SAMPLING_DAYS=7
    SAMPLING_BATCH_SIZE=1000
    
    TOPIC_FILTER=
@@ -91,6 +92,7 @@ The environment variables are defined as follows:
 | `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` | A multiplier to scale the peak consumption for future demand forecasting (e.g., `1.5` for 150%). |
 | `USE_SAMPLE_RECORDS` | Set to `True` if you want to sample records for analysis; otherwise, set to `False`. |
 | `SAMPLING_BATCH_SIZE` | The number of records to sample if `USE_SAMPLE_RECORDS` is set to `True` (e.g., `1000`). |
+| `SAMPLING_DAYS` | The number of days to look back when sampling records if `USE_SAMPLE_RECORDS` is set to `True` (e.g., `7`). |
 | `TOPIC_FILTER` | A comma-separated list of topic names to include in the analysis. Leave empty to include all topics. |
 | `USE_AWS_SECRETS_MANAGER` | Set to `True` if you want to use AWS Secrets Manager to manage your secrets; otherwise, set to `False`. |
 | `AWS_REGION_NAME` | The AWS region where your secrets are stored (e.g., `us-east-1`). |

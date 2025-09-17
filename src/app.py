@@ -3,12 +3,12 @@ import json
 import logging
 from dotenv import load_dotenv
 import os
-from typing import Final
 
 from KafkaTopicsAnalyzer import KafkaTopicsAnalyzer
 from utilities import setup_logging
 from cc_clients_python_lib.metrics_client import MetricsClient, METRICS_CONFIG, KafkaMetric
 from aws_clients_python_lib.secrets_manager import get_secrets
+from constants import DEFAULT_SAMPLING_DAYS, DEFAULT_SAMPLING_BATCH_SIZE, DEFAULT_CHARACTER_REPEAT
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -18,10 +18,6 @@ __maintainer__ = "Jeffrey Jonathan Jennings"
 __email__      = "j3@thej3.com"
 __status__     = "dev"
 
-
-# Default configuration constants
-DEFAULT_SAMPLING_BATCH_SIZE: Final[int] = 1000
-DEFAULT_CHARACTER_REPEAT: Final[int] = 150
 
 # Setup logging
 logger = setup_logging()
@@ -89,7 +85,8 @@ def main():
         results = analyzer.analyze_all_topics(
             include_internal=os.getenv("INCLUDE_INTERNAL_TOPICS", "False") == "True",
             use_sample_records=use_sample_records,
-            sampling_batch_size=int(os.getenv("SAMPLING_BATCH_SIZE", DEFAULT_SAMPLING_BATCH_SIZE)),
+            sampling_days=int(os.getenv("SAMPLING_DAYS", DEFAULT_SAMPLING_DAYS)),
+            sampling_batch_size=int(os.getenv("SAMPLING_BATCH_SIZE", DEFAULT_SAMPLING_BATCH_SIZE)),            
             topic_filter=os.getenv("TOPIC_FILTER")
         )
         

@@ -6,6 +6,7 @@ from confluent_kafka import Consumer, TopicPartition
 import logging
 
 from utilities import setup_logging
+from constants import DEFAULT_SAMPLING_DAYS, DEFAULT_SAMPLING_BATCH_SIZE
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -49,12 +50,13 @@ class KafkaTopicsAnalyzer:
             'fetch.min.bytes': 1
         }
 
-    def analyze_all_topics(self, include_internal: bool = False, use_sample_records: bool = True, sampling_batch_size: int = 1000, topic_filter: str | None = None) -> List[Dict]:
+    def analyze_all_topics(self, include_internal: bool = False, use_sample_records: bool = True, sampling_days: int = DEFAULT_SAMPLING_DAYS, sampling_batch_size: int = DEFAULT_SAMPLING_BATCH_SIZE, topic_filter: str | None = None) -> List[Dict]:
         """Analyze all topics in the cluster.
         
         Args:
             include_internal (bool, optional): Whether to include internal topics. Defaults to False.
             use_sample_records (bool, optional): Whether to sample records for average size. Defaults to True.
+            sampling_days (int, optional): Number of days to look back for sampling. Defaults to 7.
             sampling_batch_size (int, optional): Number of records to process per batch when sampling. Defaults to 1000.
             topic_filter (Optional[str], optional): If provided, only topics containing this string will be analyzed. Defaults to None.
         
@@ -87,20 +89,20 @@ class KafkaTopicsAnalyzer:
         results = []
 
         if use_sample_records:
-            # Calculate the ISO 8601 formatted begin timestamp of the rolling seven day window
+            # Calculate the ISO 8601 formatted begin timestamp of the rolling window
             utc_now = datetime.now(timezone.utc)
-            seven_days_ago = utc_now - timedelta(days=7)
-            iso_start_time = datetime.fromisoformat(seven_days_ago.strftime('%Y-%m-%dT%H:%M:%S+00:00'))
-            start_time_epoch_ms = int(seven_days_ago.timestamp() * 1000)
+            rolling_start = utc_now - timedelta(days=sampling_days)
+            iso_start_time = datetime.fromisoformat(rolling_start.strftime('%Y-%m-%dT%H:%M:%S+00:00'))
+            start_time_epoch_ms = int(rolling_start.timestamp() * 1000)
 
-            logging.info(f"Using rolling seven day window starting from {iso_start_time.isoformat()}")
+            logging.info(f"Using rolling {sampling_days} day(s) window starting from {iso_start_time.isoformat()}")
             
             for topic_name, topic_metadata in topics_to_analyze.items():
                 try:
                     result = self.__analyze_topic(topic_name, topic_metadata, sampling_batch_size, start_time_epoch_ms)
                     results.append(result)
                 except Exception as e:
-                    logging.error(f"Error analyzing topic {topic_name}: {e}")
+                    logging.error(f"Failed to analyze topic {topic_name} because {e}")
 
                     # Add basic info even if analysis fails
                     results.append({
@@ -320,12 +322,12 @@ class KafkaTopicsAnalyzer:
             topic_name (str): Name of the topic to analyze.
             topic_metadata: Metadata object for the topic.
             sampling_batch_size (int): Number of records to process per batch when sampling.
-            start_time_epoch_ms (int): Start time in epoch milliseconds for the rolling seven day window.
+            start_time_epoch_ms (int): Start time in epoch milliseconds for the rolling window.
             
         Returns:
             Dict: Analysis results including partition count, total messages, average record size, etc.
         """
-        logging.info(f"\nAnalyzing topic: {topic_name}")
+        logging.info(f"Analyzing topic: {topic_name}")
         
         partitions = list(topic_metadata.partitions.keys())
         partition_count = len(partitions)
