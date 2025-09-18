@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import time
-from typing import Dict, List, Tuple
-from confluent_kafka.admin import AdminClient
+from typing import Dict, List, Optional, Tuple
+from confluent_kafka.admin import AdminClient, ConfigResource
 from confluent_kafka import Consumer, TopicPartition
 import logging
 
@@ -69,23 +69,10 @@ class KafkaTopicsAnalyzer:
         logging.info("Connecting to Kafka cluster and fetching metadata...")
         
         # Get cluster metadata
-        metadata = self.__get_topics_metadata()
-        if not metadata:
+        topics_to_analyze = self.__get_topics_metadata(sampling_days=sampling_days, include_internal=include_internal, topic_filter=topic_filter)
+        if not topics_to_analyze:
             return []
         
-        # Filter topics
-        topics_to_analyze = {}
-        for topic_name, topic_metadata in sorted(metadata.topics.items()):
-            # Skip internal topics if not requested
-            if not include_internal and topic_name.startswith('_'):
-                continue
-                
-            # Apply topic filter if provided
-            if topic_filter and topic_filter.lower() not in topic_name.lower():
-                continue
-                
-            topics_to_analyze[topic_name] = topic_metadata
-
         logging.info(f"Found {len(topics_to_analyze)} topics to analyze")
 
         # Analyze topics
@@ -128,20 +115,76 @@ class KafkaTopicsAnalyzer:
                     'is_internal': topic_name.startswith('_')
                 })        
         return results
-    
-    def __get_topics_metadata(self) -> Dict:
-        """Get cluster metadata including topics and partitions.
+
+    def __get_topics_metadata(self, sampling_days: int, include_internal: bool, topic_filter: Optional[str]) -> Dict:
+        """Get cluster metadata including topics, partitions, and retention.
+
+        Args:
+            sampling_days (int): Number of days to look back for sampling.
+            include_internal (bool): Whether to include internal topics.
+            topic_filter (Optional[str]): If provided, only topics containing this string will be analyzed.
         
         Returns:
-            Dict: Cluster metadata including topics and partitions.
+            Dict: Metadata of topics in the cluster.
         """
         try:
+            # Get all the Kafka Topics' metadata for the Kafka Cluster
             metadata = self.admin_client.list_topics(timeout=60)
-            return metadata
+
+            # Now filter the Kafka Topics that are not to analyzed
+            topics_to_analyze = {}
+            for topic_name, topic_metadata in sorted(metadata.topics.items()):
+                # Skip internal topics if not requested
+                if not include_internal and topic_name.startswith('_'):
+                    continue
+                    
+                # Apply topic filter if provided
+                if topic_filter and topic_filter.lower() not in topic_name.lower():
+                    continue
+
+                topics_to_analyze[topic_name] = {"metadata": topic_metadata, 
+                                                 "retention_ms": None, 
+                                                 "sampling_days_based_on_retention_days": None, 
+                                                 "retention_days_for_display": None}
+
+            # Create ConfigResource objects for the topics to be analyzed
+            resources = [ConfigResource(ConfigResource.Type.TOPIC, topic_name) for topic_name in topics_to_analyze.keys()]
+        
+            # Describe configurations for the topics to be analyzed
+            configs_result = self.admin_client.describe_configs(resources)
+
+            # Process the results to extract retention.ms for each of the topics to be analyzed
+            for resource in resources:
+                try:
+                    config_dict = configs_result[resource].result(timeout=60)
+                    retention_ms = config_dict.get('retention.ms')
+                    
+                    if retention_ms:
+                        retention_value = int(retention_ms.value)
+                        if retention_value == -1:
+                            topics_to_analyze[resource.name]["sampling_days_based_on_retention_days"] = sampling_days
+                            topics_to_analyze[resource.name]["retention_days_for_display"] = "Infinite"
+                            topics_to_analyze[resource.name]["retention_ms"] = retention_ms
+                        else:
+                            days = retention_value / (1000 * 60 * 60 * 24)
+                            topics_to_analyze[resource.name]["sampling_days_based_on_retention_days"] = min(sampling_days, max(1, int(days)))
+                            topics_to_analyze[resource.name]["retention_days_for_display"] = f"{days:.1f} days"
+                        
+                        topics_to_analyze[resource.name]["retention_ms"] = retention_ms
+                    else:
+                        topics_to_analyze[resource.name]["sampling_days_based_on_retention_days"] = sampling_days
+                        topics_to_analyze[resource.name]["retention_days_for_display"] = "Unknown"
+                        topics_to_analyze[resource.name]["retention_ms"] = None
+                except:  # noqa: E722
+                    topics_to_analyze[resource.name]["sampling_days_based_on_retention_days"] = sampling_days
+                    topics_to_analyze[resource.name]["retention_days_for_display"] = "Unknown"
+                    topics_to_analyze[resource.name]["retention_ms"] = None
+
+                return metadata
         except Exception as e:
             logger.error(f"Error getting topics metadata: {e}")
             return None
-
+        
     def __get_partition_offsets(self, topic_name: str, partitions: List[int]) -> Dict[int, Tuple[int, int]]:
         """Get low and high watermarks for the topic's partitions.
         
