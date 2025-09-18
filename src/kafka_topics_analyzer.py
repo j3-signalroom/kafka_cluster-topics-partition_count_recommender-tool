@@ -164,7 +164,7 @@ class KafkaTopicsAnalyzer:
                     # Get the configuration dictionary for the topic
                     config_dict = configs_result[resource].result(timeout=60)
 
-                    # Extract relevant configurations
+                    # Extract relevant configurations (cleanup.policy and retention.ms)
                     cleanup_policy = config_dict.get('cleanup.policy')
                     retention_ms = config_dict.get('retention.ms')
 
@@ -184,14 +184,15 @@ class KafkaTopicsAnalyzer:
                             topics_to_analyze[resource.name]["retention_days_for_display"] = "Infinite"
                             topics_to_analyze[resource.name]["retention_ms"] = retention_ms
                         else:
-                            days = retention_value / (1000 * 60 * 60 * 24)
-                            topics_to_analyze[resource.name]["sampling_days_based_on_retention_days"] = min(sampling_days, max(1, int(days)))
-                            topics_to_analyze[resource.name]["retention_days_for_display"] = f"{days:.1f} days"
-                        
+                            # (1000 milliseconds * 60 seconds * 60 minutes * 24 hours) = retention in milliseconds / number of milliseconds in a day = number of days
+                            number_of_days = retention_value / (1000 * 60 * 60 * 24)
+                            topics_to_analyze[resource.name]["sampling_days_based_on_retention_days"] = min(sampling_days, max(1, int(number_of_days)))
+                            topics_to_analyze[resource.name]["retention_days_for_display"] = f"{number_of_days:.1f} days"
+
                         topics_to_analyze[resource.name]["retention_ms"] = retention_ms
                     else:
                         topics_to_analyze[resource.name]["sampling_days_based_on_retention_days"] = sampling_days
-                        topics_to_analyze[resource.name]["retention_days_for_display"] = "Unknown"
+                        topics_to_analyze[resource.name]["retention_days_for_display"] = "unknown"
                         topics_to_analyze[resource.name]["retention_ms"] = None
                 except:  # noqa: E722
                     # If there's an error retrieving the config, set defaults
@@ -199,7 +200,7 @@ class KafkaTopicsAnalyzer:
                     topics_to_analyze[resource.name]["is_compacted"] = False
                     
                     topics_to_analyze[resource.name]["sampling_days_based_on_retention_days"] = sampling_days
-                    topics_to_analyze[resource.name]["retention_days_for_display"] = "Unknown"
+                    topics_to_analyze[resource.name]["retention_days_for_display"] = "unknown"
                     topics_to_analyze[resource.name]["retention_ms"] = None
 
                 return metadata
