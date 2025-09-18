@@ -22,6 +22,8 @@ logger = setup_logging()
 
 
 class KafkaTopicsAnalyzer:
+    """Class to analyze Kafka topics in a cluster."""
+
     def __init__(self, bootstrap_server_uri: str, kafka_api_key: str, kafka_api_secret: str):
         """Connect to the Kafka Cluster with the AdminClient.
 
@@ -48,7 +50,7 @@ class KafkaTopicsAnalyzer:
             'enable.auto.commit': False,
             'session.timeout.ms': 30000,
             'fetch.min.bytes': 1,
-            'enable.metrics.push': False
+            'enable.metrics.push': False    # Disable metrics pushing for consumers to registered JMX MBeans.  However, is really being set to False to not expose unneccessary noise to the logging output
         }
 
     def analyze_all_topics(self, include_internal: bool = False, use_sample_records: bool = True, sampling_days: int = DEFAULT_SAMPLING_DAYS, sampling_batch_size: int = DEFAULT_SAMPLING_BATCH_SIZE, topic_filter: str | None = None) -> List[Dict]:
@@ -73,7 +75,7 @@ class KafkaTopicsAnalyzer:
         
         # Filter topics
         topics_to_analyze = {}
-        for topic_name, topic_metadata in metadata.topics.items():
+        for topic_name, topic_metadata in sorted(metadata.topics.items()):
             # Skip internal topics if not requested
             if not include_internal and topic_name.startswith('_'):
                 continue
@@ -90,13 +92,13 @@ class KafkaTopicsAnalyzer:
         results = []
 
         if use_sample_records:
-            # Calculate the ISO 8601 formatted begin timestamp of the rolling window
+            # Calculate the ISO 8601 formatted start timestamp of the rolling window
             utc_now = datetime.now(timezone.utc)
             rolling_start = utc_now - timedelta(days=sampling_days)
             iso_start_time = datetime.fromisoformat(rolling_start.strftime('%Y-%m-%dT%H:%M:%S+00:00'))
             start_time_epoch_ms = int(rolling_start.timestamp() * 1000)
 
-            logging.info(f"Using rolling {sampling_days} day(s) window starting from {iso_start_time.isoformat()}")
+            logging.info(f"Using rolling {sampling_days} day window starting from {iso_start_time.isoformat()}")
             
             for topic_name, topic_metadata in topics_to_analyze.items():
                 try:
@@ -249,7 +251,7 @@ class KafkaTopicsAnalyzer:
                 if total_offsets <= 0:
                     continue
                 
-                logging.info(f"    Streaming {total_offsets} records from partition {partition_number}")
+                logging.info(f"    Streaming {total_offsets:,} records from partition {partition_number}")
                 
                 # Create TopicPartition and assign it
                 topic_partition = TopicPartition(topic_name, partition_number, start_offset)
@@ -299,9 +301,9 @@ class KafkaTopicsAnalyzer:
                     if batch_records_processed > 0:
                         current_avg = total_size / total_count if total_count > 0 else 0
                         progress_pct = (partition_record_count / total_offsets) * 100
-                        logging.info(f"      Streaming batch {batch_count}: {batch_records_processed} records "
-                                f"(offsets {batch_start_offset}-{current_offset-1}), "
-                                f"progress: {progress_pct:.1f}%, running avg: {current_avg:.2f} bytes")
+                        logging.info(f"      Streaming batch {batch_count}: {batch_records_processed:,} records "
+                                f"(offsets {batch_start_offset:,}-{current_offset-1:,}), "
+                                f"progress: {progress_pct:.1f}%, running avg: {current_avg:,.2f} bytes")
             
             except Exception as e:
                 logging.error(f"    Error streaming partition {partition_detail.get('partition_number', 'unknown')}: {e}")
@@ -310,7 +312,7 @@ class KafkaTopicsAnalyzer:
         
         if total_count > 0:
             avg_size = total_size / total_count
-            logging.info(f"    Final streaming average: {avg_size:.2f} bytes from {total_count} records")
+            logging.info(f"    Final streaming average: {avg_size:,.2f} bytes from {total_count:,} records")
             return avg_size
         else:
             logging.warning(f"    No records found in topic '{topic_name}'")
