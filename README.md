@@ -70,10 +70,10 @@ Now, you need to set up the application by creating a `.env` file in the root di
 #### 1.2.1 Create the `.env` file
 Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
    ```shell
-   BOOTSTRAP_SERVER_URI=<YOUR_BOOTSTRAP_SERVER_URI>
    CONFLUENT_CLOUD_API_KEY=<YOUR_CONFLUENT_CLOUD_API_KEY>
    CONFLUENT_CLOUD_API_SECRET=<YOUR_CONFLUENT_CLOUD_API_SECRET>
    INCLUDE_INTERNAL_TOPICS=False
+   BOOTSTRAP_SERVER_URI=<YOUR_BOOTSTRAP_SERVER_URI>
    KAFKA_API_KEY=<YOUR_KAFKA_API_KEY>
    KAFKA_API_SECRET=<YOUR_KAFKA_API_SECRET>
    KAFKA_CLUSTER_ID=<YOUR_KAFKA_CLUSTER_ID>
@@ -96,10 +96,10 @@ The environment variables are defined as follows:
 
 | Environment Variable Name  | Description |
 | ----------------------------------------| ----------- |
-| `BOOTSTRAP_SERVER_URI` | Tshe bootstrap server URI for your Kafka cluster (e.g., `pkc-xxxxxx.us-east-1.aws.confluent.cloud:9092`). |
 | `CONFLUENT_CLOUD_API_KEY` | Your Confluent Cloud API Key. |
 | `CONFLUENT_CLOUD_API_SECRET` | Your Confluent Cloud API Secret. |
 | `INCLUDE_INTERNAL_TOPICS` | Set to `True` if you want to include internal topics in the analysis; otherwise, set to `False`.  Default is `False`. |
+| `BOOTSTRAP_SERVER_URI` | Tshe bootstrap server URI for your Kafka cluster (e.g., `pkc-xxxxxx.us-east-1.aws.confluent.cloud:9092`). |
 | `KAFKA_API_KEY` | Your Kafka API Key. |
 | `KAFKA_API_SECRET` | Your Kafka API Secret. |
 | `KAFKA_CLUSTER_ID` | The ID of your Kafka cluster (e.g., `lkc-123xyz`). |
