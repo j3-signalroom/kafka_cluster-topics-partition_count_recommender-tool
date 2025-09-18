@@ -79,17 +79,17 @@ class KafkaTopicsAnalyzer:
         results = []
 
         if use_sample_records:
-            # Calculate the ISO 8601 formatted start timestamp of the rolling window
-            utc_now = datetime.now(timezone.utc)
-            rolling_start = utc_now - timedelta(days=sampling_days)
-            iso_start_time = datetime.fromisoformat(rolling_start.strftime('%Y-%m-%dT%H:%M:%S+00:00'))
-            start_time_epoch_ms = int(rolling_start.timestamp() * 1000)
-
-            logging.info(f"Using rolling {sampling_days} day window starting from {iso_start_time.isoformat()}")
-            
-            for topic_name, topic_metadata in topics_to_analyze.items():
+            for topic_name, topic_info in topics_to_analyze.items():
                 try:
-                    result = self.__analyze_topic(topic_name, topic_metadata, sampling_batch_size, start_time_epoch_ms)
+                    # Calculate the ISO 8601 formatted start timestamp of the rolling window
+                    utc_now = datetime.now(timezone.utc)
+                    rolling_start = utc_now - timedelta(days=topic_info['sampling_days_based_on_retention_days'])
+                    iso_start_time = datetime.fromisoformat(rolling_start.strftime('%Y-%m-%dT%H:%M:%S+00:00'))
+                    start_time_epoch_ms = int(rolling_start.timestamp() * 1000)
+
+                    logging.info(f"Using rolling {topic_info['sampling_days_based_on_retention_days']} day window starting from {iso_start_time.isoformat()}")
+
+                    result = self.__analyze_topic(topic_name, topic_info['metadata'], sampling_batch_size, start_time_epoch_ms)
                     results.append(result)
                 except Exception as e:
                     logging.error(f"Failed to analyze topic {topic_name} because {e}")
@@ -97,7 +97,7 @@ class KafkaTopicsAnalyzer:
                     # Add basic info even if analysis fails
                     results.append({
                         'topic_name': topic_name,
-                        'partition_count': len(topic_metadata.partitions),
+                        'partition_count': len(topic_info['metadata'].partitions),
                         'total_record_count': 0,
                         'avg_bytes_per_record': 0.0,
                         'partition_details': [],
@@ -105,10 +105,10 @@ class KafkaTopicsAnalyzer:
                         'error': str(e)
                     })
         else:
-            for topic_name, topic_metadata in topics_to_analyze.items():
+            for topic_name, topic_info in topics_to_analyze.items():
                 results.append({
                     'topic_name': topic_name,
-                    'partition_count': len(topic_metadata.partitions),
+                    'partition_count': len(topic_info['metadata'].partitions),
                     'total_record_count': 0,
                     'avg_bytes_per_record': 0.0,
                     'partition_details': [],
