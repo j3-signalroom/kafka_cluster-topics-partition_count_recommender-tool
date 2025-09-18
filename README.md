@@ -41,6 +41,8 @@ The **Kafka Cluster Topics Partition Count Recommender Application** offers data
 
 ## 1.0 To get started
 
+**_Download_** ---> **_Configure_** ---> **_Run_**
+
 ### 1.1 Download the Application
 Clone the repo:
     ```shell
