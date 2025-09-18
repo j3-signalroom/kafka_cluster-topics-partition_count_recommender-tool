@@ -10,6 +10,7 @@ The **Kafka Cluster Topics Partition Count Recommender Application** offers data
 <!-- toc -->
 - [**1.0 To get started**](#10-to-get-started)
    + [**1.1 Download the Application**](#11-download-the-application)
+      - [**1.1.1 Special Note on two dependencies**](#111-special-note-on-two-dependencies)
    + [**1.2 Configure the Application**](#12-configure-the-application)
       - [**1.2.1 Create the `.env` file**](#121-create-the-env-file)
       - [**1.2.2 Using the AWS Secrets Manager (optional)**](#122-using-the-aws-secrets-manager-optional)
@@ -50,6 +51,13 @@ Since this project was built using [**`uv`**](https://docs.astral.sh/uv/), plea
    ```shell
    uv sync
    ```
+
+#### 1.1.1 Special Note on two dependencies
+This project has two dependencies that require special attention:
+
+1. **[`cc-clients-python_lib`](https://github.com/j3-signalroom/cc-clients-python_lib)**: _This library offers a simple way to interact with Confluent Cloud services, including the Metrics API. It makes it easier to send API requests and manage responses._ It is used in this project to connect to the Confluent Cloud Metrics API and retrieve topic consumption metrics.
+
+2. **[`aws-clients-python_lib`](https://github.com/j3-signalroom/aws-clients-python_lib)**: _This library is used to interact with AWS services, specifically AWS Secrets Manager in this case. It enables the application to securely retrieve secrets stored in AWS Secrets Manager._
 
 ### 1.2 Configure the Application
 
