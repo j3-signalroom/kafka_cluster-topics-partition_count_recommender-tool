@@ -176,34 +176,6 @@ class KafkaTopicsAnalyzer:
         finally:
             consumer.close()
 
-    def __get_record_timestamp(self, topic_name: str, partition: int, offset: int) -> int:
-        """Get the timestamp of a specific record by topic, partition, and offset.
-        
-        Args:
-            topic_name (str): Topic name.
-            partition (int): Partition number.
-            offset (int): Offset of the record.
-            
-        Returns:
-            int: Timestamp of the record in milliseconds since epoch, or None if not found.
-        """
-        # Create a consumer to fetch the record
-        consumer = Consumer(self.kafka_consumer_config)
-        topic_partition = TopicPartition(topic_name, partition, offset)
-        consumer.assign([topic_partition])
-        consumer.seek(topic_partition)
-        record = consumer.poll(timeout=15.0)
-        consumer.close()
-
-        if record is None:
-            return None  # No message found
-        if record.error():
-            logging.error(f"Failed retrieving record because of {record.error()}")
-            return None
-
-        _, record_timestamp = record.timestamp()
-        return record_timestamp
-    
     def __get_record_timestamp_from_offset(self, topic_name: str, partition: int, timestamp_ms: int) -> int:
         """Get the offset of the first record with a timestamp greater than or equal to the specified timestamp.
 
