@@ -99,16 +99,16 @@ The environment variables are defined as follows:
 | `BOOTSTRAP_SERVER_URI` | Tshe bootstrap server URI for your Kafka cluster (e.g., `pkc-xxxxxx.us-east-1.aws.confluent.cloud:9092`). |
 | `CONFLUENT_CLOUD_API_KEY` | Your Confluent Cloud API Key. |
 | `CONFLUENT_CLOUD_API_SECRET` | Your Confluent Cloud API Secret. |
-| `INCLUDE_INTERNAL_TOPICS` | Set to `True` if you want to include internal topics in the analysis; otherwise, set to `False`. |
+| `INCLUDE_INTERNAL_TOPICS` | Set to `True` if you want to include internal topics in the analysis; otherwise, set to `False`.  Default is `False`. |
 | `KAFKA_API_KEY` | Your Kafka API Key. |
 | `KAFKA_API_SECRET` | Your Kafka API Secret. |
 | `KAFKA_CLUSTER_ID` | The ID of your Kafka cluster (e.g., `lkc-123xyz`). |
-| `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` | A multiplier to scale the peak consumption for future demand forecasting (e.g., `1.5` for 150%). |
-| `USE_SAMPLE_RECORDS` | Set to `True` if you want to sample records for analysis; otherwise, set to `False`. |
-| `SAMPLING_BATCH_SIZE` | The number of records to sample if `USE_SAMPLE_RECORDS` is set to `True` (e.g., `1000`). |
-| `SAMPLING_DAYS` | The number of days to look back when sampling records if `USE_SAMPLE_RECORDS` is set to True (for example, 7). This creates a rolling window that always looks back the specified number of days from the current time. **Note**: _This value will be ignored for topics that do not retain records for the number of days specified by_ `SAMPLING_DAYS`.|
+| `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` | A multiplier to scale the peak consumption for future demand forecasting (e.g., `3` for `300%`).  Default is `3`. |
+| `USE_SAMPLE_RECORDS` | Set to `True` if you want to sample records for analysis; otherwise, set to `False`. Default is `True`. |
+| `SAMPLING_BATCH_SIZE` | The number of records to sample if `USE_SAMPLE_RECORDS` is set to `True` (e.g., `50,000`).  Default is `50,000`. |
+| `SAMPLING_DAYS` | The number of days to look back when sampling records if `USE_SAMPLE_RECORDS` is set to True (for example, `7`). This creates a rolling window that always looks back the specified number of days from the current time. **Note**: _This value will be ignored for topics that do not retain records for the number of days specified by_ `SAMPLING_DAYS`.  Default is `7`.|
 | `TOPIC_FILTER` | A comma-separated list of topic names to include in the analysis. Leave empty to include all topics. |
-| `USE_AWS_SECRETS_MANAGER` | Set to `True` if you want to use AWS Secrets Manager to manage your secrets; otherwise, set to `False`. |
+| `USE_AWS_SECRETS_MANAGER` | Set to `True` if you want to use AWS Secrets Manager to manage your secrets; otherwise, set to `False`.  Default is `False`. |
 | `AWS_REGION_NAME` | The AWS region where your secrets are stored (e.g., `us-east-1`). |
 | `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` | The name of the AWS Secrets Manager secrets that contains your Confluent Cloud API Key and secret. |
 | `KAFKA_API_KEY_AWS_SECRETS` | The name of the AWS Secrets Manager secrets that contains your Kafka Cluster API Key, API Secret, Kafka Cluster ID, and bootstrap server URI. |
