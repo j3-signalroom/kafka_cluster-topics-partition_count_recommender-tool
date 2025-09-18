@@ -153,11 +153,11 @@ def main():
 
         # Summary statistics
         total_topics = len(results)
-        total_partitions = sum(r['partition_count'] for r in results)
-        total_record_count = sum(r.get('total_record_count', 0) for r in results)
+        total_partitions = sum(result['partition_count'] for result in results)
+        total_record_count = sum(result.get('total_record_count', 0) for result in results)
 
         if use_sample_records:
-            active_topics = len([r for r in results if r.get('total_record_count', 0) > 0])
+            active_topics = len([result for result in results if result.get('total_record_count', 0) > 0])
 
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("SUMMARY STATISTICS")

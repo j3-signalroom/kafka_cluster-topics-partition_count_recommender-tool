@@ -249,7 +249,7 @@ class KafkaTopicsAnalyzer:
                 if total_offsets <= 0:
                     continue
                 
-                logging.debug(f"    Streaming {total_offsets} records from partition {partition_number}")
+                logging.info(f"    Streaming {total_offsets} records from partition {partition_number}")
                 
                 # Create TopicPartition and assign it
                 topic_partition = TopicPartition(topic_name, partition_number, start_offset)
@@ -299,7 +299,7 @@ class KafkaTopicsAnalyzer:
                     if batch_records_processed > 0:
                         current_avg = total_size / total_count if total_count > 0 else 0
                         progress_pct = (partition_record_count / total_offsets) * 100
-                        logging.debug(f"      Streaming batch {batch_count}: {batch_records_processed} records "
+                        logging.info(f"      Streaming batch {batch_count}: {batch_records_processed} records "
                                 f"(offsets {batch_start_offset}-{current_offset-1}), "
                                 f"progress: {progress_pct:.1f}%, running avg: {current_avg:.2f} bytes")
             
