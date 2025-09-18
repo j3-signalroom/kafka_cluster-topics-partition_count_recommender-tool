@@ -143,6 +143,8 @@ class KafkaTopicsAnalyzer:
                     continue
 
                 topics_to_analyze[topic_name] = {"metadata": topic_metadata, 
+                                                 "cleanup_policy": None,
+                                                 "is_compacted": None,
                                                  "retention_ms": None, 
                                                  "sampling_days_based_on_retention_days": None, 
                                                  "retention_days_for_display": None}
@@ -156,9 +158,22 @@ class KafkaTopicsAnalyzer:
             # Process the results to extract retention.ms for each of the topics to be analyzed
             for resource in resources:
                 try:
+                    # Get the configuration dictionary for the topic
                     config_dict = configs_result[resource].result(timeout=60)
+
+                    # Extract relevant configurations
+                    cleanup_policy = config_dict.get('cleanup.policy')
                     retention_ms = config_dict.get('retention.ms')
+
+                    # Update the topics_to_analyze dictionary with the topic's cleanup policy
+                    if cleanup_policy:
+                        topics_to_analyze[resource.name]["cleanup_policy"] = cleanup_policy.value
+                        topics_to_analyze[resource.name]["is_compacted"] = 'compact' in cleanup_policy.value.lower()
+                    else:
+                        topics_to_analyze[resource.name]["cleanup_policy"] = "unknown"
+                        topics_to_analyze[resource.name]["is_compacted"] = False
                     
+                    # Update the topics_to_analyze dictionary with the topic's retention.ms and calculate sampling_days_based_on_retention_days
                     if retention_ms:
                         retention_value = int(retention_ms.value)
                         if retention_value == -1:
@@ -176,6 +191,10 @@ class KafkaTopicsAnalyzer:
                         topics_to_analyze[resource.name]["retention_days_for_display"] = "Unknown"
                         topics_to_analyze[resource.name]["retention_ms"] = None
                 except:  # noqa: E722
+                    # If there's an error retrieving the config, set defaults
+                    topics_to_analyze[resource.name]["cleanup_policy"] = "unknown"
+                    topics_to_analyze[resource.name]["is_compacted"] = False
+                    
                     topics_to_analyze[resource.name]["sampling_days_based_on_retention_days"] = sampling_days
                     topics_to_analyze[resource.name]["retention_days_for_display"] = "Unknown"
                     topics_to_analyze[resource.name]["retention_ms"] = None
