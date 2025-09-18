@@ -90,6 +90,7 @@ class KafkaTopicsAnalyzer:
                     logging.info(f"Using rolling {topic_info['sampling_days_based_on_retention_days']} day window starting from {iso_start_time.isoformat()}")
 
                     result = self.__analyze_topic(topic_name, topic_info['metadata'], sampling_batch_size, start_time_epoch_ms)
+                    result['is_compacted'] = topic_info['is_compacted']
                     results.append(result)
                 except Exception as e:
                     logging.error(f"Failed to analyze topic {topic_name} because {e}")
@@ -97,6 +98,7 @@ class KafkaTopicsAnalyzer:
                     # Add basic info even if analysis fails
                     results.append({
                         'topic_name': topic_name,
+                        'is_compacted': topic_info['is_compacted'],
                         'partition_count': len(topic_info['metadata'].partitions),
                         'total_record_count': 0,
                         'avg_bytes_per_record': 0.0,
@@ -108,6 +110,7 @@ class KafkaTopicsAnalyzer:
             for topic_name, topic_info in topics_to_analyze.items():
                 results.append({
                     'topic_name': topic_name,
+                    'is_compacted': topic_info['is_compacted'],
                     'partition_count': len(topic_info['metadata'].partitions),
                     'total_record_count': 0,
                     'avg_bytes_per_record': 0.0,

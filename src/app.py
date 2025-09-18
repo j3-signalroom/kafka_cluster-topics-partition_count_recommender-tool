@@ -124,6 +124,7 @@ def main():
             # Extract necessary details
             kafka_topic_name = result['topic_name']
             partition_count = result['partition_count']
+            is_compacted_str = result.get('is_compacted', False)
             
             if use_sample_records:
                 # Use sample records to determine throughput
@@ -175,11 +176,11 @@ def main():
                 status = "Active"
             
             # Append formatted details to the list
-            topic_details.append(f"{kafka_topic_name:<40} {record_count_str:<12} {partition_count:<20} {required_throughput_str:<21} {consumer_throughput_str:<21} {recommended_partition_count_str:<25} {status:<10}")
+            topic_details.append(f"{kafka_topic_name:<40} {is_compacted_str:<15} {record_count_str:<12} {partition_count:<20} {required_throughput_str:<21} {consumer_throughput_str:<21} {recommended_partition_count_str:<25} {status:<10}")
 
         # Table header and details        
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
-        logging.info(f"{'Topic Name':<40} {'Records':<12} {'Current Partitions':<20} {'Required Throughput':<21} {'Consumer Throughput':<21} {'Recommended Partitions':<25} {'Status':<10}")
+        logging.info(f"{'Topic Name':<40} {'Is Compacted?':<15} {'Records':<12} {'Current Partitions':<20} {'Required Throughput':<21} {'Consumer Throughput':<21} {'Recommended Partitions':<25} {'Status':<10}")
         logging.info("-" * DEFAULT_CHARACTER_REPEAT)
         for detail in topic_details:
             logging.info(detail)    
