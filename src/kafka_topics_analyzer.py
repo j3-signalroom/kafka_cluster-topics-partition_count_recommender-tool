@@ -203,7 +203,7 @@ class KafkaTopicsAnalyzer:
                     topics_to_analyze[resource.name]["retention_days_for_display"] = "unknown"
                     topics_to_analyze[resource.name]["retention_ms"] = None
 
-                return metadata
+            return topics_to_analyze
         except Exception as e:
             logger.error(f"Error getting topics metadata: {e}")
             return None

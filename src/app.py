@@ -8,7 +8,7 @@ from typing import Dict, List
 from kafka_topics_analyzer import KafkaTopicsAnalyzer
 from utilities import setup_logging
 from cc_clients_python_lib.http_status import HttpStatus
-from cc_clients_python_lib.metrics_client import MetricsClient, METRICS_CONFIG, KafkaMetric
+from cc_clients_python_lib.metrics_client import MetricsClient, KafkaMetric
 from aws_clients_python_lib.secrets_manager import get_secrets
 from constants import (DEFAULT_SAMPLING_DAYS, 
                        DEFAULT_SAMPLING_BATCH_SIZE, 
@@ -51,25 +51,18 @@ def main():
     # Read Confluent Cloud credentials from environment variables or AWS Secrets Manager
     try:
         # Check if using AWS Secrets Manager for credentials retrieval
-        metrics_config = {}
         if use_aws_secrets_manager:
-            logging.info("Using AWS Secrets Manager for retrieving the Confluent Cloud credentials.")
-
-            # Retrieve Confluent Cloud API Key/Secret from AWS Secrets Manager
             cc_api_secrets_path = json.loads(os.getenv("CONFLUENT_CLOUD_API_SECRET_PATH", "{}"))
-            settings, error_message = get_secrets(cc_api_secrets_path["region_name"], cc_api_secrets_path["secret_name"])
-            if settings == {}:
+            metrics_config, error_message = get_secrets(cc_api_secrets_path["region_name"], cc_api_secrets_path["secret_name"])
+            if metrics_config == {}:
                 logging.error(f"FAILED TO RETRIEVE CONFLUENT CLOUD API KEY/SECRET FROM AWS SECRETS MANAGER BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
                 return
-            else:
-                metrics_config[METRICS_CONFIG["confluent_cloud_api_key"]] = settings.get("confluent_cloud_api_key")
-                metrics_config[METRICS_CONFIG["confluent_cloud_api_secret"]] = settings.get("confluent_cloud_api_secret")
-        else:
-            logging.info("Using environment variables for retrieving the Confluent Cloud credentials.")
             
-            # Use environment variables directly
-            metrics_config[METRICS_CONFIG["confluent_cloud_api_key"]] = os.getenv("CONFLUENT_CLOUD_API_KEY")
-            metrics_config[METRICS_CONFIG["confluent_cloud_api_secret"]] = os.getenv("CONFLUENT_CLOUD_API_SECRET")
+            logging.info("Using AWS Secrets Manager for retrieving the Confluent Cloud credentials.")
+        else:
+            metrics_config = json.loads(os.getenv("CONFLUENT_CLOUD_CREDENTIAL", "{}"))
+            logging.info("Using environment variables for retrieving the Confluent Cloud credentials.")
+
     except Exception as e:
         logging.error(f"THE APPLICATION FAILED TO READ CONFLUENT CLOUD CONFIGURATION SETTINGS BECAUSE OF THE FOLLOWING ERROR: {e}") 
         return
@@ -104,6 +97,7 @@ def main():
         
     if use_sample_records:
         logging.info(f"Using sample records for analysis with sample size: {sampling_batch_size:,.0f}")
+        metrics_client = None
     else:
         logging.info("Using Metrics API for analysis.")
 
@@ -174,7 +168,7 @@ def _generate_report(metrics_client: MetricsClient, kafka_cluster_id: str, resul
         # Extract necessary details
         kafka_topic_name = result['topic_name']
         partition_count = result['partition_count']
-        is_compacted_str = result.get('is_compacted', False)
+        is_compacted_str = "Yes" if result.get('is_compacted', False) else "No"
         
         if use_sample_records:
             # Use sample records to determine throughput
@@ -226,11 +220,11 @@ def _generate_report(metrics_client: MetricsClient, kafka_cluster_id: str, resul
             status = "Active"
         
         # Append formatted details to the list
-        topic_details.append(f"{kafka_topic_name:<40} {is_compacted_str:<15} {record_count_str:<12} {partition_count:<20} {required_throughput_str:<21} {consumer_throughput_str:<21} {recommended_partition_count_str:<25} {status:<10}")
+        topic_details.append(f"{kafka_topic_name:<40} {is_compacted_str:<13} {record_count_str:<12} {partition_count:<12} {required_throughput_str:<21} {consumer_throughput_str:<21} {recommended_partition_count_str:<25} {status:<10}")
 
     # Table header and details        
     logging.info("=" * DEFAULT_CHARACTER_REPEAT)
-    logging.info(f"{'Topic Name':<40} {'Is Compacted?':<15} {'Records':<12} {'Current Partitions':<20} {'Required Throughput':<21} {'Consumer Throughput':<21} {'Recommended Partitions':<25} {'Status':<10}")
+    logging.info(f"{'Topic Name':<40} {'Compacted?':<13} {'Records':<12} {'Partitions':<12} {'Required Throughput':<21} {'Consumer Throughput':<21} {'Recommended Partitions':<25} {'Status':<10}")
     logging.info("-" * DEFAULT_CHARACTER_REPEAT)
     for detail in topic_details:
         logging.info(detail)    
