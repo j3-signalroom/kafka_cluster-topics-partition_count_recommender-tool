@@ -97,7 +97,7 @@ The environment variables are defined as follows:
 | Environment Variable Name  | Description |
 | ----------------------------------------| ----------- |
 | `CONFLUENT_CLOUD_CREDENTIAL` | JSON Object with Confluent Cloud API Key and Secret keys. |
-| `KAFKA_CREDENTIALS` | JSON Object Array with Kafka Cluster API Key, API Secret, Kafka Cluster ID, and bootstrap server URI. |
+| `KAFKA_CREDENTIALS` | JSON Object Array with Kafka Cluster API Keys, API Secrets, Kafka Cluster IDs, and bootstrap server URIs. |
 | `USE_AWS_SECRETS_MANAGER` | Set to `True` if you want to use AWS Secrets Manager to manage your secrets; otherwise, set to `False`.  Default is `False`. |
 | `CONFLUENT_CLOUD_API_SECRET_PATH` | JSON Object with the Secrets' AWS Region Name and the name of the AWS Secrets Manager secrets that contains your Confluent Cloud API Key and secret. |
 | `KAFKA_API_SECRET_PATHS` | JSON Object Array with the Secrets' AWS Region Name and the name of the AWS Secrets Manager secrets that contains your Kafka Cluster API Key, API Secret, Kafka Cluster ID, and bootstrap server URI. |
