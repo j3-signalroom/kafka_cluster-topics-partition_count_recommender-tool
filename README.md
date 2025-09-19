@@ -210,102 +210,78 @@ The **50 partitions** ensure that the consumer can achieve the required throughp
 #### 2.1 End-to-End Application Workflow
 ```mermaid
 ---
-id: 9958c339-5496-4c34-bcb4-3ba359a17ee3
+id: 18ffc070-2801-4d6a-9a7c-36619ce33af3
 ---
 sequenceDiagram
-   participant Main as main()
-   participant Env as Environment/.env
-   participant AWS as AWS Secrets Manager
-   participant MC as MetricsClient
-   participant KTA as KafkaTopicsAnalyzer
-   participant Kafka as Kafka Cluster
-   participant File as JSON Output File
+    participant Main as main()
+    participant Env as Environment/.env
+    participant AWS as AWS Secrets Manager
+    participant MC as MetricsClient
+    participant KTA as KafkaTopicsAnalyzer
+    participant Report as _generate_report()
+    participant File as JSON File
 
-   Main->>Env: load_dotenv()
-   Main->>Env: Get configuration variables
-   
-   alt USE_AWS_SECRETS_MANAGER == "True"
-      Main->>AWS: get_secrets(confluent_cloud_secrets)
-      AWS-->>Main: API credentials or empty dict
-      Main->>AWS: get_secrets(kafka_secrets)
-      AWS-->>Main: Kafka credentials or empty dict
-      alt Secrets retrieved successfully
-         Note over Main: Use AWS secrets
-      else Secrets empty
-         Main->>Env: Fallback to environment variables
-      end
-   else
-      Main->>Env: Use environment variables directly
-   end
+    Main->>Env: load_dotenv()
+    Main->>Env: Read configuration settings
+    Note over Main,Env: REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR<br/>USE_SAMPLE_RECORDS, USE_AWS_SECRETS_MANAGER<br/>INCLUDE_INTERNAL_TOPICS, etc.
 
-   alt use_sample_records == False
-      rect rgb(173, 216, 230)
-         Note over Main,MC: METRICS API ANALYSIS PATH
-         Main->>MC: MetricsClient(metrics_config)
-         Note over MC: Initialize Confluent Cloud API client
-      end
-   end
+    alt use_aws_secrets_manager == True
+        Main->>AWS: get_secrets(cc_api_secrets_path)
+        AWS-->>Main: metrics_config or error
+        Main->>AWS: get_secrets(kafka_api_secrets_paths)
+        AWS-->>Main: kafka_credentials or error
+    else use environment variables
+        Main->>Env: Read CONFLUENT_CLOUD_CREDENTIAL
+        Main->>Env: Read KAFKA_CREDENTIALS
+        Env-->>Main: credentials
+    end
 
-   Main->>KTA: KafkaTopicsAnalyzer(bootstrap_server, api_key, api_secret)
-   
-   Main->>KTA: analyze_all_topics(params)
-   KTA->>Kafka: Connect to Kafka cluster
-   KTA->>Kafka: List all topics
-   Kafka-->>KTA: Topic list
-   
-   loop For each topic
-      KTA->>Kafka: Get topic metadata (partitions)
-      Kafka-->>KTA: Partition count
-      
-      alt use_sample_records == True
-         rect rgb(144, 238, 144)
-               Note over KTA,Kafka: SAMPLE RECORDS ANALYSIS PATH
-               KTA->>Kafka: Sample records from topic
-               Kafka-->>KTA: Sample data
-               KTA->>KTA: Calculate avg_bytes_per_record
-               KTA->>KTA: Calculate total_record_count
-         end
-      else
-         rect rgb(173, 216, 230)
-               Note over KTA: METRICS API PATH - Skip sampling
-         end
-      end
-   end
-   
-   KTA-->>Main: Analysis results array
+    alt use_sample_records == False
+        rect rgb(173, 216, 230)
+            Main->>MC: MetricsClient(metrics_config)
+            MC-->>Main: metrics_client instance
+        end
+    else
+        rect rgb(255, 182, 193)
+            Note over Main: metrics_client = None
+        end
+    end
 
-   alt results empty
-      Main->>Main: Log error and return
-   else
-      loop For each result
-         alt use_sample_records == True
-               rect rgb(144, 238, 144)
-                  Note over Main: SAMPLE RECORDS THROUGHPUT CALCULATION
-                  Main->>Main: Calculate throughput from samples
-               end
-         else
-               rect rgb(173, 216, 230)
-                  Note over Main,MC: METRICS API THROUGHPUT CALCULATION
-                  Main->>MC: get_topic_daily_aggregated_totals(RECEIVED_BYTES)
-                  MC->>MC: Query Confluent Cloud Metrics API
-                  MC-->>Main: Bytes throughput data
-                  Main->>MC: get_topic_daily_aggregated_totals(RECEIVED_RECORDS)
-                  MC->>MC: Query Confluent Cloud Metrics API  
-                  MC-->>Main: Records count data
-               end
-         end
-         Main->>Main: Calculate recommended partition count
-      end
-
-      Main->>Main: Sort results by topic name
-      Main->>Main: Format and log analysis table
-      Main->>Main: Calculate summary statistics
-      Main->>Main: Log summary statistics
-      
-      Main->>File: Export results to JSON
-      File-->>Main: File written successfully
-      Main->>Main: Log completion message
-   end
+    loop for each kafka_credential
+        Main->>KTA: KafkaTopicsAnalyzer(bootstrap_server, api_key, api_secret)
+        KTA-->>Main: analyzer instance
+        
+        Main->>KTA: analyze_all_topics(parameters)
+        Note over KTA: Analyzes topics based on<br/>include_internal, use_sample_records<br/>sampling_days, sampling_batch_size
+        KTA-->>Main: results (List[Dict])
+        
+        alt results exist
+            Main->>Report: _generate_report(metrics_client, kafka_cluster_id, results, ...)
+            
+            alt use_sample_records == False
+                rect rgb(173, 216, 230)
+                    loop for each result/topic
+                        Report->>MC: get_topic_daily_aggregated_totals(RECEIVED_BYTES)
+                        MC-->>Report: bytes_query_result or error
+                        Report->>MC: get_topic_daily_aggregated_totals(RECEIVED_RECORDS)
+                        MC-->>Report: record_query_result or error
+                    end
+                end
+            else
+                rect rgb(255, 182, 193)
+                    Note over Report: Use sample record data<br/>for throughput calculations
+                end
+            end
+            
+            Note over Report: Calculate recommended partitions<br/>Format and log analysis results<br/>Generate summary statistics
+            Report-->>Main: Report logged
+            
+            Main->>File: Export results to JSON
+            File-->>Main: JSON file created
+        else
+            Note over Main: Log "NO TOPIC(S) FOUND"
+        end
+    end
 ```
 
 ### 3.0 Unlocking High-Performance Consumer Throughput
