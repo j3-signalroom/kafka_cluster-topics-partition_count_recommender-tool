@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import time
-from typing import Dict, List, Tuple
-from confluent_kafka.admin import AdminClient
+from typing import Dict, List, Optional, Tuple
+from confluent_kafka.admin import AdminClient, ConfigResource
 from confluent_kafka import Consumer, TopicPartition
 import logging
 
@@ -69,40 +69,28 @@ class KafkaTopicsAnalyzer:
         logging.info("Connecting to Kafka cluster and fetching metadata...")
         
         # Get cluster metadata
-        metadata = self.__get_topics_metadata()
-        if not metadata:
+        topics_to_analyze = self.__get_topics_metadata(sampling_days=sampling_days, include_internal=include_internal, topic_filter=topic_filter)
+        if not topics_to_analyze:
             return []
         
-        # Filter topics
-        topics_to_analyze = {}
-        for topic_name, topic_metadata in sorted(metadata.topics.items()):
-            # Skip internal topics if not requested
-            if not include_internal and topic_name.startswith('_'):
-                continue
-                
-            # Apply topic filter if provided
-            if topic_filter and topic_filter.lower() not in topic_name.lower():
-                continue
-                
-            topics_to_analyze[topic_name] = topic_metadata
-
         logging.info(f"Found {len(topics_to_analyze)} topics to analyze")
 
         # Analyze topics
         results = []
 
         if use_sample_records:
-            # Calculate the ISO 8601 formatted start timestamp of the rolling window
-            utc_now = datetime.now(timezone.utc)
-            rolling_start = utc_now - timedelta(days=sampling_days)
-            iso_start_time = datetime.fromisoformat(rolling_start.strftime('%Y-%m-%dT%H:%M:%S+00:00'))
-            start_time_epoch_ms = int(rolling_start.timestamp() * 1000)
-
-            logging.info(f"Using rolling {sampling_days} day window starting from {iso_start_time.isoformat()}")
-            
-            for topic_name, topic_metadata in topics_to_analyze.items():
+            for topic_name, topic_info in topics_to_analyze.items():
                 try:
-                    result = self.__analyze_topic(topic_name, topic_metadata, sampling_batch_size, start_time_epoch_ms)
+                    # Calculate the ISO 8601 formatted start timestamp of the rolling window
+                    utc_now = datetime.now(timezone.utc)
+                    rolling_start = utc_now - timedelta(days=topic_info['sampling_days_based_on_retention_days'])
+                    iso_start_time = datetime.fromisoformat(rolling_start.strftime('%Y-%m-%dT%H:%M:%S+00:00'))
+                    start_time_epoch_ms = int(rolling_start.timestamp() * 1000)
+
+                    logging.info(f"Using rolling {topic_info['sampling_days_based_on_retention_days']} day window starting from {iso_start_time.isoformat()}")
+
+                    result = self.__analyze_topic(topic_name, topic_info['metadata'], sampling_batch_size, start_time_epoch_ms)
+                    result['is_compacted'] = topic_info['is_compacted']
                     results.append(result)
                 except Exception as e:
                     logging.error(f"Failed to analyze topic {topic_name} because {e}")
@@ -110,7 +98,8 @@ class KafkaTopicsAnalyzer:
                     # Add basic info even if analysis fails
                     results.append({
                         'topic_name': topic_name,
-                        'partition_count': len(topic_metadata.partitions),
+                        'is_compacted': topic_info['is_compacted'],
+                        'partition_count': len(topic_info['metadata'].partitions),
                         'total_record_count': 0,
                         'avg_bytes_per_record': 0.0,
                         'partition_details': [],
@@ -118,30 +107,107 @@ class KafkaTopicsAnalyzer:
                         'error': str(e)
                     })
         else:
-            for topic_name, topic_metadata in topics_to_analyze.items():
+            for topic_name, topic_info in topics_to_analyze.items():
                 results.append({
                     'topic_name': topic_name,
-                    'partition_count': len(topic_metadata.partitions),
+                    'is_compacted': topic_info['is_compacted'],
+                    'partition_count': len(topic_info['metadata'].partitions),
                     'total_record_count': 0,
                     'avg_bytes_per_record': 0.0,
                     'partition_details': [],
                     'is_internal': topic_name.startswith('_')
                 })        
         return results
-    
-    def __get_topics_metadata(self) -> Dict:
-        """Get cluster metadata including topics and partitions.
+
+    def __get_topics_metadata(self, sampling_days: int, include_internal: bool, topic_filter: Optional[str]) -> Dict:
+        """Get cluster metadata including topics, partitions, and retention.
+
+        Args:
+            sampling_days (int): Number of days to look back for sampling.
+            include_internal (bool): Whether to include internal topics.
+            topic_filter (Optional[str]): If provided, only topics containing this string will be analyzed.
         
         Returns:
-            Dict: Cluster metadata including topics and partitions.
+            Dict: Metadata of topics in the cluster.
         """
         try:
+            # Get all the Kafka Topics' metadata for the Kafka Cluster
             metadata = self.admin_client.list_topics(timeout=60)
-            return metadata
+
+            # Now filter the Kafka Topics that are not to analyzed
+            topics_to_analyze = {}
+            for topic_name, topic_metadata in sorted(metadata.topics.items()):
+                # Skip internal topics if not requested
+                if not include_internal and topic_name.startswith('_'):
+                    continue
+                    
+                # Apply topic filter if provided
+                if topic_filter and topic_filter.lower() not in topic_name.lower():
+                    continue
+
+                topics_to_analyze[topic_name] = {"metadata": topic_metadata, 
+                                                 "cleanup_policy": None,
+                                                 "is_compacted": None,
+                                                 "retention_ms": None, 
+                                                 "sampling_days_based_on_retention_days": None, 
+                                                 "retention_days_for_display": None}
+
+            # Create ConfigResource objects for the topics to be analyzed
+            resources = [ConfigResource(ConfigResource.Type.TOPIC, topic_name) for topic_name in topics_to_analyze.keys()]
+        
+            # Describe configurations for the topics to be analyzed
+            configs_result = self.admin_client.describe_configs(resources)
+
+            # Process the results to extract retention.ms for each of the topics to be analyzed
+            for resource in resources:
+                try:
+                    # Get the configuration dictionary for the topic
+                    config_dict = configs_result[resource].result(timeout=60)
+
+                    # Extract relevant configurations (cleanup.policy and retention.ms)
+                    cleanup_policy = config_dict.get('cleanup.policy')
+                    retention_ms = config_dict.get('retention.ms')
+
+                    # Update the topics_to_analyze dictionary with the topic's cleanup policy
+                    if cleanup_policy:
+                        topics_to_analyze[resource.name]["cleanup_policy"] = cleanup_policy.value
+                        topics_to_analyze[resource.name]["is_compacted"] = 'compact' in cleanup_policy.value.lower()
+                    else:
+                        topics_to_analyze[resource.name]["cleanup_policy"] = "unknown"
+                        topics_to_analyze[resource.name]["is_compacted"] = False
+                    
+                    # Update the topics_to_analyze dictionary with the topic's retention.ms and calculate sampling_days_based_on_retention_days
+                    if retention_ms:
+                        retention_value = int(retention_ms.value)
+                        if retention_value == -1:
+                            topics_to_analyze[resource.name]["sampling_days_based_on_retention_days"] = sampling_days
+                            topics_to_analyze[resource.name]["retention_days_for_display"] = "Infinite"
+                            topics_to_analyze[resource.name]["retention_ms"] = retention_ms
+                        else:
+                            # (1000 milliseconds * 60 seconds * 60 minutes * 24 hours) = retention in milliseconds / number of milliseconds in a day = number of days
+                            number_of_days = retention_value / (1000 * 60 * 60 * 24)
+                            topics_to_analyze[resource.name]["sampling_days_based_on_retention_days"] = min(sampling_days, max(1, int(number_of_days)))
+                            topics_to_analyze[resource.name]["retention_days_for_display"] = f"{number_of_days:.1f} days"
+
+                        topics_to_analyze[resource.name]["retention_ms"] = retention_ms
+                    else:
+                        topics_to_analyze[resource.name]["sampling_days_based_on_retention_days"] = sampling_days
+                        topics_to_analyze[resource.name]["retention_days_for_display"] = "unknown"
+                        topics_to_analyze[resource.name]["retention_ms"] = None
+                except:  # noqa: E722
+                    # If there's an error retrieving the config, set defaults
+                    topics_to_analyze[resource.name]["cleanup_policy"] = "unknown"
+                    topics_to_analyze[resource.name]["is_compacted"] = False
+                    
+                    topics_to_analyze[resource.name]["sampling_days_based_on_retention_days"] = sampling_days
+                    topics_to_analyze[resource.name]["retention_days_for_display"] = "unknown"
+                    topics_to_analyze[resource.name]["retention_ms"] = None
+
+                return metadata
         except Exception as e:
             logger.error(f"Error getting topics metadata: {e}")
             return None
-
+        
     def __get_partition_offsets(self, topic_name: str, partitions: List[int]) -> Dict[int, Tuple[int, int]]:
         """Get low and high watermarks for the topic's partitions.
         

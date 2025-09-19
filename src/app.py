@@ -9,7 +9,13 @@ from utilities import setup_logging
 from cc_clients_python_lib.http_status import HTTPStatus
 from cc_clients_python_lib.metrics_client import MetricsClient, METRICS_CONFIG, KafkaMetric
 from aws_clients_python_lib.secrets_manager import get_secrets
-from constants import DEFAULT_SAMPLING_DAYS, DEFAULT_SAMPLING_BATCH_SIZE, DEFAULT_CHARACTER_REPEAT
+from constants import (DEFAULT_SAMPLING_DAYS, 
+                       DEFAULT_SAMPLING_BATCH_SIZE, 
+                       DEFAULT_CHARACTER_REPEAT, 
+                       DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR, 
+                       DEFAULT_USE_SAMPLE_RECORDS,
+                       DEFAULT_USE_AWS_SECRETS_MANAGER,
+                       DEFAULT_INCLUDE_INTERNAL_TOPICS)
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -29,12 +35,12 @@ def main():
     load_dotenv()
  
     try:
-        required_consumption_throughput_factor = int(os.getenv("REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR", "5"))
-        use_sample_records=os.getenv("USE_SAMPLE_RECORDS", "True") == "True"
+        required_consumption_throughput_factor = int(os.getenv("REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR", DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR))
+        use_sample_records=os.getenv("USE_SAMPLE_RECORDS", DEFAULT_USE_SAMPLE_RECORDS) == "True"
         
         # Check if using AWS Secrets Manager for credentials retrieval
         metrics_config = {}
-        if os.getenv("USE_AWS_SECRETS_MANAGER", "False") == "True":
+        if os.getenv("USE_AWS_SECRETS_MANAGER", DEFAULT_USE_AWS_SECRETS_MANAGER) == "True":
             logging.info("Using AWS Secrets Manager for credentials retrieval.")
 
             # Retrieve Confluent Cloud API Key/Secret from AWS Secrets Manager
@@ -92,7 +98,7 @@ def main():
 
         # Analyze all topics        
         results = analyzer.analyze_all_topics(
-            include_internal=os.getenv("INCLUDE_INTERNAL_TOPICS", "False") == "True",
+            include_internal=os.getenv("INCLUDE_INTERNAL_TOPICS", DEFAULT_INCLUDE_INTERNAL_TOPICS) == "True",
             use_sample_records=use_sample_records,
             sampling_days=int(os.getenv("SAMPLING_DAYS", DEFAULT_SAMPLING_DAYS)),
             sampling_batch_size=int(os.getenv("SAMPLING_BATCH_SIZE", DEFAULT_SAMPLING_BATCH_SIZE)),            
@@ -118,6 +124,7 @@ def main():
             # Extract necessary details
             kafka_topic_name = result['topic_name']
             partition_count = result['partition_count']
+            is_compacted_str = result.get('is_compacted', False)
             
             if use_sample_records:
                 # Use sample records to determine throughput
@@ -169,11 +176,11 @@ def main():
                 status = "Active"
             
             # Append formatted details to the list
-            topic_details.append(f"{kafka_topic_name:<40} {record_count_str:<12} {partition_count:<20} {required_throughput_str:<21} {consumer_throughput_str:<21} {recommended_partition_count_str:<25} {status:<10}")
+            topic_details.append(f"{kafka_topic_name:<40} {is_compacted_str:<15} {record_count_str:<12} {partition_count:<20} {required_throughput_str:<21} {consumer_throughput_str:<21} {recommended_partition_count_str:<25} {status:<10}")
 
         # Table header and details        
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
-        logging.info(f"{'Topic Name':<40} {'Records':<12} {'Current Partitions':<20} {'Required Throughput':<21} {'Consumer Throughput':<21} {'Recommended Partitions':<25} {'Status':<10}")
+        logging.info(f"{'Topic Name':<40} {'Is Compacted?':<15} {'Records':<12} {'Current Partitions':<20} {'Required Throughput':<21} {'Consumer Throughput':<21} {'Recommended Partitions':<25} {'Status':<10}")
         logging.info("-" * DEFAULT_CHARACTER_REPEAT)
         for detail in topic_details:
             logging.info(detail)    
