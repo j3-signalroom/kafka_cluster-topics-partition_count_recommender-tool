@@ -91,6 +91,7 @@ class KafkaTopicsAnalyzer:
 
                     result = self.__analyze_topic(topic_name, topic_info['metadata'], sampling_batch_size, start_time_epoch_ms)
                     result['is_compacted'] = topic_info['is_compacted']
+                    result['sampling_days'] = topic_info['sampling_days_based_on_retention_days']
                     results.append(result)
                 except Exception as e:
                     logging.error(f"Failed to analyze topic {topic_name} because {e}")
@@ -99,6 +100,7 @@ class KafkaTopicsAnalyzer:
                     results.append({
                         'topic_name': topic_name,
                         'is_compacted': topic_info['is_compacted'],
+                        'sampling_days': topic_info['sampling_days_based_on_retention_days'],
                         'partition_count': len(topic_info['metadata'].partitions),
                         'total_record_count': 0,
                         'avg_bytes_per_record': 0.0,
@@ -111,6 +113,7 @@ class KafkaTopicsAnalyzer:
                 results.append({
                     'topic_name': topic_name,
                     'is_compacted': topic_info['is_compacted'],
+                    'sampling_days': topic_info['sampling_days_based_on_retention_days'],
                     'partition_count': len(topic_info['metadata'].partitions),
                     'total_record_count': 0,
                     'avg_bytes_per_record': 0.0,

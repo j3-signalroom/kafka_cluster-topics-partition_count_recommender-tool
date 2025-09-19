@@ -69,49 +69,44 @@ Now, you need to set up the application by creating a `.env` file in the root di
 
 #### 1.2.1 Create the `.env` file
 Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
-   ```shell
-   CONFLUENT_CLOUD_API_KEY=<YOUR_CONFLUENT_CLOUD_API_KEY>
-   CONFLUENT_CLOUD_API_SECRET=<YOUR_CONFLUENT_CLOUD_API_SECRET>
-   INCLUDE_INTERNAL_TOPICS=False
-   BOOTSTRAP_SERVER_URI=<YOUR_BOOTSTRAP_SERVER_URI>
-   KAFKA_API_KEY=<YOUR_KAFKA_API_KEY>
-   KAFKA_API_SECRET=<YOUR_KAFKA_API_SECRET>
-   KAFKA_CLUSTER_ID=<YOUR_KAFKA_CLUSTER_ID>
+```shell
+# Environment variables credentials for Confluent Cloud and Kafka clusters
+CONFLUENT_CLOUD_CREDENTIAL={"confluent_cloud_api_key":"<YOUR_CONFLUENT_CLOUD_API_KEY>", "confluent_cloud_api_secret": "<YOUR_CONFLUENT_CLOUD_API_SECRETS>"}
+KAFKA_CREDENTIALS=[{"kafka_cluster_id": "<YOUR_KAFKA_CLUSTER_ID>", "bootstrap.servers": "<YOUR_BOOTSTRAP_SERVER_URI>", "sasl.username": "<YOUR_KAFKA_API_KEY>", "sasl.password": "<YOUR_KAFKA_API_SECRET>"}]
 
-   REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR=<YOUR_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR>
+# AWS Secrets Manager Secrets for Confluent Cloud and Kafka clusters
+USE_AWS_SECRETS_MANAGER=<True|False>
+CONFLUENT_CLOUD_API_SECRET_PATH={"region_name": "<YOUR_SECRET_AWS_REGION_NAME>", "secret_name": "<YOUR_CONFLUENT_CLOUD_API_KEY_AWS_SECRETS>"}
+KAFKA_API_SECRET_PATHS=[{"region_name": "<YOUR_SECRET_AWS_REGION_NAME>", "secret_name": "<YOUR_KAFKA_API_KEY_AWS_SECRETS>"}]
 
-   USE_SAMPLE_RECORDS=<True|False>
-   SAMPLING_DAYS=<YOUR_SAMPLING_DAYS>
-   SAMPLING_BATCH_SIZE=<YOUR_SAMPLING_BATCH_SIZE>
-   
-   TOPIC_FILTER=<YOUR_TOPIC_FILTER, IF ANY>
+# Topic analysis configuration
+INCLUDE_INTERNAL_TOPICS=<True|False>
+TOPIC_FILTER=<YOUR_TOPIC_FILTER, IF ANY>
 
-   USE_AWS_SECRETS_MANAGER=<True|False>
-   AWS_REGION_NAME=<YOUR_AWS_REGION_NAME>
-   CONFLUENT_CLOUD_API_KEY_AWS_SECRETS=<YOUR_CONFLUENT_CLOUD_API_KEY_AWS_SECRETS>
-   KAFKA_API_KEY_AWS_SECRETS=<YOUR_KAFKA_API_KEY_AWS_SECRETS>
-   ```
+# Throughput and partition calculation configuration
+REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR=<YOUR_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR>
+
+# Sampling configuration
+USE_SAMPLE_RECORDS=<True|False>
+SAMPLING_DAYS=<YOUR_SAMPLING_DAYS>
+SAMPLING_BATCH_SIZE=<YOUR_SAMPLING_BATCH_SIZE>
+```
 
 The environment variables are defined as follows:
 
 | Environment Variable Name  | Description |
 | ----------------------------------------| ----------- |
-| `CONFLUENT_CLOUD_API_KEY` | Your Confluent Cloud API Key. |
-| `CONFLUENT_CLOUD_API_SECRET` | Your Confluent Cloud API Secret. |
+| `CONFLUENT_CLOUD_CREDENTIAL` | JSON Object with Confluent Cloud API Key and Secret keys. |
+| `KAFKA_CREDENTIALS` | JSON Object Array with Kafka Cluster API Key, API Secret, Kafka Cluster ID, and bootstrap server URI. |
+| `USE_AWS_SECRETS_MANAGER` | Set to `True` if you want to use AWS Secrets Manager to manage your secrets; otherwise, set to `False`.  Default is `False`. |
+| `CONFLUENT_CLOUD_API_SECRET_PATH` | JSON Object with the Secrets' AWS Region Name and the name of the AWS Secrets Manager secrets that contains your Confluent Cloud API Key and secret. |
+| `KAFKA_API_SECRET_PATHS` | JSON Object Array with the Secrets' AWS Region Name and the name of the AWS Secrets Manager secrets that contains your Kafka Cluster API Key, API Secret, Kafka Cluster ID, and bootstrap server URI. |
 | `INCLUDE_INTERNAL_TOPICS` | Set to `True` if you want to include internal topics in the analysis; otherwise, set to `False`.  Default is `False`. |
-| `BOOTSTRAP_SERVER_URI` | Tshe bootstrap server URI for your Kafka cluster (e.g., `pkc-xxxxxx.us-east-1.aws.confluent.cloud:9092`). |
-| `KAFKA_API_KEY` | Your Kafka API Key. |
-| `KAFKA_API_SECRET` | Your Kafka API Secret. |
-| `KAFKA_CLUSTER_ID` | The ID of your Kafka cluster (e.g., `lkc-123xyz`). |
+| `TOPIC_FILTER` | A comma-separated list of topic names to include in the analysis. Leave empty to include all topics. |
 | `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` | A multiplier to scale the peak consumption for future demand forecasting (e.g., `3` for `300%`).  Default is `3`. |
 | `USE_SAMPLE_RECORDS` | Set to `True` if you want to sample records for analysis; otherwise, set to `False`. Default is `True`. |
 | `SAMPLING_BATCH_SIZE` | The number of records to sample if `USE_SAMPLE_RECORDS` is set to `True` (e.g., `50,000`).  Default is `50,000`. |
 | `SAMPLING_DAYS` | The number of days to look back when sampling records if `USE_SAMPLE_RECORDS` is set to True (for example, `7`). This creates a rolling window that always looks back the specified number of days from the current time. **Note**: _This value will be ignored for topics that do not retain records for the number of days specified by_ `SAMPLING_DAYS`.  Default is `7`.|
-| `TOPIC_FILTER` | A comma-separated list of topic names to include in the analysis. Leave empty to include all topics. |
-| `USE_AWS_SECRETS_MANAGER` | Set to `True` if you want to use AWS Secrets Manager to manage your secrets; otherwise, set to `False`.  Default is `False`. |
-| `AWS_REGION_NAME` | The AWS region where your secrets are stored (e.g., `us-east-1`). |
-| `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` | The name of the AWS Secrets Manager secrets that contains your Confluent Cloud API Key and secret. |
-| `KAFKA_API_KEY_AWS_SECRETS` | The name of the AWS Secrets Manager secrets that contains your Kafka Cluster API Key, API Secret, Kafka Cluster ID, and bootstrap server URI. |
 
 #### 1.2.2 Using the AWS Secrets Manager (optional)
 If you use **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and the application will retrieve the secrets from AWS Secrets Manager using the names provided in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`.  

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import json
 import logging
 from dotenv import load_dotenv
@@ -71,7 +71,7 @@ def main():
         # Check if using AWS Secrets Manager for credentials retrieval
         if use_aws_secrets_manager:
             # Retrieve Kafka API Key/Secret from AWS Secrets Manager
-            kafka_api_secrets_paths = json.loads(os.getenv("KAFKA_API_SECRET_PATH", "[]"))
+            kafka_api_secrets_paths = json.loads(os.getenv("KAFKA_API_SECRET_PATHS", "[]"))
             kafka_credentials = []
             for kafka_api_secrets_path in kafka_api_secrets_paths:
                 settings, error_message = get_secrets(kafka_api_secrets_path["region_name"], kafka_api_secrets_path["secret_name"])
@@ -187,7 +187,7 @@ def _generate_report(metrics_client: MetricsClient, kafka_cluster_id: str, resul
                 record_count = 0
             else:
                 consumer_throughput = bytes_query_result.get('avg_total', 0)
-                required_throughput = bytes_query_result.get('max_total', 0) * required_consumption_throughput_factor
+                required_throughput = bytes_query_result.get('avg_total', 0) * required_consumption_throughput_factor
 
                 http_status_code, error_message, record_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_RECORDS, kafka_cluster_id, kafka_topic_name)
 
