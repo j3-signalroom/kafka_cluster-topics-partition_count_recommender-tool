@@ -140,7 +140,7 @@ uv run python src/app.py
 
 If `USE_SAMPLE_RECORDS` environment variable is set to `True`, the application will sample records from each topic to calculate the average record size in bytes.  For example, below is a screenshot of the application running successfully:
 
-![sample-records-run](.blog/images/sample-records-run.png)
+![sampling-records-run](.blog/images/sampling-records-run.png)
 
 If `USE_SAMPLE_RECORDS` is set to `False`, the application will use the Confluent Cloud Metrics API to retrieve the average and peak consumption in bytes over a rolling seven-day period.  For example, below is a screenshot of the application running successfully:
 
