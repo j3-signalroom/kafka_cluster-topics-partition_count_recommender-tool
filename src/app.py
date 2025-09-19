@@ -7,7 +7,7 @@ from typing import Dict, List
 
 from kafka_topics_analyzer import KafkaTopicsAnalyzer
 from utilities import setup_logging
-from cc_clients_python_lib.http_status import HTTPStatus
+from cc_clients_python_lib.http_status import HttpStatus
 from cc_clients_python_lib.metrics_client import MetricsClient, METRICS_CONFIG, KafkaMetric
 from aws_clients_python_lib.secrets_manager import get_secrets
 from constants import (DEFAULT_SAMPLING_DAYS, 
@@ -94,12 +94,13 @@ def main():
                     })
 
         else:
-            logging.info("Using environment variables for credentials retrieval.")
+            logging.info("Using environment variables for retrieving the Kafka Cluster credentials.")
             
             # Use environment variables directly
             kafka_credentials = json.loads(os.getenv("KAFKA_CREDENTIALS", "[]"))
     except Exception as e:
         logging.error(f"THE APPLICATION FAILED TO RUN BECAUSE OF THE FOLLOWING ERROR: {e}")
+        return
         
     if use_sample_records:
         logging.info(f"Using sample records for analysis with sample size: {sampling_batch_size:,.0f}")
@@ -184,7 +185,7 @@ def _generate_report(metrics_client: MetricsClient, kafka_cluster_id: str, resul
             # Use Metrics API to determine throughput
             http_status_code, error_message, bytes_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_BYTES, kafka_cluster_id, kafka_topic_name)
 
-            if http_status_code != HTTPStatus.OK:
+            if http_status_code != HttpStatus.OK:
                 logging.error(f"Error retrieving 'RECEIVED BYTES' metric for topic {kafka_topic_name} because the following error occurred: {error_message}")
                 result['error'] = error_message
                 consumer_throughput = 0
@@ -196,7 +197,7 @@ def _generate_report(metrics_client: MetricsClient, kafka_cluster_id: str, resul
 
                 http_status_code, error_message, record_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_RECORDS, kafka_cluster_id, kafka_topic_name)
 
-                if http_status_code != HTTPStatus.OK:
+                if http_status_code != HttpStatus.OK:
                     logging.error(f"Error retrieving 'RECEIVED RECORDS' metric for topic {kafka_topic_name} because the following error occurred: {error_message}")
                     result['error'] = error_message
                     record_count = 0
