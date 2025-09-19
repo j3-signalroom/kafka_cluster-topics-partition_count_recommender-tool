@@ -40,7 +40,6 @@ def main():
         required_consumption_throughput_factor = int(os.getenv("REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR", DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR))
         use_sample_records=os.getenv("USE_SAMPLE_RECORDS", DEFAULT_USE_SAMPLE_RECORDS) == "True"
         use_aws_secrets_manager = os.getenv("USE_AWS_SECRETS_MANAGER", DEFAULT_USE_AWS_SECRETS_MANAGER) == "True"
-        aws_region_name = os.environ['AWS_REGION_NAME']
         include_internal=os.getenv("INCLUDE_INTERNAL_TOPICS", DEFAULT_INCLUDE_INTERNAL_TOPICS) == "True"
         sampling_days=int(os.getenv("SAMPLING_DAYS", DEFAULT_SAMPLING_DAYS))
         sampling_batch_size=int(os.getenv("SAMPLING_BATCH_SIZE", DEFAULT_SAMPLING_BATCH_SIZE))
@@ -57,13 +56,11 @@ def main():
             logging.info("Using AWS Secrets Manager for retrieving the Confluent Cloud credentials.")
 
             # Retrieve Confluent Cloud API Key/Secret from AWS Secrets Manager
-            cc_secrets_path = os.getenv("CONFLUENT_CLOUD_API_KEY_AWS_SECRETS")
-            settings, error_message = get_secrets(aws_region_name, cc_secrets_path)
+            cc_api_secrets_path = json.loads(os.getenv("CONFLUENT_CLOUD_API_SECRET_PATH", "{}"))
+            settings, error_message = get_secrets(cc_api_secrets_path["region_name"], cc_api_secrets_path["secret_name"])
             if settings == {}:
-                logging.warning(f"Unable to retrieve Confluent Cloud API Key/Secret from AWS Secrets Manager because the following error occurred: {error_message}.  Falling back to environment variables.")
-
-                metrics_config[METRICS_CONFIG["confluent_cloud_api_key"]] = os.getenv("CONFLUENT_CLOUD_API_KEY")
-                metrics_config[METRICS_CONFIG["confluent_cloud_api_secret"]] = os.getenv("CONFLUENT_CLOUD_API_SECRET")
+                logging.error(f"FAILED TO RETRIEVE CONFLUENT CLOUD API KEY/SECRET FROM AWS SECRETS MANAGER BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
+                return
             else:
                 metrics_config[METRICS_CONFIG["confluent_cloud_api_key"]] = settings.get("confluent_cloud_api_key")
                 metrics_config[METRICS_CONFIG["confluent_cloud_api_secret"]] = settings.get("confluent_cloud_api_secret")
@@ -81,28 +78,26 @@ def main():
         # Check if using AWS Secrets Manager for credentials retrieval
         if use_aws_secrets_manager:
             # Retrieve Kafka API Key/Secret from AWS Secrets Manager
-            kafka_secrets_path = os.getenv("KAFKA_API_KEY_AWS_SECRETS")
-            settings, error_message = get_secrets(aws_region_name, kafka_secrets_path)
-            if settings == {}:
-                logging.warning(f"Unable to retrieve Kafka API Key/Secret from AWS Secrets Manager because the following error occurred: {error_message}.  Falling back to environment variables.")
+            kafka_api_secrets_paths = json.loads(os.getenv("KAFKA_API_SECRET_PATH", "[]"))
+            kafka_credentials = []
+            for kafka_api_secrets_path in kafka_api_secrets_paths:
+                settings, error_message = get_secrets(kafka_api_secrets_path["region_name"], kafka_api_secrets_path["secret_name"])
+                if settings == {}:
+                    logging.error(f"FAILED TO RETRIEVE KAFKA API KEY/SECRET FROM AWS SECRETS MANAGER BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
+                    return
+                else:
+                    kafka_credentials.append({
+                        "bootstrap.servers": settings.get("bootstrap.servers"),
+                        "sasl.username": settings.get("sasl.username"),
+                        "sasl.password": settings.get("sasl.password"),
+                        "kafka_cluster_id": settings.get("kafka_cluster_id")
+                    })
 
-                kafka_cluster_id = os.getenv("KAFKA_CLUSTER_ID")
-                bootstrap_server_uri=os.getenv("BOOTSTRAP_SERVER_URI")
-                kafka_api_key=os.getenv("KAFKA_API_KEY")
-                kafka_api_secret=os.getenv("KAFKA_API_SECRET")
-            else:
-                kafka_cluster_id = settings.get("kafka_cluster_id")
-                bootstrap_server_uri=settings.get("bootstrap.servers")
-                kafka_api_key=settings.get("sasl.username")
-                kafka_api_secret=settings.get("sasl.password")
         else:
             logging.info("Using environment variables for credentials retrieval.")
             
             # Use environment variables directly
-            kafka_cluster_id = os.getenv("KAFKA_CLUSTER_ID")
-            bootstrap_server_uri=os.getenv("BOOTSTRAP_SERVER_URI")
-            kafka_api_key=os.getenv("KAFKA_API_KEY")
-            kafka_api_secret=os.getenv("KAFKA_API_SECRET")
+            kafka_credentials = json.loads(os.getenv("KAFKA_CREDENTIALS", "[]"))
     except Exception as e:
         logging.error(f"THE APPLICATION FAILED TO RUN BECAUSE OF THE FOLLOWING ERROR: {e}")
         
@@ -114,42 +109,43 @@ def main():
         # Instantiate the MetricsClient class.
         metrics_client = MetricsClient(metrics_config)
 
-    # Initialize recommender
-    analyzer = KafkaTopicsAnalyzer(
-        bootstrap_server_uri=bootstrap_server_uri,
-        kafka_api_key=kafka_api_key,
-        kafka_api_secret=kafka_api_secret
-    )
-
-    # Analyze all topics        
-    results = analyzer.analyze_all_topics(
-        include_internal=include_internal,
-        use_sample_records=use_sample_records,
-        sampling_days=sampling_days,
-        sampling_batch_size=sampling_batch_size,
-        topic_filter=topic_filter
-    )
-    
-    if not results:
-        logging.error("NO TOPIC(S) FOUND OR ANALYSIS FAILED.")
-    else:
-        # Generate report
-        generate_report(
-            metrics_client=metrics_client,
-            kafka_cluster_id=kafka_cluster_id,
-            results=results,
-            required_consumption_throughput_factor=required_consumption_throughput_factor,
-            use_sample_records=use_sample_records
+    for kafka_credential in kafka_credentials:
+        # Initialize recommender
+        analyzer = KafkaTopicsAnalyzer(
+            bootstrap_server_uri=kafka_credential.get("bootstrap.servers"),
+            kafka_api_key=kafka_credential.get("sasl.username"),
+            kafka_api_secret=kafka_credential.get("sasl.password")
         )
 
-        # Export detailed results to a JSON file
-        json_file = f"{kafka_cluster_id}-topics-partition-count-recommender-app.json"
-        with open(json_file, 'w') as f:
-            json.dump(results, f, indent=2, default=str)
-        logging.info(f"Exported detailed results to: {json_file}")
+        # Analyze all topics        
+        results = analyzer.analyze_all_topics(
+            include_internal=include_internal,
+            use_sample_records=use_sample_records,
+            sampling_days=sampling_days,
+            sampling_batch_size=sampling_batch_size,
+            topic_filter=topic_filter
+        )
+        
+        if not results:
+            logging.error("NO TOPIC(S) FOUND OR ANALYSIS FAILED.")
+        else:
+            # Generate report
+            _generate_report(
+                metrics_client=metrics_client,
+                kafka_cluster_id=kafka_credential.get("kafka_cluster_id"),
+                results=results,
+                required_consumption_throughput_factor=required_consumption_throughput_factor,
+                use_sample_records=use_sample_records
+            )
+
+            # Export detailed results to a JSON file
+            json_file = f"{kafka_credential.get('kafka_cluster_id')}-topics-partition-count-recommender-app.json"
+            with open(json_file, 'w') as f:
+                json.dump(results, f, indent=2, default=str)
+            logging.info(f"Exported detailed results to: {json_file}")
     
 
-def generate_report(metrics_client: MetricsClient, kafka_cluster_id: str, results: List[Dict], required_consumption_throughput_factor: float, use_sample_records: bool) -> None:
+def _generate_report(metrics_client: MetricsClient, kafka_cluster_id: str, results: List[Dict], required_consumption_throughput_factor: float, use_sample_records: bool) -> None:
     """Generates and logs a report based on the analysis results.
 
     Args:
