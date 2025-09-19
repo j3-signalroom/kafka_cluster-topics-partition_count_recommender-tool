@@ -187,7 +187,7 @@ def _generate_report(metrics_client: MetricsClient, kafka_cluster_id: str, resul
                 record_count = 0
             else:
                 consumer_throughput = bytes_query_result.get('avg_total', 0)
-                required_throughput = bytes_query_result.get('max_total', 0) * required_consumption_throughput_factor
+                required_throughput = consumer_throughput * required_consumption_throughput_factor
 
                 http_status_code, error_message, record_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_RECORDS, kafka_cluster_id, kafka_topic_name)
 
