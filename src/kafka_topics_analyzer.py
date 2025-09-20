@@ -1,3 +1,4 @@
+import csv
 from datetime import datetime, timedelta, timezone
 import time
 from typing import Dict, List, Optional, Tuple
@@ -5,8 +6,15 @@ from confluent_kafka.admin import AdminClient, ConfigResource
 from confluent_kafka import Consumer, TopicPartition
 import logging
 
+from cc_clients_python_lib.http_status import HttpStatus
+from cc_clients_python_lib.metrics_client import MetricsClient, KafkaMetric
 from utilities import setup_logging
-from constants import DEFAULT_SAMPLING_DAYS, DEFAULT_SAMPLING_BATCH_SIZE
+from constants import (DEFAULT_SAMPLING_DAYS, 
+                       DEFAULT_SAMPLING_BATCH_SIZE, 
+                       DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR,
+                       DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD,
+                       DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS,
+                       DEFAULT_CHARACTER_REPEAT)
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -24,14 +32,18 @@ logger = setup_logging()
 class KafkaTopicsAnalyzer:
     """Class to analyze Kafka topics in a cluster."""
 
-    def __init__(self, bootstrap_server_uri: str, kafka_api_key: str, kafka_api_secret: str):
+    def __init__(self, kafka_cluster_id: str, bootstrap_server_uri: str, kafka_api_key: str, kafka_api_secret: str, metrics_config: Dict):
         """Connect to the Kafka Cluster with the AdminClient.
 
         Args:
+            kafka_cluster_id (string): Your Confluent Cloud Kafka Cluster ID
             bootstrap_server_uri (string): Kafka Cluster URI
             kafka_api_key (string): Your Confluent Cloud Kafka API key
             kafka_api_secret (string): Your Confluent Cloud Kafka API secret
+            metrics_config (Dict): Configuration for the MetricsClient
         """
+        self.kafka_cluster_id = kafka_cluster_id
+
         # Instantiate the AdminClient with the provided credentials
         config = {
             'bootstrap.servers': bootstrap_server_uri,
@@ -53,11 +65,15 @@ class KafkaTopicsAnalyzer:
             'enable.metrics.push': False    # Disable metrics pushing for consumers to registered JMX MBeans.  However, is really being set to False to not expose unneccessary noise to the logging output
         }
 
-    def analyze_all_topics(self, include_internal: bool = False, use_sample_records: bool = True, sampling_days: int = DEFAULT_SAMPLING_DAYS, sampling_batch_size: int = DEFAULT_SAMPLING_BATCH_SIZE, topic_filter: str | None = None) -> List[Dict]:
+        # Instantiate the MetricsClient class.
+        self.metrics_client = MetricsClient(metrics_config)
+
+    def analyze_all_topics(self, include_internal: bool = False, required_consumption_throughput_factor: float = DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR ,use_sample_records: bool = True, sampling_days: int = DEFAULT_SAMPLING_DAYS, sampling_batch_size: int = DEFAULT_SAMPLING_BATCH_SIZE, topic_filter: str | None = None) -> List[Dict]:
         """Analyze all topics in the cluster.
         
         Args:
             include_internal (bool, optional): Whether to include internal topics. Defaults to False.
+            required_consumption_throughput_factor (float, optional): Factor to multiply the consumer throughput to determine required consumption throughput. Defaults to 3.0.
             use_sample_records (bool, optional): Whether to sample records for average size. Defaults to True.
             sampling_days (int, optional): Number of days to look back for sampling. Defaults to 7.
             sampling_batch_size (int, optional): Number of records to process per batch when sampling. Defaults to 1000.
@@ -77,9 +93,15 @@ class KafkaTopicsAnalyzer:
 
         # Analyze topics
         results = []
+        report_details = []
+        total_recommended_partitions = 0
+        report_filename = f"{self.kafka_cluster_id}-recommender-{int(time.time())}-report.csv"
+        with open(report_filename, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(["topic_name","is_compacted","number_of_records","number_of_partitions","required_throughput","consumer_throughput","recommended_partitions","status"])
 
-        if use_sample_records:
-            for topic_name, topic_info in topics_to_analyze.items():
+        for topic_name, topic_info in topics_to_analyze.items():
+            if use_sample_records:
                 try:
                     # Calculate the ISO 8601 formatted start timestamp of the rolling window
                     utc_now = datetime.now(timezone.utc)
@@ -91,12 +113,12 @@ class KafkaTopicsAnalyzer:
                     result = self.__analyze_topic(topic_name, topic_info, sampling_batch_size, start_time_epoch_ms, iso_start_time)
                     result['is_compacted'] = topic_info['is_compacted']
                     result['sampling_days'] = topic_info['sampling_days_based_on_retention_days']
-                    results.append(result)
+                    
                 except Exception as e:
                     logging.error(f"Failed to analyze topic {topic_name} because {e}")
 
                     # Add basic info even if analysis fails
-                    results.append({
+                    result = {
                         'topic_name': topic_name,
                         'is_compacted': topic_info['is_compacted'],
                         'sampling_days': topic_info['sampling_days_based_on_retention_days'],
@@ -106,20 +128,105 @@ class KafkaTopicsAnalyzer:
                         'partition_details': [],
                         'is_internal': topic_name.startswith('_'),
                         'error': str(e)
-                    })
-        else:
-            for topic_name, topic_info in topics_to_analyze.items():
-                results.append({
-                    'topic_name': topic_name,
-                    'is_compacted': topic_info['is_compacted'],
-                    'sampling_days': topic_info['sampling_days_based_on_retention_days'],
-                    'partition_count': len(topic_info['metadata'].partitions),
-                    'total_record_count': 0,
-                    'avg_bytes_per_record': 0.0,
-                    'partition_details': [],
-                    'is_internal': topic_name.startswith('_')
-                })        
-        return results
+                    }
+
+                results.append(result)
+                
+                # Extract necessary details
+                partition_count = result['partition_count']
+                is_compacted_str = "yes" if result.get('is_compacted', False) else "no"
+
+                # Use sample records to determine throughput
+                record_count = result.get('total_record_count', 0)
+                consumer_throughput = result.get('avg_bytes_per_record', 0) * record_count
+                required_throughput = consumer_throughput * required_consumption_throughput_factor
+            else:
+                partition_count = len(topic_info['metadata'].partitions)
+                is_compacted_str = "yes" if topic_info['is_compacted'] else "no"
+
+                # Use Metrics API to get the consumer byte consumption
+                http_status_code, error_message, bytes_query_result = self.metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_BYTES, self.kafka_cluster_id, topic_name)
+                if http_status_code != HttpStatus.OK:
+                    logging.warning(f"Failed retrieving 'RECEIVED BYTES' metric for topic {topic_name} because the following error occurred: {error_message}")
+                    result['error'] = error_message
+                    consumer_throughput = 0
+                    required_throughput = 0
+                    record_count = 0
+                else:
+                    # Use the Confluent Metrics API to get the record count
+                    http_status_code, error_message, record_query_result = self.metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_RECORDS, self.kafka_cluster_id, topic_name)
+                    if http_status_code != HttpStatus.OK:
+                        logging.warning(f"Failed retrieving 'RECEIVED RECORDS' metric for topic {topic_name} because the following error occurred: {error_message}")
+                        result['error'] = error_message
+                        record_count = 0
+                    else:
+                        record_count = record_query_result.get('sum_total', 0)
+
+                        # Calculate daily consumed average bytes per record
+                        bytes_daily_totals = bytes_query_result.get('daily_total', [])
+                        records_daily_totals = record_query_result.get('daily_total', [])
+                        avg_bytes_daily_totals = []
+
+                        for index, record_total in enumerate(records_daily_totals):
+                            if record_total > 0:
+                                avg_bytes_daily_totals.append(bytes_daily_totals[index]/record_total)
+
+                        avg_bytes_per_record = sum(avg_bytes_daily_totals)/len(avg_bytes_daily_totals) if len(avg_bytes_daily_totals) > 0 else 0
+
+                        logging.info(f"Confluent Metrics API - For topic {topic_name}, the average bytes per record is {avg_bytes_per_record:,.2f} bytes/record for a total of {record_count:,.0f} records.")
+
+                        # Calculate consumer throughput and required throughput
+                        consumer_throughput = avg_bytes_per_record * record_count
+                        required_throughput = consumer_throughput * required_consumption_throughput_factor
+
+            # Handle cases where record count is zero or an error occurred
+            if record_count == 0:
+                recommended_partition_count = 0
+                status = "error" if 'error' in result else "empty"
+            else:
+                # Determine recommended partition count
+                if required_throughput < DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD:
+                    # Set to minimum recommended partitions if below threshold
+                    recommended_partition_count = DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS
+                else:
+                    # Calculate recommended partition count
+                    recommended_partition_count = round(required_throughput / consumer_throughput)
+                total_recommended_partitions += recommended_partition_count if recommended_partition_count > 0 else 0
+
+                status = "active"
+
+            # Log the results for the topic to a CSV file
+            with open(report_filename, 'a', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                writer.writerow([f"'{topic_name}'", f"'{is_compacted_str}'", record_count, partition_count, required_throughput, consumer_throughput, recommended_partition_count, f"'{status}'"])
+
+        # Summarize results
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
+        logging.info("KAFKA TOPICS ANALYSIS RESULTS")
+        logging.info(f"Analysis Timestamp: {datetime.now().isoformat()}")
+        logging.info(f"Kafka Cluster ID: {self.kafka_cluster_id}")
+        logging.info(f"Required Consumption Throughput Factor: {required_consumption_throughput_factor}")
+
+        # Summarize results
+        total_topics = len(results)
+        total_partitions = sum(result['partition_count'] for result in results)
+        total_record_count = sum(result.get('total_record_count', 0) for result in results)
+
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
+        logging.info("SUMMARY STATISTICS")
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
+        logging.info(f"Total Topics: {total_topics}")
+
+        active_topics = len([result for result in results if result.get('total_record_count', 0) > 0])
+        logging.info(f"Active Topics: {active_topics} ({active_topics/total_topics*100:.1f}%)")
+
+        logging.info(f"Total Partitions: {total_partitions}")
+        logging.info(f"Total Recommended Partitions: {total_recommended_partitions}")
+        logging.info(f"Total Records: {total_record_count:,}")
+        logging.info(f"Average Partitions per Topic: {total_partitions/total_topics:.0f}")
+        logging.info(f"Average Recommended Partitions per Topic: {total_recommended_partitions/total_topics:.0f}")
+
+        return report_details
 
     def __get_topics_metadata(self, sampling_days: int, include_internal: bool, topic_filter: Optional[str]) -> Dict:
         """Get cluster metadata including topics, partitions, and retention.
@@ -381,19 +488,20 @@ class KafkaTopicsAnalyzer:
         
         # Get partition offsets to calculate total records
         partition_offsets = self.__get_partition_offsets(topic_name, partitions)
-        
-        total_record_count = 0
         partition_details = []
-        
+        total_record_count = 0
         for partition_number, (low, high) in partition_offsets.items():
             record_count = high - low
             total_record_count += record_count
-                
-            # Get the earliest offset in the partition whose record timestamp is >= start_time_epoch_ms
-            offset_at_start_time = self.__get_record_timestamp_from_offset(topic_name, partition_number, start_time_epoch_ms)
+            
+            if record_count > 0:
+                # Get the earliest offset in the partition whose record timestamp is >= start_time_epoch_ms
+                offset_at_start_time = self.__get_record_timestamp_from_offset(topic_name, partition_number, start_time_epoch_ms)
 
-            if offset_at_start_time is None:
-                offset_at_start_time = high
+                if offset_at_start_time is None:
+                    offset_at_start_time = high
+            else:
+                offset_at_start_time = 0
             
             partition_details.append({
                 "partition_number": partition_number,
@@ -401,19 +509,14 @@ class KafkaTopicsAnalyzer:
                 "offset_end": high,
                 "record_count": record_count
             })
-        
-        logging.debug(f"  Partitions: {partition_count}")
-        logging.debug(f"  Total record count: {total_record_count:,.0f}")
 
-
-        # Sample record sizes if requested and topic has messages
-        avg_record_size = 0.0
-        if total_record_count > 0:
-            avg_record_size = self.__sample_record_sizes(topic_name, sampling_batch_size, partition_details)
-        elif total_record_count == 0:
+        if total_record_count == 0:
             logging.info(f"  No records available in topic '{topic_name}' for sampling.")
             avg_record_size = 0.0
+        else:
+            avg_record_size = avg_record_size = self.__sample_record_sizes(topic_name, sampling_batch_size, partition_details)
         
+        # Compile and return the analysis results
         return {
             'topic_name': topic_name,
             'partition_count': partition_count,

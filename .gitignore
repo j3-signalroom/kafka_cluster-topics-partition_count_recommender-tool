@@ -12,4 +12,4 @@ wheels/
 .DS_Store
 *.log
 .env
-*.json
+*.csv

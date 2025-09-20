@@ -1,25 +1,18 @@
-from datetime import datetime
 import json
 import logging
 from dotenv import load_dotenv
 import os
-from typing import Dict, List
 
 from kafka_topics_analyzer import KafkaTopicsAnalyzer
 from utilities import setup_logging
-from cc_clients_python_lib.http_status import HttpStatus
-from cc_clients_python_lib.metrics_client import MetricsClient, KafkaMetric
 from aws_clients_python_lib.secrets_manager import get_secrets
 from constants import (DEFAULT_SAMPLING_DAYS, 
                        DEFAULT_SAMPLING_BATCH_SIZE, 
-                       DEFAULT_CHARACTER_REPEAT, 
                        DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR, 
                        DEFAULT_USE_SAMPLE_RECORDS,
                        DEFAULT_USE_AWS_SECRETS_MANAGER,
-                       DEFAULT_INCLUDE_INTERNAL_TOPICS,
-                       DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD,
-                       DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS)
-
+                       DEFAULT_INCLUDE_INTERNAL_TOPICS)
+\
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
 __credits__    = ["Jeffrey Jonathan Jennings"]
@@ -99,178 +92,32 @@ def main():
         
     if use_sample_records:
         logging.info(f"Using sample records for analysis with sample size: {sampling_batch_size:,.0f}")
-        metrics_client = None
     else:
         logging.info("Using Metrics API for analysis.")
-
-        # Instantiate the MetricsClient class.
-        metrics_client = MetricsClient(metrics_config)
 
     for kafka_credential in kafka_credentials:
         # Initialize recommender
         analyzer = KafkaTopicsAnalyzer(
+            kafka_cluster_id=kafka_credential.get("kafka_cluster_id"),
             bootstrap_server_uri=kafka_credential.get("bootstrap.servers"),
             kafka_api_key=kafka_credential.get("sasl.username"),
-            kafka_api_secret=kafka_credential.get("sasl.password")
+            kafka_api_secret=kafka_credential.get("sasl.password"),
+            metrics_config=metrics_config
         )
 
         # Analyze all topics        
-        results = analyzer.analyze_all_topics(
+        report_details = analyzer.analyze_all_topics(
             include_internal=include_internal,
+            required_consumption_throughput_factor=required_consumption_throughput_factor,
             use_sample_records=use_sample_records,
             sampling_days=sampling_days,
             sampling_batch_size=sampling_batch_size,
             topic_filter=topic_filter
         )
         
-        if not results:
+        if not report_details:
             logging.error("NO TOPIC(S) FOUND OR ANALYSIS FAILED.")
-        else:
-            # Generate report
-            _generate_report(
-                metrics_client=metrics_client,
-                kafka_cluster_id=kafka_credential.get("kafka_cluster_id"),
-                results=results,
-                required_consumption_throughput_factor=required_consumption_throughput_factor,
-                use_sample_records=use_sample_records
-            )
-
-            # Export detailed results to a JSON file
-            json_file = f"{kafka_credential.get('kafka_cluster_id')}-topics-partition-count-recommender-app.json"
-            with open(json_file, 'w') as f:
-                json.dump(results, f, indent=2, default=str)
-            logging.info(f"Exported detailed results to: {json_file}")
     
-
-def _generate_report(metrics_client: MetricsClient, kafka_cluster_id: str, results: List[Dict], required_consumption_throughput_factor: float, use_sample_records: bool) -> None:
-    """Generates and logs a report based on the analysis results.
-
-    Args:
-        metrics_client (MetricsClient): An instance of the MetricsClient class.
-        kafka_cluster_id (str): The Kafka cluster ID.
-        results (List[Dict]): A list of dictionaries containing analysis results for each topic.
-        required_consumption_throughput_factor (float): The factor to multiply the consumer throughput by to determine required throughput.
-        use_sample_records (bool): Whether sample records were used for analysis.
-
-    Returns:
-        None
-    """
-    # Generate report header
-    logging.info("=" * DEFAULT_CHARACTER_REPEAT)
-    logging.info("KAFKA TOPICS ANALYSIS RESULTS")
-    logging.info(f"Analysis Timestamp: {datetime.now().isoformat()}")
-    logging.info(f"Kafka Cluster ID: {kafka_cluster_id}")
-    logging.info(f"Required Consumption Throughput Factor: {required_consumption_throughput_factor}")
-
-    # Calculate details for each topic
-    total_recommended_partitions = 0
-    total_record_count = 0
-    topic_details = []
-    for result in results:
-        # Extract necessary details
-        kafka_topic_name = result['topic_name']
-        partition_count = result['partition_count']
-        is_compacted_str = "Yes" if result.get('is_compacted', False) else "No"
-        
-        if use_sample_records:
-            # Use sample records to determine throughput
-            record_count = result.get('total_record_count', 0)
-            consumer_throughput = result.get('avg_bytes_per_record', 0) * record_count
-            required_throughput = consumer_throughput * required_consumption_throughput_factor
-        else:
-            # Use Metrics API to get the consumer byte consumption
-            http_status_code, error_message, bytes_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_BYTES, kafka_cluster_id, kafka_topic_name)
-            if http_status_code != HttpStatus.OK:
-                logging.warning(f"Failed retrieving 'RECEIVED BYTES' metric for topic {kafka_topic_name} because the following error occurred: {error_message}")
-                result['error'] = error_message
-                consumer_throughput = 0
-                required_throughput = 0
-                record_count = 0
-            else:
-                # Use the Confluent Metrics API to get the record count
-                http_status_code, error_message, record_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_RECORDS, kafka_cluster_id, kafka_topic_name)
-                if http_status_code != HttpStatus.OK:
-                    logging.warning(f"Failed retrieving 'RECEIVED RECORDS' metric for topic {kafka_topic_name} because the following error occurred: {error_message}")
-                    result['error'] = error_message
-                    record_count = 0
-                else:
-                    record_count = record_query_result.get('sum_total', 0)
-
-                    # Calculate daily consumed average bytes per record
-                    bytes_daily_totals = bytes_query_result.get('daily_total', [])
-                    records_daily_totals = record_query_result.get('daily_total', [])
-                    avg_bytes_daily_totals = []
-
-                    for index, record_total in enumerate(records_daily_totals):
-                        if record_total > 0:
-                            avg_bytes_daily_totals.append(bytes_daily_totals[index]/record_total)
-
-                    avg_bytes_per_record = sum(avg_bytes_daily_totals)/len(avg_bytes_daily_totals) if len(avg_bytes_daily_totals) > 0 else 0
-
-                    logging.info(f"Confluent Metrics API - For topic {kafka_topic_name}, the average bytes per record is {avg_bytes_per_record:,.2f} bytes/record for a total of {record_count:,.0f} records.")
-
-                    # Calculate consumer throughput and required throughput
-                    consumer_throughput = avg_bytes_per_record * record_count
-                    required_throughput = consumer_throughput * required_consumption_throughput_factor
-
-        # Handle cases where record count is zero or an error occurred
-        if record_count == 0:
-            consumer_throughput_str = "N/A"
-            required_throughput_str = "N/A"
-            recommended_partition_count_str = "N/A"
-            record_count_str = "N/A"
-            status = "Error" if 'error' in result else "Empty"
-        else:
-            # Update total record count
-            total_record_count += record_count
-
-            # Determine recommended partition count
-            if required_throughput < DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD:
-                # Set to minimum recommended partitions if below threshold
-                recommended_partition_count = DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS
-            else:
-                # Calculate recommended partition count
-                recommended_partition_count = round(required_throughput / consumer_throughput)
-            total_recommended_partitions += recommended_partition_count if recommended_partition_count > 0 else 0
-
-            # Format numbers with commas for thousands, and no decimal places
-            consumer_throughput_str = f"{consumer_throughput:,.0f}"
-            required_throughput_str = f"{required_throughput:,.0f}"
-            recommended_partition_count_str = f"{recommended_partition_count:,.0f}" if recommended_partition_count > 0 else "N/A"
-            record_count_str = f"{record_count:,.0f}"
-
-            status = "Active"
-        
-        # Append formatted details to the list
-        topic_details.append(f"{kafka_topic_name:<40} {is_compacted_str:<13} {record_count_str:<12} {partition_count:<12} {required_throughput_str:<21} {consumer_throughput_str:<21} {recommended_partition_count_str:<25} {status:<10}")
-
-    # Table header and details        
-    logging.info("=" * DEFAULT_CHARACTER_REPEAT)
-    logging.info(f"{'Topic Name':<40} {'Compacted?':<13} {'Records':<12} {'Partitions':<12} {'Required Throughput':<21} {'Consumer Throughput':<21} {'Recommended Partitions':<25} {'Status':<10}")
-    logging.info("-" * DEFAULT_CHARACTER_REPEAT)
-    for detail in topic_details:
-        logging.info(detail)    
-
-    # Summarize results
-    total_topics = len(results)
-    total_partitions = sum(result['partition_count'] for result in results)
-    total_record_count = sum(result.get('total_record_count', 0) for result in results)
-
-    logging.info("=" * DEFAULT_CHARACTER_REPEAT)
-    logging.info("SUMMARY STATISTICS")
-    logging.info("=" * DEFAULT_CHARACTER_REPEAT)
-    logging.info(f"Total Topics: {total_topics}")
-
-    if use_sample_records:
-        active_topics = len([result for result in results if result.get('total_record_count', 0) > 0])
-        logging.info(f"Active Topics: {active_topics} ({active_topics/total_topics*100:.1f}%)")
-
-    logging.info(f"Total Partitions: {total_partitions}")
-    logging.info(f"Total Recommended Partitions: {total_recommended_partitions}")
-    logging.info(f"Total Records: {total_record_count:,}")
-    logging.info(f"Average Partitions per Topic: {total_partitions/total_topics:.0f}")
-    logging.info(f"Average Recommended Partitions per Topic: {total_recommended_partitions/total_topics:.0f}")
-
     
 if __name__ == "__main__":
     main()
