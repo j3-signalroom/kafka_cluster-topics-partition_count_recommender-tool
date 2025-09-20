@@ -87,9 +87,8 @@ class KafkaTopicsAnalyzer:
                     iso_start_time = datetime.fromisoformat(rolling_start.strftime('%Y-%m-%dT%H:%M:%S+00:00'))
                     start_time_epoch_ms = int(rolling_start.timestamp() * 1000)
 
-                    logging.info(f"Using rolling {topic_info['sampling_days_based_on_retention_days']} day window starting from {iso_start_time.isoformat()}")
-
-                    result = self.__analyze_topic(topic_name, topic_info['metadata'], sampling_batch_size, start_time_epoch_ms)
+                    # Analyze the topic
+                    result = self.__analyze_topic(topic_name, topic_info, sampling_batch_size, start_time_epoch_ms, iso_start_time)
                     result['is_compacted'] = topic_info['is_compacted']
                     result['sampling_days'] = topic_info['sampling_days_based_on_retention_days']
                     results.append(result)
@@ -359,24 +358,28 @@ class KafkaTopicsAnalyzer:
             logging.warning(f"    No records found in topic '{topic_name}'")
             return 0.0
 
-    def __analyze_topic(self, topic_name: str, topic_metadata, sampling_batch_size: int, start_time_epoch_ms: int) -> Dict:
+    def __analyze_topic(self, topic_name: str, topic_info: Dict, sampling_batch_size: int, start_time_epoch_ms: int, iso_start_time: datetime) -> Dict:
         """Analyze a single topic.
         
         Args:
             topic_name (str): Name of the topic to analyze.
-            topic_metadata: Metadata object for the topic.
+            topic_info (Dict): Metadata and configuration of the topic.
             sampling_batch_size (int): Number of records to process per batch when sampling.
             start_time_epoch_ms (int): Start time in epoch milliseconds for the rolling window.
+            iso_start_time (datetime): Start time as an ISO 8601 formatted datetime object.
             
         Returns:
             Dict: Analysis results including partition count, total messages, average record size, etc.
         """
-        logging.info(f"Analyzing topic: {topic_name}")
-        
+        topic_metadata = topic_info['metadata']
+        sampling_days = topic_info['sampling_days_based_on_retention_days']
+
+        logging.info(f"Analyzing topic {topic_name} with {sampling_days}-day rolling window (from {iso_start_time.isoformat()})")
+
         partitions = list(topic_metadata.partitions.keys())
         partition_count = len(partitions)
         
-        # Get partition offsets to calculate total messages
+        # Get partition offsets to calculate total records
         partition_offsets = self.__get_partition_offsets(topic_name, partitions)
         
         total_record_count = 0
@@ -408,7 +411,7 @@ class KafkaTopicsAnalyzer:
         if total_record_count > 0:
             avg_record_size = self.__sample_record_sizes(topic_name, sampling_batch_size, partition_details)
         elif total_record_count == 0:
-            logging.warning(f"  Topic '{topic_name}' is empty - no records to sample")
+            logging.info(f"  No records available in topic '{topic_name}' for sampling.")
             avg_record_size = 0.0
         
         return {
