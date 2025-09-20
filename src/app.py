@@ -200,7 +200,7 @@ def _generate_report(metrics_client: MetricsClient, kafka_cluster_id: str, resul
                     avg_bytes_daily_totals = []
 
                     for index, record_total in enumerate(records_daily_totals):
-                        if record_total:
+                        if record_total > 0:
                             avg_bytes_daily_totals.append(bytes_daily_totals[index]/record_total)
 
                     avg_bytes_per_record = sum(avg_bytes_daily_totals)/len(avg_bytes_daily_totals) if len(avg_bytes_daily_totals) > 0 else 0
