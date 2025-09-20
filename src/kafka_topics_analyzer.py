@@ -265,7 +265,7 @@ class KafkaTopicsAnalyzer:
             return result[0].offset
         return None
 
-    def __sample_record_sizes(self, topic_name: str, sampling_batch_size: int, partition_details: List[Dict]) -> float | None:
+    def __sample_record_sizes(self, topic_name: str, sampling_batch_size: int, partition_details: List[Dict]) -> float:
         """Sample record sizes from the specified partitions to calculate average record size.
         
         Args:
@@ -274,7 +274,7 @@ class KafkaTopicsAnalyzer:
             partition_details (List[Dict]): Details of the partitions to process.
 
         Returns:
-            float | None: Average record size in bytes, or None if no records found.
+            float: Average record size in bytes, or 0 if no records found.
         """
         total_size = 0
         total_count = 0
@@ -357,7 +357,7 @@ class KafkaTopicsAnalyzer:
             return avg_size
         else:
             logging.warning(f"    No records found in topic '{topic_name}'")
-            return None
+            return 0.0
 
     def __analyze_topic(self, topic_name: str, topic_metadata, sampling_batch_size: int, start_time_epoch_ms: int) -> Dict:
         """Analyze a single topic.
@@ -404,7 +404,7 @@ class KafkaTopicsAnalyzer:
 
 
         # Sample record sizes if requested and topic has messages
-        avg_record_size = None
+        avg_record_size = 0.0
         if total_record_count > 0:
             avg_record_size = self.__sample_record_sizes(topic_name, sampling_batch_size, partition_details)
         elif total_record_count == 0:
