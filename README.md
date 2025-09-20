@@ -210,78 +210,101 @@ The **50 partitions** ensure that the consumer can achieve the required throughp
 #### 2.1 End-to-End Application Workflow
 ```mermaid
 ---
-id: 18ffc070-2801-4d6a-9a7c-36619ce33af3
+id: 3eadd090-8b11-4a52-abc2-9755066ffc9d
 ---
 sequenceDiagram
-    participant Main as main()
-    participant Env as Environment/.env
-    participant AWS as AWS Secrets Manager
-    participant MC as MetricsClient
+    participant User
+    participant App as app.py
     participant KTA as KafkaTopicsAnalyzer
-    participant Report as _generate_report()
-    participant File as JSON File
+    participant AC as AdminClient
+    participant MC as MetricsClient
+    participant KC as Consumer
+    participant AWS as AWS Secrets Manager
+    participant CSV as CSV Report
 
-    Main->>Env: load_dotenv()
-    Main->>Env: Read configuration settings
-    Note over Main,Env: REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR<br/>USE_SAMPLE_RECORDS, USE_AWS_SECRETS_MANAGER<br/>INCLUDE_INTERNAL_TOPICS, etc.
-
-    alt use_aws_secrets_manager == True
-        Main->>AWS: get_secrets(cc_api_secrets_path)
-        AWS-->>Main: metrics_config or error
-        Main->>AWS: get_secrets(kafka_api_secrets_paths)
-        AWS-->>Main: kafka_credentials or error
-    else use environment variables
-        Main->>Env: Read CONFLUENT_CLOUD_CREDENTIAL
-        Main->>Env: Read KAFKA_CREDENTIALS
-        Env-->>Main: credentials
+    User->>App: Run application
+    App->>App: Load environment variables
+    App->>App: Read configuration settings
+    
+    alt Use AWS Secrets Manager
+        App->>AWS: Get Confluent Cloud credentials
+        AWS-->>App: Return credentials
+        App->>AWS: Get Kafka API credentials
+        AWS-->>App: Return Kafka credentials
+    else Use Environment Variables
+        App->>App: Read credentials from env vars
     end
 
-    alt use_sample_records == False
-        rect rgb(173, 216, 230)
-            Main->>MC: MetricsClient(metrics_config)
-            MC-->>Main: metrics_client instance
-        end
-    else
-        rect rgb(255, 182, 193)
-            Note over Main: metrics_client = None
-        end
-    end
-
-    loop for each kafka_credential
-        Main->>KTA: KafkaTopicsAnalyzer(bootstrap_server, api_key, api_secret)
-        KTA-->>Main: analyzer instance
+    loop For each Kafka cluster
+        App->>KTA: Initialize(cluster_id, bootstrap_server, api_key, api_secret, metrics_config)
+        KTA->>AC: Create AdminClient
+        KTA->>MC: Create MetricsClient
         
-        Main->>KTA: analyze_all_topics(parameters)
-        Note over KTA: Analyzes topics based on<br/>include_internal, use_sample_records<br/>sampling_days, sampling_batch_size
-        KTA-->>Main: results (List[Dict])
+        App->>KTA: analyze_all_topics(parameters)
         
-        alt results exist
-            Main->>Report: _generate_report(metrics_client, kafka_cluster_id, results, ...)
-            
-            alt use_sample_records == False
+        KTA->>AC: list_topics()
+        AC-->>KTA: Return topics metadata
+        
+        KTA->>AC: describe_configs(topics)
+        AC-->>KTA: Return topic configurations
+        
+        KTA->>KTA: Filter topics (internal, topic_filter)
+        
+        KTA->>CSV: Create report file with headers
+        
+        loop For each topic to analyze
+            alt Use Sample Records
                 rect rgb(173, 216, 230)
-                    loop for each result/topic
-                        Report->>MC: get_topic_daily_aggregated_totals(RECEIVED_BYTES)
-                        MC-->>Report: bytes_query_result or error
-                        Report->>MC: get_topic_daily_aggregated_totals(RECEIVED_RECORDS)
-                        MC-->>Report: record_query_result or error
+                    KTA->>KTA: Calculate rolling window timeframe
+                    KTA->>KTA: __analyze_topic()
+                    
+                    KTA->>KC: Create Consumer
+                    KTA->>KC: get_watermark_offsets()
+                    KC-->>KTA: Return low/high offsets
+                    
+                    KTA->>KC: offsets_for_times()
+                    KC-->>KTA: Return offset at timestamp
+                    
+                    KTA->>KTA: __sample_record_sizes()
+                    
+                    loop For each partition
+                        KTA->>KC: assign() and seek()
+                        
+                        loop Sample records in batches
+                            KTA->>KC: poll()
+                            KC-->>KTA: Return record
+                            KTA->>KTA: Calculate record size
+                            KTA->>KTA: Update running totals
+                        end
                     end
+                    
+                    KTA->>KC: close()
+                    KTA->>KTA: Calculate average record size
                 end
-            else
+                
+            else Use Metrics API
                 rect rgb(255, 182, 193)
-                    Note over Report: Use sample record data<br/>for throughput calculations
+                    KTA->>MC: get_topic_daily_aggregated_totals(RECEIVED_BYTES)
+                    MC-->>KTA: Return bytes metrics
+                    
+                    KTA->>MC: get_topic_daily_aggregated_totals(RECEIVED_RECORDS)
+                    MC-->>KTA: Return records metrics
+                    
+                    KTA->>KTA: Calculate average bytes per record
                 end
             end
             
-            Note over Report: Calculate recommended partitions<br/>Format and log analysis results<br/>Generate summary statistics
-            Report-->>Main: Report logged
-            
-            Main->>File: Export results to JSON
-            File-->>Main: JSON file created
-        else
-            Note over Main: Log "NO TOPIC(S) FOUND"
+            KTA->>KTA: Calculate required throughput
+            KTA->>KTA: Determine recommended partitions
+            KTA->>CSV: Write topic analysis to report
         end
+        
+        KTA->>KTA: Generate summary statistics
+        KTA-->>App: Return analysis results
     end
+    
+    App->>User: Display completion message
+    App->>CSV: Save report file
 ```
 
 ### 3.0 Unlocking High-Performance Consumer Throughput
