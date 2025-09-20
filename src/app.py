@@ -176,47 +176,62 @@ def _generate_report(metrics_client: MetricsClient, kafka_cluster_id: str, resul
             consumer_throughput = result.get('avg_bytes_per_record', 0) * record_count
             required_throughput = consumer_throughput * required_consumption_throughput_factor
         else:
-            # Use Metrics API to determine throughput
+            # Use Metrics API to get the consumer byte consumption
             http_status_code, error_message, bytes_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_BYTES, kafka_cluster_id, kafka_topic_name)
-
             if http_status_code != HttpStatus.OK:
-                logging.error(f"Error retrieving 'RECEIVED BYTES' metric for topic {kafka_topic_name} because the following error occurred: {error_message}")
+                logging.warning(f"Failed retrieving 'RECEIVED BYTES' metric for topic {kafka_topic_name} because the following error occurred: {error_message}")
                 result['error'] = error_message
                 consumer_throughput = 0
                 required_throughput = 0
                 record_count = 0
             else:
-                consumer_throughput = bytes_query_result.get('avg_total', 0)
-                required_throughput = bytes_query_result.get('avg_total', 0) * required_consumption_throughput_factor
-
+                # Use the Confluent Metrics API to get the record count
                 http_status_code, error_message, record_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_RECORDS, kafka_cluster_id, kafka_topic_name)
-
                 if http_status_code != HttpStatus.OK:
-                    logging.error(f"Error retrieving 'RECEIVED RECORDS' metric for topic {kafka_topic_name} because the following error occurred: {error_message}")
+                    logging.warning(f"Failed retrieving 'RECEIVED RECORDS' metric for topic {kafka_topic_name} because the following error occurred: {error_message}")
                     result['error'] = error_message
                     record_count = 0
                 else:
                     record_count = record_query_result.get('sum_total', 0)
 
-        # Update total record count
-        total_record_count += record_count
+                    # Calculate daily consumed average bytes per record
+                    bytes_daily_totals = bytes_query_result.get('daily_total', [])
+                    records_daily_totals = record_query_result.get('daily_total', [])
+                    avg_bytes_daily_totals = []
 
-        # Calculate recommended partition count
-        recommended_partition_count = round(required_throughput / consumer_throughput)
-        total_recommended_partitions += recommended_partition_count if recommended_partition_count > 0 else 0
+                    for index, record_total in enumerate(records_daily_totals):
+                        if record_total:
+                            avg_bytes_daily_totals.append(bytes_daily_totals[index]/record_total)
 
-        # Format numbers with commas for thousands, and no decimal places
-        consumer_throughput_str = f"{consumer_throughput:,.0f}"
-        required_throughput_str = f"{required_throughput:,.0f}"
-        recommended_partition_count_str = f"{recommended_partition_count:,.0f}" if recommended_partition_count > 0 else "N/A"
-        record_count_str = f"{record_count:,.0f}"
-        
-        # Determine status
-        if 'error' in result:
-            status = "Error"
-        elif record_count == 0:
-            status = "Empty"
+                    avg_bytes_per_record = sum(avg_bytes_daily_totals)/len(avg_bytes_daily_totals) if len(avg_bytes_daily_totals) > 0 else 0
+
+                    logging.info(f"Confluent Metrics API - For topic {kafka_topic_name}, the average bytes per record is {avg_bytes_per_record:,.2f} bytes/record for a total of {record_count:,.0f} records.")
+
+                    # Calculate consumer throughput and required throughput
+                    consumer_throughput = avg_bytes_per_record * record_count
+                    required_throughput = consumer_throughput * required_consumption_throughput_factor
+
+        # Handle cases where record count is zero or an error occurred
+        if record_count == 0:
+            consumer_throughput_str = "N/A"
+            required_throughput_str = "N/A"
+            recommended_partition_count_str = "N/A"
+            record_count_str = "N/A"
+            status = "Error" if 'error' in result else "Empty"
         else:
+            # Update total record count
+            total_record_count += record_count
+
+            # Calculate recommended partition count
+            recommended_partition_count = round(required_throughput / consumer_throughput)
+            total_recommended_partitions += recommended_partition_count if recommended_partition_count > 0 else 0
+
+            # Format numbers with commas for thousands, and no decimal places
+            consumer_throughput_str = f"{consumer_throughput:,.0f}"
+            required_throughput_str = f"{required_throughput:,.0f}"
+            recommended_partition_count_str = f"{recommended_partition_count:,.0f}" if recommended_partition_count > 0 else "N/A"
+            record_count_str = f"{record_count:,.0f}"
+
             status = "Active"
         
         # Append formatted details to the list
