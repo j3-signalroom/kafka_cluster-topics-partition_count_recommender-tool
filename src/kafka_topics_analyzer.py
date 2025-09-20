@@ -139,7 +139,7 @@ class KafkaTopicsAnalyzer:
 
             # Now filter the Kafka Topics that are not to analyzed
             topics_to_analyze = {}
-            for topic_name, topic_metadata in sorted(metadata.topics.items()):
+            for topic_name, topic_metadata in sorted(metadata.topics.items(), key=lambda x: x[0].lower()):
                 # Skip internal topics if not requested
                 if not include_internal and topic_name.startswith('_'):
                     continue
