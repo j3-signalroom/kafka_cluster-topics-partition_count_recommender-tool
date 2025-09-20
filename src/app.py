@@ -16,7 +16,9 @@ from constants import (DEFAULT_SAMPLING_DAYS,
                        DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR, 
                        DEFAULT_USE_SAMPLE_RECORDS,
                        DEFAULT_USE_AWS_SECRETS_MANAGER,
-                       DEFAULT_INCLUDE_INTERNAL_TOPICS)
+                       DEFAULT_INCLUDE_INTERNAL_TOPICS,
+                       DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD,
+                       DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS)
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -222,8 +224,13 @@ def _generate_report(metrics_client: MetricsClient, kafka_cluster_id: str, resul
             # Update total record count
             total_record_count += record_count
 
-            # Calculate recommended partition count
-            recommended_partition_count = round(required_throughput / consumer_throughput)
+            # Determine recommended partition count
+            if required_throughput < DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD:
+                # Set to minimum recommended partitions if below threshold
+                recommended_partition_count = DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS
+            else:
+                # Calculate recommended partition count
+                recommended_partition_count = round(required_throughput / consumer_throughput)
             total_recommended_partitions += recommended_partition_count if recommended_partition_count > 0 else 0
 
             # Format numbers with commas for thousands, and no decimal places
