@@ -94,19 +94,19 @@ SAMPLING_BATCH_SIZE=<YOUR_SAMPLING_BATCH_SIZE>
 
 The environment variables are defined as follows:
 
-| Environment Variable Name  | Description |
-| ----------------------------------------| ----------- |
-| `CONFLUENT_CLOUD_CREDENTIAL` | JSON Object with Confluent Cloud API Key and Secret keys. |
-| `KAFKA_CREDENTIALS` | JSON Object Array with Kafka Cluster API Keys, API Secrets, Kafka Cluster IDs, and bootstrap server URIs. |
-| `USE_AWS_SECRETS_MANAGER` | Set to `True` if you want to use AWS Secrets Manager to manage your secrets; otherwise, set to `False`.  Default is `False`. |
-| `CONFLUENT_CLOUD_API_SECRET_PATH` | JSON Object with the Secrets' AWS Region Name and the name of the AWS Secrets Manager secrets that contains your Confluent Cloud API Key and secret. |
-| `KAFKA_API_SECRET_PATHS` | JSON Object Array with the Secrets' AWS Region Name and the name of the AWS Secrets Manager secrets that contains your Kafka Cluster API Key, API Secret, Kafka Cluster ID, and bootstrap server URI. |
-| `INCLUDE_INTERNAL_TOPICS` | Set to `True` if you want to include internal topics in the analysis; otherwise, set to `False`.  Default is `False`. |
-| `TOPIC_FILTER` | A comma-separated list of topic names to include in the analysis. Leave empty to include all topics. |
-| `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` | A multiplier to scale the peak consumption for future demand forecasting (e.g., `3` for `300%`).  Default is `3`. |
-| `USE_SAMPLE_RECORDS` | Set to `True` if you want to sample records for analysis; otherwise, set to `False`. Default is `True`. |
-| `SAMPLING_BATCH_SIZE` | The number of records to sample if `USE_SAMPLE_RECORDS` is set to `True` (e.g., `50,000`).  Default is `50,000`. |
-| `SAMPLING_DAYS` | The number of days to look back when sampling records if `USE_SAMPLE_RECORDS` is set to True (for example, `7`). This creates a rolling window that always looks back the specified number of days from the current time. **Note**: _This value will be ignored for topics that do not retain records for the number of days specified by_ `SAMPLING_DAYS`.  Default is `7`.|
+| Environment Variable Name | Type | Description | Example | Default | Required |
+|---------------|------|-------------|---------|---------|----------|
+| `CONFLUENT_CLOUD_CREDENTIAL` | JSON Object | Contains authentication credentials for Confluent Cloud API access. Must include `confluent_cloud_api_key` and `confluent_cloud_api_secret` fields for authenticating with Confluent Cloud services. | `{"confluent_cloud_api_key": "CKABCD123456", "confluent_cloud_api_secret": "xyz789secretkey"}` | None | Yes (if not using AWS Secrets Manager) |
+| `KAFKA_CREDENTIALS` | JSON Array | Array of Kafka cluster connection objects. Each object must contain `sasl.username`, `sasl.password`, `kafka_cluster_id`, and `bootstrap.servers` for connecting to specific Kafka clusters. | `[{"sasl.username": "ABC123", "sasl.password": "secret123", "kafka_cluster_id": "lkc-abc123", "bootstrap.servers": "pkc-123.us-east-1.aws.confluent.cloud:9092"}]` | None | Yes (if not using AWS Secrets Manager) |
+| `USE_AWS_SECRETS_MANAGER` | Boolean | Controls whether to retrieve credentials from AWS Secrets Manager instead of using direct environment variables. When `True`, credentials are fetched from AWS Secrets Manager using the paths specified in other variables. | `True` or `False` | `False` | No |
+| `CONFLUENT_CLOUD_API_SECRET_PATH` | JSON Object | AWS Secrets Manager configuration for Confluent Cloud credentials. Contains `region_name` (AWS region) and `secret_name` (name of the secret in AWS Secrets Manager). Only used when `USE_AWS_SECRETS_MANAGER` is `True`. | `{"region_name": "us-east-1", "secret_name": "confluent-cloud-api-credentials"}` | None | Yes (if `USE_AWS_SECRETS_MANAGER` is `True`) |
+| `KAFKA_API_SECRET_PATHS` | JSON Array | Array of AWS Secrets Manager configurations for Kafka cluster credentials. Each object contains `region_name` and `secret_name` for retrieving cluster-specific credentials from AWS Secrets Manager. | `[{"region_name": "us-east-1", "secret_name": "kafka-cluster-1-creds"}, {"region_name": "us-east-1", "secret_name": "kafka-cluster-2-creds"}]` | None | Yes (if `USE_AWS_SECRETS_MANAGER` is `True`) |
+| `INCLUDE_INTERNAL_TOPICS` | Boolean | Determines whether Kafka internal topics (system topics like `__consumer_offsets`, `_schemas`) are included in the analysis and reporting. Set to `False` to exclude internal topics and focus only on user-created topics. | `True` or `False` | `False` | No |
+| `TOPIC_FILTER` | Comma-separated String | Whitelist of specific topic names to analyze. When specified, only these topics will be included in the analysis. Use commas to separate multiple topic names. Leave empty or unset to analyze all available topics. | `"user-events,order-processing,payment-notifications"` | Empty (all topics) | No |
+| `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` | Float/Integer | Multiplier applied to current peak consumption rates for capacity planning and future demand forecasting. A value of `3` means planning for 3x the current peak throughput (300% of current load). | `3` (for 300%), `2.5` (for 250%) | `3` | No |
+| `USE_SAMPLE_RECORDS` | Boolean | Enables record sampling mode for analysis instead of processing all records. When `True`, only a subset of records is analyzed for performance optimization. Recommended for large topics or initial analysis. | `True` or `False` | `True` | No |
+| `SAMPLING_BATCH_SIZE` | Integer | Maximum number of records to sample per topic when `USE_SAMPLE_RECORDS` is `True`. Controls the sample size for analysis to balance accuracy with performance. Larger values provide more accurate analysis but slower processing. | `50000`, `100000` | `50000` | No |
+| `SAMPLING_DAYS` | Integer | Time window (in days) for record sampling, creating a rolling window that looks back from the current time. Defines how far back to sample records for analysis. **Note**: Topics with retention periods shorter than this value will use their maximum available retention period instead. | `7` (last week), `30` (last month) | `7` | No |
 
 #### 1.2.2 Using the AWS Secrets Manager (optional)
 If you use **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and the application will retrieve the secrets from AWS Secrets Manager using the names provided in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`.  
