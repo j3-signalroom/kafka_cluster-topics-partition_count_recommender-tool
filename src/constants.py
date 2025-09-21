@@ -17,7 +17,8 @@ DEFAULT_USE_SAMPLE_RECORDS: Final[str] = "True"
 DEFAULT_USE_AWS_SECRETS_MANAGER: Final[str] = "False"
 DEFAULT_INCLUDE_INTERNAL_TOPICS: Final[str] = "False"
 
-DEFAULT_CHARACTER_REPEAT: Final[int] = 160
+# Character repeat limit for string fields
+DEFAULT_CHARACTER_REPEAT: Final[int] = 100
 
 # Consumer throughput threshold and minimum recommended partitions
 DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD: Final[int] = 1024 * 1024 * 10  # 10 MB/s

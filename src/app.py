@@ -43,7 +43,7 @@ def main():
         logging.error(f"THE APPLICATION FAILED TO READ CONFIGURATION SETTINGS BECAUSE OF THE FOLLOWING ERROR: {e}") 
         return
     
-    # Read Confluent Cloud credentials from environment variables or AWS Secrets Manager
+    # Read Confluent Cloud credentials from environment variable or AWS Secrets Manager
     try:
         # Check if using AWS Secrets Manager for credentials retrieval
         if use_aws_secrets_manager:
@@ -52,16 +52,18 @@ def main():
             if metrics_config == {}:
                 logging.error(f"FAILED TO RETRIEVE CONFLUENT CLOUD API KEY/SECRET FROM AWS SECRETS MANAGER BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
                 return
-            
-            logging.info("Using AWS Secrets Manager for retrieving the Confluent Cloud credentials.")
+
+            logging.info("Retrieving the Confluent Cloud credentials from the AWS Secrets Manager.")
         else:
             metrics_config = json.loads(os.getenv("CONFLUENT_CLOUD_CREDENTIAL", "{}"))
-            logging.info("Using environment variables for retrieving the Confluent Cloud credentials.")
+
+            logging.info("Retrieving the Confluent Cloud credentials from the .env file.")
 
     except Exception as e:
         logging.error(f"THE APPLICATION FAILED TO READ CONFLUENT CLOUD CONFIGURATION SETTINGS BECAUSE OF THE FOLLOWING ERROR: {e}") 
         return
     
+    # Read the Kafka Cluster credentials from the environment variable or AWS Secrets Manager
     try:
         # Check if using AWS Secrets Manager for credentials retrieval
         if use_aws_secrets_manager:
@@ -80,23 +82,20 @@ def main():
                         "sasl.password": settings.get("sasl.password"),
                         "kafka_cluster_id": settings.get("kafka_cluster_id")
                     })
-
+            logging.info("Retrieving the Kafka Cluster credentials from the AWS Secrets Manager.")
         else:
-            logging.info("Using environment variables for retrieving the Kafka Cluster credentials.")
-            
-            # Use environment variables directly
             kafka_credentials = json.loads(os.getenv("KAFKA_CREDENTIALS", "[]"))
+
+            logging.info("Retrieving the Kafka Cluster credentials from the .env file.")
     except Exception as e:
         logging.error(f"THE APPLICATION FAILED TO RUN BECAUSE OF THE FOLLOWING ERROR: {e}")
         return
         
-    if use_sample_records:
-        logging.info(f"Using sample records for analysis with sample size: {sampling_batch_size:,.0f}")
-    else:
+    if not use_sample_records:
         logging.info("Using Metrics API for analysis.")
 
-    for kafka_credential in kafka_credentials:
-        # Initialize recommender
+    # Instantiating the Kafka Topics Analyzer and analzing cluster topics
+    for kafka_credential in kafka_credentials:        
         analyzer = KafkaTopicsAnalyzer(
             kafka_cluster_id=kafka_credential.get("kafka_cluster_id"),
             bootstrap_server_uri=kafka_credential.get("bootstrap.servers"),
@@ -104,8 +103,6 @@ def main():
             kafka_api_secret=kafka_credential.get("sasl.password"),
             metrics_config=metrics_config
         )
-
-        # Analyze all topics        
         report_details = analyzer.analyze_all_topics(
             include_internal=include_internal,
             required_consumption_throughput_factor=required_consumption_throughput_factor,
