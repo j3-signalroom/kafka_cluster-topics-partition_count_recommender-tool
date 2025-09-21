@@ -187,9 +187,7 @@ Finally, run the following command to list all topics in your Kafka cluster:
 If the connection is successful, you should see a list of topics in your Kafka cluster. If you encounter any errors, double-check your credentials and network connectivity.
 
 ### 1.4 The Results
-When the application has completed iterating through the list of topics, it will produce a .CSV file in the root folder of the application.  The CSV file contains for each topic, the computed average consumer throughput in MB/s, required throughput in MB/s, which is use to calculate the recommended partition count for the topic. Below is an example of a CSV output:
-
-![]()
+When the application has completed iterating through the list of topics, it will produce a .CSV file in the root folder of the application.  The CSV file contains for each topic, the computed average consumer throughput in MB/s, required throughput in MB/s, which is use to calculate the recommended partition count for the topic.
 
  > The name of the CSV comprises of the `<KAFKA CLUSTER ID>-recommender-<CURRENT EPOCH TIME IN SECONDS>-report.csv`.  The current epoch time is to help with making the file name unique.
 
