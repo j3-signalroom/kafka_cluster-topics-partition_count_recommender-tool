@@ -58,10 +58,15 @@ class KafkaTopicsAnalyzer:
         self.kafka_consumer_config = {
             **config,
             'group.id': f'topics-partition-count-recommender-{int(time.time())}',
-            'auto.offset.reset': 'earliest',
+            'auto.offset.reset': 'latest',
             'enable.auto.commit': False,
-            'session.timeout.ms': 30000,
+            'session.timeout.ms': 45000,
+            'request.timeout.ms': 30000,
             'fetch.min.bytes': 1,
+            'log_level': 3,            
+            'enable.partition.eof': True,
+            'fetch.message.max.bytes': 1048576,  # 1MB max message size
+            'queued.min.messages': 1000,     
             'enable.metrics.push': False    # Disable metrics pushing for consumers to registered JMX MBeans.  However, is really being set to False to not expose unneccessary noise to the logging output
         }
 
@@ -241,7 +246,7 @@ class KafkaTopicsAnalyzer:
         """
         try:
             # Get all the Kafka Topics' metadata for the Kafka Cluster
-            metadata = self.admin_client.list_topics(timeout=60)
+            metadata = self.admin_client.list_topics(timeout=30)
 
             # Now filter the Kafka Topics that are not to analyzed
             topics_to_analyze = {}
@@ -271,7 +276,7 @@ class KafkaTopicsAnalyzer:
             for resource in resources:
                 try:
                     # Get the configuration dictionary for the topic
-                    config_dict = configs_result[resource].result(timeout=60)
+                    config_dict = configs_result[resource].result(timeout=30)
 
                     # Extract relevant configurations (cleanup.policy and retention.ms)
                     cleanup_policy = config_dict.get('cleanup.policy')
@@ -328,19 +333,26 @@ class KafkaTopicsAnalyzer:
             Dict[int, Tuple[int, int]]: A dictionary with partition IDs as keys and tuples of (low, high) offsets as values.
         """
         consumer = Consumer(self.kafka_consumer_config)
-        
+    
         try:
-            # Create Topic's TopicPartition objects
+            partition_offsets = {}
             topic_partitions = [TopicPartition(topic_name, partition) for partition in partitions]
             
-            # Get high watermarks for all partitions
-            partition_offsets = {}
+            # Get all watermarks at once for efficiency
             for topic_partition in topic_partitions:
                 try:
                     low, high = consumer.get_watermark_offsets(topic_partition, timeout=10)
-                    partition_offsets[topic_partition.partition] = (low, high)
+                    
+                    # Validate watermarks
+                    if low < 0 or high < 0 or high < low:
+                        logging.warning(f"Invalid watermarks for {topic_name}[{topic_partition.partition}]: low={low}, high={high}")
+                        partition_offsets[topic_partition.partition] = (0, 0)
+                    else:
+                        partition_offsets[topic_partition.partition] = (low, high)
+                        logging.debug(f"Valid watermarks for {topic_name}[{topic_partition.partition}]: [{low}, {high}]")
+                        
                 except Exception as e:
-                    logging.error(f"Failed retrieving low and high offsets for {topic_name}'s partition {topic_partition.partition} because {e}")
+                    logging.warning(f"Failed to get watermarks for {topic_name}[{topic_partition.partition}]: {e}")
                     partition_offsets[topic_partition.partition] = (0, 0)
             
             return partition_offsets
@@ -363,13 +375,27 @@ class KafkaTopicsAnalyzer:
             int: Offset of the record, or None if not found.
         """
         consumer = Consumer(self.kafka_consumer_config)
-        topic_partition = TopicPartition(topic_name, partition, timestamp_ms)
-        result = consumer.offsets_for_times([topic_partition], timeout=15.0)
-        consumer.close()
-
-        if result and result[0].offset != -1:
-            return result[0].offset
-        return None
+        try:
+            topic_partition = TopicPartition(topic_name, partition, timestamp_ms)
+            result = consumer.offsets_for_times([topic_partition], timeout=15.0)
+            
+            if result and len(result) > 0 and result[0].offset != -1:
+                # Validate the returned offset is within valid range
+                low, high = consumer.get_watermark_offsets(TopicPartition(topic_name, partition), timeout=10)
+                returned_offset = result[0].offset
+                
+                if low <= returned_offset <= high:
+                    return returned_offset
+                else:
+                    logging.warning(f"Timestamp-based offset {returned_offset} out of range [{low}, {high}] for {topic_name}[{partition}]")
+                    return max(low, 0)  # Use earliest available offset
+            
+            return None
+        except Exception as e:
+            logging.warning(f"Error getting timestamp offset for {topic_name}[{partition}]: {e}")
+            return None
+        finally:
+            consumer.close()
 
     def __sample_record_sizes(self, topic_name: str, sampling_batch_size: int, partition_details: List[Dict]) -> float:
         """Sample record sizes from the specified partitions to calculate average record size.
@@ -386,83 +412,152 @@ class KafkaTopicsAnalyzer:
         total_count = 0
         
         for partition_detail in partition_details:
+            if partition_detail.get("record_count", 0) <= 0:
+                continue
+                
             consumer = Consumer(self.kafka_consumer_config)
             
             try:
                 partition_number = partition_detail["partition_number"]
                 start_offset = partition_detail["offset_start"]
                 end_offset = partition_detail["offset_end"]
-                
+
+                # Validate offsets before proceeding
+                if start_offset is None or start_offset < 0:
+                    logging.warning(f"Invalid start_offset for {topic_name}[{partition_number}]: {start_offset}")
+                    continue
+                    
                 total_offsets = end_offset - start_offset
-                
                 if total_offsets <= 0:
                     continue
                 
-                logging.info(f"    Streaming {total_offsets:,} records from partition {partition_number}")
-                
-                # Create TopicPartition and assign it
-                topic_partition = TopicPartition(topic_name, partition_number, start_offset)
+                logging.info(f"    Sampling from partition {partition_number}: offsets [{start_offset}, {end_offset})")
+
+                # Setup consumer and validate watermarks
+                topic_partition = TopicPartition(topic_name, partition_number)
                 consumer.assign([topic_partition])
-                consumer.seek(topic_partition)
                 
-                current_offset = start_offset
+                # Verify watermarks before seeking
+                try:
+                    low_watermark, high_watermark = consumer.get_watermark_offsets(topic_partition, timeout=5)
+                    
+                    # Adjust offsets to be within valid range
+                    safe_start = max(low_watermark, start_offset)
+                    safe_end = min(high_watermark, end_offset)
+                    
+                    if safe_start >= safe_end:
+                        logging.warning(f"No valid offset range for {topic_name}[{partition_number}]: adjusted [{safe_start}, {safe_end}]")
+                        continue
+                    
+                    # Seek to safe start offset
+                    topic_partition.offset = safe_start
+                    consumer.seek(topic_partition)
+                    logging.debug(f"Seeking to offset {safe_start} for {topic_name}[{partition_number}]")
+                    
+                except Exception as seek_error:
+                    logging.error(f"Failed to seek for {topic_name}[{partition_number}]: {seek_error}")
+                    continue
+                
+                # Initialize tracking variables
                 batch_count = 0
                 partition_record_count = 0
+                total_partition_offsets = safe_end - safe_start
                 
-                while current_offset < end_offset:
+                # Process records in batches
+                while partition_record_count < total_partition_offsets:
                     batch_records_processed = 0
-                    batch_start_offset = current_offset
+                    batch_attempts = 0
+                    max_attempts_per_batch = sampling_batch_size * 3  # Safety limit
+                    max_consecutive_nulls = 50  # Limit consecutive null polls
+                    consecutive_nulls = 0
                     
-                    # Process one batch
-                    while batch_records_processed < sampling_batch_size and current_offset < end_offset:
-                        record = consumer.poll(timeout=5.0)
+                    logging.debug(f"Starting batch {batch_count + 1} for partition {partition_number}")
+                    
+                    # Process one batch with safety limits
+                    while (batch_records_processed < sampling_batch_size and 
+                        batch_attempts < max_attempts_per_batch and
+                        consecutive_nulls < max_consecutive_nulls):
                         
-                        if record is None:
-                            current_offset += 1
-                            continue
+                        batch_attempts += 1
                         
-                        if record.error():
-                            current_offset += 1
-                            continue
-                        
-                        # Calculate record size
                         try:
-                            key_size = len(record.key()) if record.key() else 0
-                            value_size = len(record.value()) if record.value() else 0
-                            headers_size = sum(len(k) + len(v) for k, v in (record.headers() or []))
-                            record_size = key_size + value_size + headers_size
-                        except:  # noqa: E722
-                            record_size = 0
-                        
-                        # Update running totals (streaming approach - saves memory)
-                        total_size += record_size
-                        total_count += 1
-                        
-                        current_offset = record.offset() + 1
-                        batch_records_processed += 1
-                        partition_record_count += 1
+                            record = consumer.poll(timeout=2.0)
+                            
+                            if record is None:
+                                consecutive_nulls += 1
+                                continue
+                            
+                            consecutive_nulls = 0  # Reset null counter
+                            
+                            # Check if we've moved beyond our target range
+                            if hasattr(record, 'offset') and record.offset() >= safe_end:
+                                logging.debug(f"Reached end of target range at offset {record.offset()}")
+                                break
+                            
+                            if record.error():
+                                logging.warning(f"Consumer error at offset {getattr(record, 'offset', 'unknown')}: {record.error()}")
+                                continue  # Don't count errors toward batch_records_processed
+                            
+                            # Verify we're in the correct partition
+                            if record.partition() != partition_number:
+                                logging.warning(f"Received record from wrong partition: {record.partition()} != {partition_number}")
+                                continue
+                            
+                            # Calculate record size
+                            try:
+                                key_size = len(record.key()) if record.key() else 0
+                                value_size = len(record.value()) if record.value() else 0
+                                headers_size = sum(len(k) + len(v) for k, v in (record.headers() or []))
+                                record_size = key_size + value_size + headers_size
+                            except Exception as size_error:
+                                logging.warning(f"Error calculating record size at offset {getattr(record, 'offset', 'unknown')}: {size_error}")
+                                record_size = 0
+                            
+                            # Update running totals
+                            total_size += record_size
+                            total_count += 1
+                            batch_records_processed += 1
+                            partition_record_count += 1
+                            
+                        except Exception as poll_error:
+                            logging.warning(f"Error during polling: {poll_error}")
+                            continue
                     
                     batch_count += 1
                     
-                    # Log progress
+                    # Log batch progress
                     if batch_records_processed > 0:
                         current_avg = total_size / total_count if total_count > 0 else 0
-                        progress_pct = (partition_record_count / total_offsets) * 100
-                        logging.info(f"      Streaming batch {batch_count}: {batch_records_processed:,} records "
-                                f"(offsets {batch_start_offset:,}-{current_offset-1:,}), "
-                                f"progress: {progress_pct:.1f}%, running avg: {current_avg:,.2f} bytes")
+                        progress_pct = (partition_record_count / max(1, total_partition_offsets)) * 100
+                        error_attempts = batch_attempts - batch_records_processed
+                        
+                        logging.info(f"      Batch {batch_count}: {batch_records_processed:,} valid records "
+                                    f"({error_attempts} errors/nulls), progress: {progress_pct:.1f}%, "
+                                    f"running avg: {current_avg:,.2f} bytes")
+                    else:
+                        logging.warning(f"      Batch {batch_count}: No valid records processed "
+                                    f"({batch_attempts} attempts, {consecutive_nulls} consecutive nulls)")
+                    
+                    # Break if we hit safety limits
+                    if consecutive_nulls >= max_consecutive_nulls:
+                        logging.warning(f"Too many consecutive null polls ({consecutive_nulls}) - stopping partition {partition_number}")
+                        break
+                    
+                    if batch_attempts >= max_attempts_per_batch and batch_records_processed == 0:
+                        logging.warning(f"No progress after {max_attempts_per_batch} attempts - stopping partition {partition_number}")
+                        break
             
             except Exception as e:
-                logging.error(f"    Error streaming partition {partition_detail.get('partition_number', 'unknown')}: {e}")
+                logging.error(f"    Error sampling partition {partition_detail.get('partition_number', 'unknown')}: {e}")
             finally:
                 consumer.close()
         
         if total_count > 0:
             avg_size = total_size / total_count
-            logging.info(f"    Final streaming average: {avg_size:,.2f} bytes from {total_count:,} records")
+            logging.info(f"    Final average: {avg_size:,.2f} bytes from {total_count:,} records")
             return avg_size
         else:
-            logging.warning(f"    No records found in topic '{topic_name}'")
+            logging.warning(f"    No records sampled from topic '{topic_name}'")
             return 0.0
 
     def __analyze_topic(self, topic_name: str, topic_info: Dict, sampling_batch_size: int, start_time_epoch_ms: int, iso_start_time: datetime) -> Dict:
