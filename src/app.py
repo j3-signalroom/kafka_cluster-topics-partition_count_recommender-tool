@@ -52,12 +52,12 @@ def main():
             if metrics_config == {}:
                 logging.error(f"FAILED TO RETRIEVE CONFLUENT CLOUD API KEY/SECRET FROM AWS SECRETS MANAGER BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
                 return
-            
-            logging.info("Using retrieving the Confluent Cloud credentials from the AWS Secrets Manager.")
+
+            logging.info("Retrieving the Confluent Cloud credentials from the AWS Secrets Manager.")
         else:
             metrics_config = json.loads(os.getenv("CONFLUENT_CLOUD_CREDENTIAL", "{}"))
 
-            logging.info("Using retrieving the Confluent Cloud credentials from the .env file.")
+            logging.info("Retrieving the Confluent Cloud credentials from the .env file.")
 
     except Exception as e:
         logging.error(f"THE APPLICATION FAILED TO READ CONFLUENT CLOUD CONFIGURATION SETTINGS BECAUSE OF THE FOLLOWING ERROR: {e}") 
@@ -82,11 +82,11 @@ def main():
                         "sasl.password": settings.get("sasl.password"),
                         "kafka_cluster_id": settings.get("kafka_cluster_id")
                     })
-            logging.info("Using retrieving the Kafka Cluster credentials from the AWS Secrets Manager.")
+            logging.info("Retrieving the Kafka Cluster credentials from the AWS Secrets Manager.")
         else:
             kafka_credentials = json.loads(os.getenv("KAFKA_CREDENTIALS", "[]"))
 
-            logging.info("Using retrieving the Kafka Cluster credentials from the .env file.")
+            logging.info("Retrieving the Kafka Cluster credentials from the .env file.")
     except Exception as e:
         logging.error(f"THE APPLICATION FAILED TO RUN BECAUSE OF THE FOLLOWING ERROR: {e}")
         return
