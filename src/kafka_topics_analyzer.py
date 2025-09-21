@@ -73,7 +73,13 @@ class KafkaTopicsAnalyzer:
         # Instantiate the MetricsClient class.
         self.metrics_client = MetricsClient(metrics_config)
 
-    def analyze_all_topics(self, include_internal: bool = False, required_consumption_throughput_factor: float = DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR ,use_sample_records: bool = True, sampling_days: int = DEFAULT_SAMPLING_DAYS, sampling_batch_size: int = DEFAULT_SAMPLING_BATCH_SIZE, topic_filter: str | None = None) -> List[Dict]:
+    def analyze_all_topics(self, 
+                           include_internal: bool = False, 
+                           required_consumption_throughput_factor: float = DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR ,
+                           use_sample_records: bool = True, 
+                           sampling_days: int = DEFAULT_SAMPLING_DAYS, 
+                           sampling_batch_size: int = DEFAULT_SAMPLING_BATCH_SIZE, 
+                           topic_filter: str | None = None) -> List[Dict]:
         """Analyze all topics in the cluster.
         
         Args:
@@ -200,36 +206,38 @@ class KafkaTopicsAnalyzer:
 
                 status = "active"
 
-            # Log the results for the topic to a CSV file
+            # Add topic calculations to the CSV file.  Note the throughputs are converted to MBs
             with open(report_filename, 'a', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
-                writer.writerow([f"'{topic_name}'", f"'{is_compacted_str}'", record_count, partition_count, required_throughput, consumer_throughput, recommended_partition_count, f"'{status}'"])
+                writer.writerow([topic_name, is_compacted_str, record_count, partition_count, required_throughput/1024/1024, consumer_throughput/1024/1024, recommended_partition_count, status])
 
-        # Summarize results
+        # Compute total counts
+        overall_topic_count = len(results)
+        total_partition_count = sum(result['partition_count'] for result in results)
+        total_record_count = sum(result.get('total_record_count', 0) for result in results)
+        non_empty_topic_count = len([result for result in results if result.get('total_record_count', 0) > 0])
+
+        # Log summary results
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("KAFKA TOPICS ANALYSIS RESULTS")
         logging.info(f"Analysis Timestamp: {datetime.now().isoformat()}")
         logging.info(f"Kafka Cluster ID: {self.kafka_cluster_id}")
+        if use_sample_records:
+            logging.info(f"Sampling Records Size: {sampling_batch_size:,.0f}")
         logging.info(f"Required Consumption Throughput Factor: {required_consumption_throughput_factor}")
-
-        # Summarize results
-        total_topics = len(results)
-        total_partitions = sum(result['partition_count'] for result in results)
-        total_record_count = sum(result.get('total_record_count', 0) for result in results)
-
+        logging.info(f"Default Partition Count: {DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS}")
+        logging.info(f"Minimum Required Throughput in MB/s: {DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD/1024/1024} MB/s")
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("SUMMARY STATISTICS")
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
-        logging.info(f"Total Topics: {total_topics}")
-
-        active_topics = len([result for result in results if result.get('total_record_count', 0) > 0])
-        logging.info(f"Active Topics: {active_topics} ({active_topics/total_topics*100:.1f}%)")
-
-        logging.info(f"Total Partitions: {total_partitions}")
+        logging.info(f"Total Topics: {overall_topic_count}")
+        logging.info(f"Active Topics: {non_empty_topic_count} ({non_empty_topic_count/overall_topic_count*100:.1f}%)")
+        logging.info(f"Total Partitions: {total_partition_count}")
         logging.info(f"Total Recommended Partitions: {total_recommended_partitions}")
         logging.info(f"Total Records: {total_record_count:,}")
-        logging.info(f"Average Partitions per Topic: {total_partitions/total_topics:.0f}")
-        logging.info(f"Average Recommended Partitions per Topic: {total_recommended_partitions/total_topics:.0f}")
+        logging.info(f"Average Partitions per Topic: {total_partition_count/overall_topic_count:.0f}")
+        logging.info(f"Average Recommended Partitions per Topic: {total_recommended_partitions/overall_topic_count:.0f}")
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
 
         return report_details
 
@@ -437,31 +445,35 @@ class KafkaTopicsAnalyzer:
                 topic_partition = TopicPartition(topic_name, partition_number)
                 consumer.assign([topic_partition])
                 
-                # Verify watermarks before seeking
+                # Watermarks in Kafka are metadata that indicate the range of available offsets in a partition. So, the
+                # code needs to vertify the watermarks before seeking to check that theses boundaries are valid before 
+                # attempting to position the consumer at a specific offset
                 try:
                     low_watermark, high_watermark = consumer.get_watermark_offsets(topic_partition, timeout=5)
                     
                     # Adjust offsets to be within valid range
-                    safe_start = max(low_watermark, start_offset)
-                    safe_end = min(high_watermark, end_offset)
+                    valid_start = max(low_watermark, start_offset)
+                    valid_end = min(high_watermark, end_offset)
                     
-                    if safe_start >= safe_end:
-                        logging.warning(f"No valid offset range for {topic_name}[{partition_number}]: adjusted [{safe_start}, {safe_end}]")
+                    if valid_start >= valid_end:
+                        logging.warning(f"No valid offset range for {topic_name} - partiton {partition_number}: adjusted [{valid_start}, {valid_end}]")
                         continue
                     
                     # Seek to safe start offset
-                    topic_partition.offset = safe_start
+                    topic_partition.offset = valid_start
                     consumer.seek(topic_partition)
-                    logging.debug(f"Seeking to offset {safe_start} for {topic_name}[{partition_number}]")
+                    logging.debug(f"Seeking to offset {valid_start} for {topic_name}[{partition_number}]")
                     
                 except Exception as seek_error:
+                    # By checking watermarks first, the code ensures that it only seeks to offsets that 
+                    # actually exist on the broker, eliminating the previous “Offset out of range” errors.
                     logging.error(f"Failed to seek for {topic_name}[{partition_number}]: {seek_error}")
                     continue
                 
                 # Initialize tracking variables
                 batch_count = 0
                 partition_record_count = 0
-                total_partition_offsets = safe_end - safe_start
+                total_partition_offsets = valid_end - valid_start
                 
                 # Process records in batches
                 while partition_record_count < total_partition_offsets:
@@ -490,7 +502,7 @@ class KafkaTopicsAnalyzer:
                             consecutive_nulls = 0  # Reset null counter
                             
                             # Check if we've moved beyond our target range
-                            if hasattr(record, 'offset') and record.offset() >= safe_end:
+                            if hasattr(record, 'offset') and record.offset() >= valid_end:
                                 logging.debug(f"Reached end of target range at offset {record.offset()}")
                                 break
                             

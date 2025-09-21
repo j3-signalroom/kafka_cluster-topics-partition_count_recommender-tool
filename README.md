@@ -17,6 +17,7 @@ The **Kafka Cluster Topics Partition Count Recommender Application** offers data
    + [**1.3 Run the Application**](#13-run-the-application)
       - [**1.3.1 Did you notice we prefix `uv run` to `python src/app.py`?**](#131-did-you-notice-we-prefix-uv-run-to-python-srcapppy)
       - [**1.3.2 Troubleshoot Connectivity Issues (if any)**](#132-troubleshoot-connectivity-issues-if-any)
+   + [**1.4 The Results**](#14-the-results)
 - [**2.0 How the app calculates the recommended partition count**](#20-how-the-app-calculates-the-recommended-partition-count)
    + [**2.1 End-to-End Application Workflow**](#21-end-to-end-application-workflow)
 - [**3.0 Unlocking High-Performance Consumer Throughput**](#30-unlocking-high-performance-consumer-throughput)
@@ -41,7 +42,7 @@ The **Kafka Cluster Topics Partition Count Recommender Application** offers data
 
 ## 1.0 To get started
 
-**_Download_** ---> **_Configure_** ---> **_Run_**
+**_Download_** ---> **_Configure_** ---> **_Run_** ---> **_Results_**
 
 ### 1.1 Download the Application
 Clone the repo:
@@ -184,6 +185,13 @@ Finally, run the following command to list all topics in your Kafka cluster:
 ```
 
 If the connection is successful, you should see a list of topics in your Kafka cluster. If you encounter any errors, double-check your credentials and network connectivity.
+
+### 1.4 The Results
+When the application has completed iterating through the list of topics, it will produce a .CSV file in the root folder of the application.  The CSV file contains for each topic, the computed average consumer throughput in MB/s, required throughput in MB/s, which is use to calculate the recommended partition count for the topic. Below is an example of a CSV output:
+
+![]()
+
+ > The name of the CSV comprises of the `<KAFKA CLUSTER ID>-recommender-<CURRENT EPOCH TIME IN SECONDS>-report.csv`.  The current epoch time is to help with making the file name unique.
 
 ## 2.0 How the app calculates the recommended partition count
 The app uses the Kafka `AdminClient` to retrieve all Kafka Topics (based on the `TOPIC_FILTER` specified) stored in your Kafka Cluster, including the original partition count per topic. Then, it iterates through each Kafka Topic, calling the Confluent Cloud Metrics RESTful API to retrieve the topic’s average (i.e., the _Consumer Throughput_) and peak consumption in bytes over a rolling seven-day period. Next, it calculates the required throughput by multiplying the peak consumption by the `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` (i.e., the _Required Throughput_). Finally, it divides the required throughput by the consumer throughput and rounds the result to the nearest whole number to determine the optimal number of partitions.
