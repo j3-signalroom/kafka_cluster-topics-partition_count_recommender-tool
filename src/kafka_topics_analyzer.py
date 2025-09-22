@@ -115,6 +115,10 @@ class KafkaTopicsAnalyzer:
         logging.info("Connecting to Kafka cluster and retrieving metadata...")
         logging.info(f"Found {len(topics_to_analyze)} topics to analyze")
         logging.info(f'{"Including" if include_internal else "Excluding"} internal topics')
+        logging.info(f"Required consumption throughput factor: {required_consumption_throughput_factor:.1f}")
+        logging.info(f"Minimum required throughput threshold: {DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD/1024/1024:.1f} MB/s")
+        logging.info(f"Topic filter: {topic_filter if topic_filter else 'None'}")
+        logging.info(f"Default Partition Count: {DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS}")
         logging.info(f'Using {"sample records" if use_sample_records else "Metrics API"} for average record size calculation')
         if use_sample_records:
             logging.info(f"Sampling batch size: {sampling_batch_size:,} records")
@@ -122,10 +126,7 @@ class KafkaTopicsAnalyzer:
             logging.info(f"Sampling max consecutive nulls: {sampling_max_consecutive_nulls:,} records")
             logging.info(f"Sampling timeout: {sampling_timeout_seconds:.1f} seconds")
             logging.info(f"Sampling max continuous failed batches: {sampling_max_continuous_failed_batches:,} batches")
-        logging.info(f"Required consumption throughput factor: {required_consumption_throughput_factor:.1f}")
-        logging.info(f"Minimum required throughput threshold: {DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD/1024/1024:.1f} MB/s")
-        logging.info(f"Topic filter: {topic_filter if topic_filter else 'None'}")
-        logging.info(f"Default Partition Count: {DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS}")
+        
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
 
         # Initialize results list and total recommended partitions counter
