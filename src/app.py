@@ -97,9 +97,6 @@ def main():
         logging.error(f"THE APPLICATION FAILED TO RUN BECAUSE OF THE FOLLOWING ERROR: {e}")
         return
         
-    if not use_sample_records:
-        logging.info("Using Metrics API for analysis.")
-
     for kafka_credential in kafka_credentials:
         # Instantiate the Kafka Topics Analyzer
         analyzer = KafkaTopicsAnalyzer(

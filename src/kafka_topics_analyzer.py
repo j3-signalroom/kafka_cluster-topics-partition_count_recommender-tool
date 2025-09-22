@@ -101,14 +101,32 @@ class KafkaTopicsAnalyzer:
         Returns:
             bool: True if analysis was successful, False otherwise.
         """
-        logging.info("Connecting to Kafka cluster and retrieving metadata...")
-        
         # Get cluster metadata
         topics_to_analyze = self.__get_topics_metadata(sampling_days=sampling_days, include_internal=include_internal, topic_filter=topic_filter)
         if not topics_to_analyze:
             return []
         
+        # Log initial analysis parameters
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
+        logging.info("INITIAL ANALYSIS PARAMETERS")
+        logging.info("-" * DEFAULT_CHARACTER_REPEAT)
+        logging.info(f"Analysis Timestamp: {datetime.now().isoformat()}")
+        logging.info(f"Kafka Cluster ID: {self.kafka_cluster_id}")
+        logging.info("Connecting to Kafka cluster and retrieving metadata...")
         logging.info(f"Found {len(topics_to_analyze)} topics to analyze")
+        logging.info(f'{"Including" if include_internal else "Excluding"} internal topics')
+        logging.info(f'Using {"sample records" if use_sample_records else "Metrics API"} for average record size calculation')
+        if use_sample_records:
+            logging.info(f"Sampling batch size: {sampling_batch_size:,} records")
+            logging.info(f"Sampling days: {sampling_days} days")
+            logging.info(f"Sampling max consecutive nulls: {sampling_max_consecutive_nulls:,} records")
+            logging.info(f"Sampling timeout: {sampling_timeout_seconds:.1f} seconds")
+            logging.info(f"Sampling max continuous failed batches: {sampling_max_continuous_failed_batches:,} batches")
+        logging.info(f"Required consumption throughput factor: {required_consumption_throughput_factor:.1f}")
+        logging.info(f"Minimum required throughput threshold: {DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD/1024/1024:.1f} MB/s")
+        logging.info(f"Topic filter: {topic_filter if topic_filter else 'None'}")
+        logging.info(f"Default Partition Count: {DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS}")
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
 
         # Initialize results list and total recommended partitions counter
         results = []
@@ -253,11 +271,6 @@ class KafkaTopicsAnalyzer:
         with open(report_filename, 'w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             writer.writerow(["stat","value"])
-            if use_sample_records:
-                writer.writerow(["sampling_records_size", sampling_batch_size])
-            writer.writerow(["required_consumption_throughput_factor", required_consumption_throughput_factor])
-            writer.writerow(["default_partition_count", DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS])
-            writer.writerow(["minimum_required_throughput_mbs", DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD/1024/1024])
             writer.writerow(["total_topics", overall_topic_count])
             writer.writerow(["active_topics", non_empty_topic_count])
             writer.writerow(["total_partitions", total_partition_count])
@@ -268,17 +281,8 @@ class KafkaTopicsAnalyzer:
 
         # Log summary results
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
-        logging.info("KAFKA TOPICS ANALYSIS RESULTS")
-        logging.info(f"Analysis Timestamp: {datetime.now().isoformat()}")
-        logging.info(f"Kafka Cluster ID: {self.kafka_cluster_id}")
-        if use_sample_records:
-            logging.info(f"Sampling Records Size: {sampling_batch_size:,.0f}")
-        logging.info(f"Required Consumption Throughput Factor: {required_consumption_throughput_factor}")
-        logging.info(f"Default Partition Count: {DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS}")
-        logging.info(f"Minimum Required Throughput in MB/s: {DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD/1024/1024} MB/s")
-        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("SUMMARY STATISTICS")
-        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
+        logging.info("-" * DEFAULT_CHARACTER_REPEAT)
         logging.info(f"Total Topics: {overall_topic_count}")
         logging.info(f"Active Topics: {non_empty_topic_count} ({non_empty_topic_count/overall_topic_count*100:.1f}%)")
         logging.info(f"Total Partitions: {total_partition_count}")
