@@ -107,6 +107,8 @@ class KafkaTopicsAnalyzer:
         if not topics_to_analyze:
             return []
         
+        app_start_time = time.time()
+
         # Log initial analysis parameters
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("INITIAL ANALYSIS PARAMETERS")
@@ -135,7 +137,7 @@ class KafkaTopicsAnalyzer:
         total_recommended_partitions = 0
 
         # Prepare CSV report file
-        base_filename = f"{self.kafka_cluster_id}-recommender-{int(time.time())}"
+        base_filename = f"{self.kafka_cluster_id}-recommender-{int(app_start_time)}"
 
         # Detail report filename
         report_filename = f"{base_filename}-detail-report.csv"
@@ -260,7 +262,8 @@ class KafkaTopicsAnalyzer:
                 writer = csv.writer(file)
                 writer.writerow([topic_name, is_compacted_str, record_count, partition_count, required_throughput/1024/1024, consumer_throughput/1024/1024, recommended_partition_count, status])
 
-        # Using the results list, compute the total counts
+        # Calculate summary statistics
+        elapsed_time = time.time() - app_start_time
         overall_topic_count = len(results)
         total_partition_count = sum(result['partition_count'] for result in results)
         total_record_count = sum(result.get('total_record_count', 0) for result in results)
@@ -279,6 +282,7 @@ class KafkaTopicsAnalyzer:
         with open(report_filename, 'w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             writer.writerow(["stat","value"])
+            writer.writerow(["elapsed_time_in_hours", elapsed_time / 3600])
             writer.writerow(["total_topics", overall_topic_count])
             writer.writerow(["internal_topics_included", include_internal])
             writer.writerow(["topic_filter", topic_filter if topic_filter else "None"])
@@ -298,6 +302,7 @@ class KafkaTopicsAnalyzer:
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("SUMMARY STATISTICS")
         logging.info("-" * DEFAULT_CHARACTER_REPEAT)
+        logging.info(f"Elapsed Time: {elapsed_time/3600:.2f} hours")
         logging.info(f"Total Topics: {overall_topic_count}")
         logging.info(f"Active Topics: {non_empty_topic_count} ({non_empty_topic_count/overall_topic_count*100:.1f}%)")
         logging.info(f"Total Partitions: {total_partition_count}")
