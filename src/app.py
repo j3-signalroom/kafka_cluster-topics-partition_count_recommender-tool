@@ -7,12 +7,13 @@ from kafka_topics_analyzer import KafkaTopicsAnalyzer
 from utilities import setup_logging
 from aws_clients_python_lib.secrets_manager import get_secrets
 from constants import (DEFAULT_SAMPLING_DAYS, 
-                       DEFAULT_SAMPLING_BATCH_SIZE, 
-                       DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR, 
+                       DEFAULT_SAMPLING_BATCH_SIZE,
+                       DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS,
+                       DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR,
                        DEFAULT_USE_SAMPLE_RECORDS,
                        DEFAULT_USE_AWS_SECRETS_MANAGER,
                        DEFAULT_INCLUDE_INTERNAL_TOPICS)
-\
+
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
 __credits__    = ["Jeffrey Jonathan Jennings"]
@@ -37,6 +38,7 @@ def main():
         use_aws_secrets_manager = os.getenv("USE_AWS_SECRETS_MANAGER", DEFAULT_USE_AWS_SECRETS_MANAGER) == "True"
         include_internal=os.getenv("INCLUDE_INTERNAL_TOPICS", DEFAULT_INCLUDE_INTERNAL_TOPICS) == "True"
         sampling_days=int(os.getenv("SAMPLING_DAYS", DEFAULT_SAMPLING_DAYS))
+        sampling_max_consecutive_nulls=int(os.getenv("SAMPLING_MAX_CONSECUTIVE_NULLS", DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS))
         sampling_batch_size=int(os.getenv("SAMPLING_BATCH_SIZE", DEFAULT_SAMPLING_BATCH_SIZE))
         topic_filter=os.getenv("TOPIC_FILTER")
     except Exception as e:
@@ -110,6 +112,7 @@ def main():
                                        use_sample_records=use_sample_records,
                                        sampling_days=sampling_days,
                                        sampling_batch_size=sampling_batch_size,
+                                       sampling_max_consecutive_nulls=sampling_max_consecutive_nulls,
                                        topic_filter=topic_filter):
             logging.info("TOPIC ANALYSIS COMPLETED SUCCESSFULLY.")
         else:
