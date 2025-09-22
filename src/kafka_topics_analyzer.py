@@ -546,8 +546,8 @@ class KafkaTopicsAnalyzer:
 
             # Determine effective batch size
             optimal_batch_size = calculate_optimal_batch_size(partition_detail["record_count"])
-            effective_batch_size = min(max(sampling_batch_size, optimal_batch_size), DEFAULT_SAMPLING_MAXIMUM_BATCH_SIZE)
-                
+            effective_batch_size = optimal_batch_size
+
             consumer = Consumer(self.kafka_consumer_config)
             
             try:
