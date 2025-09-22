@@ -8,6 +8,7 @@ from utilities import setup_logging
 from aws_clients_python_lib.secrets_manager import get_secrets
 from constants import (DEFAULT_SAMPLING_DAYS, 
                        DEFAULT_SAMPLING_BATCH_SIZE,
+                       DEFAULT_SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES,
                        DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS,
                        DEFAULT_SAMPLING_TIMEOUT_SECONDS,
                        DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR,
@@ -42,6 +43,7 @@ def main():
         sampling_timeout_seconds=float(os.getenv("SAMPLING_TIMEOUT_SECONDS", DEFAULT_SAMPLING_TIMEOUT_SECONDS))
         sampling_max_consecutive_nulls=int(os.getenv("SAMPLING_MAX_CONSECUTIVE_NULLS", DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS))
         sampling_batch_size=int(os.getenv("SAMPLING_BATCH_SIZE", DEFAULT_SAMPLING_BATCH_SIZE))
+        sampling_max_continuous_failed_batches=int(os.getenv("SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES", DEFAULT_SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES))
         topic_filter=os.getenv("TOPIC_FILTER")
     except Exception as e:
         logging.error(f"THE APPLICATION FAILED TO READ CONFIGURATION SETTINGS BECAUSE OF THE FOLLOWING ERROR: {e}") 
@@ -116,6 +118,7 @@ def main():
                                        sampling_batch_size=sampling_batch_size,
                                        sampling_max_consecutive_nulls=sampling_max_consecutive_nulls,
                                        sampling_timeout_seconds=sampling_timeout_seconds,
+                                       sampling_max_continuous_failed_batches=sampling_max_continuous_failed_batches,
                                        topic_filter=topic_filter):
             logging.info("TOPIC ANALYSIS COMPLETED SUCCESSFULLY.")
         else:

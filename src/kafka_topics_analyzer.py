@@ -14,6 +14,7 @@ from constants import (DEFAULT_SAMPLING_DAYS,
                        DEFAULT_SAMPLING_TIMEOUT_SECONDS,
                        DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS,
                        DEFAULT_SAMPLING_MINIMUM_BATCH_SIZE,
+                       DEFAULT_SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES,
                        DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR,
                        DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD,
                        DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS,
@@ -84,6 +85,7 @@ class KafkaTopicsAnalyzer:
                            sampling_batch_size: int = DEFAULT_SAMPLING_BATCH_SIZE,
                            sampling_max_consecutive_nulls: int = DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS,
                            sampling_timeout_seconds: float = DEFAULT_SAMPLING_TIMEOUT_SECONDS,
+                           sampling_max_continuous_failed_batches: int = DEFAULT_SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES,
                            topic_filter: str | None = None) -> bool:
         """Analyze all topics in the Kafka cluster.
         
@@ -139,6 +141,7 @@ class KafkaTopicsAnalyzer:
                                                   sampling_batch_size=sampling_batch_size,
                                                   sampling_max_consecutive_nulls=sampling_max_consecutive_nulls,
                                                   sampling_timeout_seconds=sampling_timeout_seconds,
+                                                  sampling_max_continuous_failed_batches=sampling_max_continuous_failed_batches,
                                                   start_time_epoch_ms=start_time_epoch_ms,
                                                   iso_start_time=iso_start_time)
                     
@@ -456,6 +459,7 @@ class KafkaTopicsAnalyzer:
                               sampling_batch_size: int, 
                               sampling_max_consecutive_nulls: int, 
                               sampling_timeout_seconds: float,
+                              sampling_max_continuous_failed_batches: int,
                               partition_details: List[Dict]) -> float:
         """Sample record sizes from the specified partitions to calculate average record size.
         
@@ -464,6 +468,7 @@ class KafkaTopicsAnalyzer:
             sampling_batch_size (int): Number of records to process per batch when sampling.
             sampling_max_consecutive_nulls (int): Maximum number of consecutive null records to encounter before stopping sampling in a partition.
             sampling_timeout_seconds (float): Maximum time in seconds to spend sampling records per topic.
+            sampling_max_continuous_failed_batches (int): Maximum number of continuous failed batches before stopping sampling in a partition.
             partition_details (List[Dict]): Details of the partitions to process.
 
         Returns:
@@ -567,6 +572,8 @@ class KafkaTopicsAnalyzer:
                 batch_count = 0
                 partition_record_count = 0
                 total_partition_offsets = valid_end - valid_start
+                failed_batches_in_a_row = 0
+                max_failed_batches = sampling_max_continuous_failed_batches
                 
                 # Process records in batches
                 while partition_record_count < total_partition_offsets:
@@ -632,6 +639,7 @@ class KafkaTopicsAnalyzer:
                     
                     # Log batch progress
                     if batch_records_processed > 0:
+                        failed_batches_in_a_row = 0  # Reset failure counter on success
                         current_avg = total_size / total_count if total_count > 0 else 0
                         progress_pct = (partition_record_count / max(1, total_partition_offsets)) * 100
                         error_attempts = batch_attempts - batch_records_processed
@@ -640,9 +648,11 @@ class KafkaTopicsAnalyzer:
                                     f"({error_attempts} errors/nulls), progress: {progress_pct:.1f}%, "
                                     f"running avg: {current_avg:,.2f} bytes")
                     else:
+                        failed_batches_in_a_row += 1
                         logging.warning(f"      Batch {batch_count}: No valid records processed "
-                                    f"({batch_attempts} attempts, {consecutive_nulls} consecutive nulls)")
-                    
+                                    f"({batch_attempts} attempts, {consecutive_nulls} consecutive nulls) "
+                                    f"[{failed_batches_in_a_row}/{max_failed_batches} consecutive failures]")
+
                     # Break if we hit safety limits
                     if consecutive_nulls >= max_consecutive_nulls:
                         # Note:  The reason why we are breaking is because the code reached a point where the max 
@@ -654,8 +664,19 @@ class KafkaTopicsAnalyzer:
                         logging.warning(f"Too many consecutive null polls ({consecutive_nulls}) - stopping partition {partition_number}")
                         break
                     
+                    # If we made too many attempts without progress, stop processing this partition
                     if batch_attempts >= max_attempts_per_batch and batch_records_processed == 0:
                         logging.warning(f"No progress after {max_attempts_per_batch} attempts - stopping partition {partition_number}")
+                        break
+
+                    # If we have too many failed batches in a row, stop processing this partition
+                    if failed_batches_in_a_row >= max_failed_batches:
+                        logging.error(f"Giving up on partition {partition_number} after {max_failed_batches} "
+                                    f"consecutive failed batches. This partition may have:")
+                        logging.error("  - Corrupted data")
+                        logging.error("  - All records outside the time window")
+                        logging.error("  - Network connectivity issues")
+                        logging.error("  - Broker-side problems")
                         break
             
             except Exception as e:
@@ -677,6 +698,7 @@ class KafkaTopicsAnalyzer:
                         sampling_batch_size: int, 
                         sampling_max_consecutive_nulls: int,
                         sampling_timeout_seconds: float,
+                        sampling_max_continuous_failed_batches: int,
                         start_time_epoch_ms: int, 
                         iso_start_time: datetime) -> Dict:
         """Analyze a single topic.
@@ -687,6 +709,7 @@ class KafkaTopicsAnalyzer:
             sampling_batch_size (int): Number of records to process per batch when sampling.
             sampling_max_consecutive_nulls (int): Maximum number of consecutive null records to encounter before stopping sampling in a partition.
             sampling_timeout_seconds (float): Maximum time in seconds to spend sampling records per topic.
+            sampling_max_continuous_failed_batches (int): Maximum number of continuous failed batches before giving up on a partition.
             start_time_epoch_ms (int): Start time in epoch milliseconds for the rolling window.
             iso_start_time (datetime): Start time as an ISO 8601 formatted datetime object.
             
@@ -733,6 +756,7 @@ class KafkaTopicsAnalyzer:
                                                                            sampling_batch_size=sampling_batch_size, 
                                                                            sampling_max_consecutive_nulls=sampling_max_consecutive_nulls,
                                                                            sampling_timeout_seconds=sampling_timeout_seconds,
+                                                                           sampling_max_continuous_failed_batches=sampling_max_continuous_failed_batches,
                                                                            partition_details=partition_details)
 
         # Compile and return the analysis results
