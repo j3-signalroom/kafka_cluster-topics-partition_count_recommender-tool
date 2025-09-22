@@ -264,7 +264,13 @@ class KafkaTopicsAnalyzer:
         overall_topic_count = len(results)
         total_partition_count = sum(result['partition_count'] for result in results)
         total_record_count = sum(result.get('total_record_count', 0) for result in results)
+        non_empty_total_partition_count = sum(result.get('partition_count', 0) for result in results if result.get('total_record_count', 0) > 0)
         non_empty_topic_count = len([result for result in results if result.get('total_record_count', 0) > 0])
+
+        if non_empty_total_partition_count > total_recommended_partitions:
+            percentage_decrease = (non_empty_total_partition_count - total_recommended_partitions) / non_empty_total_partition_count * 100 if non_empty_total_partition_count > 0 else 0.0
+        else:
+            percentage_increase = (total_recommended_partitions - non_empty_total_partition_count) / non_empty_total_partition_count * 100 if non_empty_total_partition_count > 0 else 0.0
 
         # Summary report filename
         report_filename = f"{base_filename}-summary-report.csv"
@@ -274,13 +280,20 @@ class KafkaTopicsAnalyzer:
             writer = csv.writer(file)
             writer.writerow(["stat","value"])
             writer.writerow(["total_topics", overall_topic_count])
+            writer.writerow(["internal_topics_included", include_internal])
+            writer.writerow(["topic_filter", topic_filter if topic_filter else "None"])
             writer.writerow(["active_topics", non_empty_topic_count])
             writer.writerow(["total_partitions", total_partition_count])
             writer.writerow(["total_recommended_partitions", total_recommended_partitions])
+            writer.writerow(["non_empty_total_partition_count", f"{non_empty_total_partition_count:.1f}"])
+            if non_empty_total_partition_count > total_recommended_partitions:
+                writer.writerow(["recommended_percentage_decrease_in_partitions", f"{percentage_decrease:.1f}%"])
+            else:
+                writer.writerow(["recommended_percentage_increase_in_partitions", f"{percentage_increase:.1f}%"])
             writer.writerow(["total_records", total_record_count])
             writer.writerow(["average_partitions_per_topic", total_partition_count/overall_topic_count])
             writer.writerow(["average_recommended_partitions_per_topic", total_recommended_partitions/overall_topic_count])
-
+            
         # Log summary results
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("SUMMARY STATISTICS")
@@ -289,6 +302,11 @@ class KafkaTopicsAnalyzer:
         logging.info(f"Active Topics: {non_empty_topic_count} ({non_empty_topic_count/overall_topic_count*100:.1f}%)")
         logging.info(f"Total Partitions: {total_partition_count}")
         logging.info(f"Total Recommended Partitions: {total_recommended_partitions}")
+        logging.info(f"Non-Empty Topics Total Partitions: {non_empty_total_partition_count}")
+        if non_empty_total_partition_count > total_recommended_partitions:
+            logging.info(f"RECOMMENDED Decrease in Partitions: {percentage_decrease:.1f}%")
+        else:
+            logging.info(f"RECOMMENDED Increase in Partitions: {percentage_increase:.1f}%")
         logging.info(f"Total Records: {total_record_count:,}")
         logging.info(f"Average Partitions per Topic: {total_partition_count/overall_topic_count:.0f}")
         logging.info(f"Average Recommended Partitions per Topic: {total_recommended_partitions/overall_topic_count:.0f}")
