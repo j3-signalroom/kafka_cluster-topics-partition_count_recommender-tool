@@ -10,7 +10,8 @@ from cc_clients_python_lib.http_status import HttpStatus
 from cc_clients_python_lib.metrics_client import MetricsClient, KafkaMetric
 from utilities import setup_logging
 from constants import (DEFAULT_SAMPLING_DAYS, 
-                       DEFAULT_SAMPLING_BATCH_SIZE, 
+                       DEFAULT_SAMPLING_BATCH_SIZE,
+                       DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS,
                        DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR,
                        DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD,
                        DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS,
@@ -78,7 +79,8 @@ class KafkaTopicsAnalyzer:
                            required_consumption_throughput_factor: float = DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR,
                            use_sample_records: bool = True, 
                            sampling_days: int = DEFAULT_SAMPLING_DAYS, 
-                           sampling_batch_size: int = DEFAULT_SAMPLING_BATCH_SIZE, 
+                           sampling_batch_size: int = DEFAULT_SAMPLING_BATCH_SIZE,
+                           sampling_max_consecutive_nulls: int = DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS,
                            topic_filter: str | None = None) -> bool:
         """Analyze all topics in the Kafka cluster.
         
@@ -87,7 +89,8 @@ class KafkaTopicsAnalyzer:
             required_consumption_throughput_factor (float, optional): Factor to multiply the consumer throughput to determine required consumption throughput. Defaults to 3.0.
             use_sample_records (bool, optional): Whether to sample records for average size. Defaults to True.
             sampling_days (int, optional): Number of days to look back for sampling. Defaults to 7.
-            sampling_batch_size (int, optional): Number of records to process per batch when sampling. Defaults to 1000.
+            sampling_batch_size (int, optional): Number of records to process per batch when sampling. Defaults to 10,000.
+            sampling_max_consecutive_nulls (int, optional): Maximum number of consecutive null records to encounter before stopping sampling in a partition. Defaults to 50.
             topic_filter (Optional[str], optional): If provided, only topics containing this string will be analyzed. Defaults to None.
         
         Returns:
@@ -128,7 +131,14 @@ class KafkaTopicsAnalyzer:
                     start_time_epoch_ms = int(rolling_start.timestamp() * 1000)
 
                     # Analyze the topic
-                    result = self.__analyze_topic(topic_name, topic_info, sampling_batch_size, start_time_epoch_ms, iso_start_time)
+                    result = self.__analyze_topic(topic_name=topic_name, 
+                                                  topic_info=topic_info,
+                                                  sampling_batch_size=sampling_batch_size,
+                                                  sampling_max_consecutive_nulls=sampling_max_consecutive_nulls,
+                                                  start_time_epoch_ms=start_time_epoch_ms,
+                                                  iso_start_time=iso_start_time)
+                    
+                    # Add compaction and sampling days info to the result
                     result['is_compacted'] = topic_info['is_compacted']
                     result['sampling_days'] = topic_info['sampling_days_based_on_retention_days']
                     
@@ -437,12 +447,17 @@ class KafkaTopicsAnalyzer:
         finally:
             consumer.close()
 
-    def __sample_record_sizes(self, topic_name: str, sampling_batch_size: int, partition_details: List[Dict]) -> float:
+    def __sample_record_sizes(self, 
+                              topic_name: str, 
+                              sampling_batch_size: int, 
+                              sampling_max_consecutive_nulls: int, 
+                              partition_details: List[Dict]) -> float:
         """Sample record sizes from the specified partitions to calculate average record size.
         
         Args:
             topic_name (str): Topic name to process.
             sampling_batch_size (int): Number of records to process per batch when sampling.
+            sampling_max_consecutive_nulls (int): Maximum number of consecutive null records to encounter before stopping sampling in a partition.
             partition_details (List[Dict]): Details of the partitions to process.
 
         Returns:
@@ -512,7 +527,7 @@ class KafkaTopicsAnalyzer:
                     batch_records_processed = 0
                     batch_attempts = 0
                     max_attempts_per_batch = sampling_batch_size * 3  # Safety limit
-                    max_consecutive_nulls = 50  # Limit consecutive null polls
+                    max_consecutive_nulls = sampling_max_consecutive_nulls
                     consecutive_nulls = 0
                     
                     logging.debug(f"Starting batch {batch_count + 1} for partition {partition_number}")
@@ -610,13 +625,20 @@ class KafkaTopicsAnalyzer:
             logging.warning(f"    No records sampled from topic '{topic_name}'")
             return 0.0
 
-    def __analyze_topic(self, topic_name: str, topic_info: Dict, sampling_batch_size: int, start_time_epoch_ms: int, iso_start_time: datetime) -> Dict:
+    def __analyze_topic(self, 
+                        topic_name: str, 
+                        topic_info: Dict, 
+                        sampling_batch_size: int, 
+                        sampling_max_consecutive_nulls: int, 
+                        start_time_epoch_ms: int, 
+                        iso_start_time: datetime) -> Dict:
         """Analyze a single topic.
         
         Args:
             topic_name (str): Name of the topic to analyze.
             topic_info (Dict): Metadata and configuration of the topic.
             sampling_batch_size (int): Number of records to process per batch when sampling.
+            sampling_max_consecutive_nulls (int): Maximum number of consecutive null records to encounter before stopping sampling in a partition.
             start_time_epoch_ms (int): Start time in epoch milliseconds for the rolling window.
             iso_start_time (datetime): Start time as an ISO 8601 formatted datetime object.
             
@@ -659,8 +681,11 @@ class KafkaTopicsAnalyzer:
             logging.info(f"  No records available in topic '{topic_name}' for sampling.")
             avg_record_size = 0.0
         else:
-            avg_record_size = avg_record_size = self.__sample_record_sizes(topic_name, sampling_batch_size, partition_details)
-        
+            avg_record_size = avg_record_size = self.__sample_record_sizes(topic_name=topic_name, 
+                                                                           sampling_batch_size=sampling_batch_size, 
+                                                                           sampling_max_consecutive_nulls=sampling_max_consecutive_nulls, 
+                                                                           partition_details=partition_details)
+
         # Compile and return the analysis results
         return {
             'topic_name': topic_name,

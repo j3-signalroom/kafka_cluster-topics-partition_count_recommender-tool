@@ -11,6 +11,7 @@ __status__     = "dev"
 
 # Default configuration constants
 DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR: Final[float] = 3.0
+DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS: Final[int] = 50
 DEFAULT_SAMPLING_DAYS: Final[int] = 7
 DEFAULT_SAMPLING_BATCH_SIZE: Final[int] = 10000
 DEFAULT_USE_SAMPLE_RECORDS: Final[str] = "True"
