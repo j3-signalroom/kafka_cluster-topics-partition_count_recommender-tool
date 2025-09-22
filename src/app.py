@@ -94,8 +94,8 @@ def main():
     if not use_sample_records:
         logging.info("Using Metrics API for analysis.")
 
-    # Instantiating the Kafka Topics Analyzer and analzing cluster topics
-    for kafka_credential in kafka_credentials:        
+    for kafka_credential in kafka_credentials:
+        # Instantiate the Kafka Topics Analyzer
         analyzer = KafkaTopicsAnalyzer(
             kafka_cluster_id=kafka_credential.get("kafka_cluster_id"),
             bootstrap_server_uri=kafka_credential.get("bootstrap.servers"),
@@ -103,17 +103,17 @@ def main():
             kafka_api_secret=kafka_credential.get("sasl.password"),
             metrics_config=metrics_config
         )
-        report_details = analyzer.analyze_all_topics(
-            include_internal=include_internal,
-            required_consumption_throughput_factor=required_consumption_throughput_factor,
-            use_sample_records=use_sample_records,
-            sampling_days=sampling_days,
-            sampling_batch_size=sampling_batch_size,
-            topic_filter=topic_filter
-        )
-        
-        if not report_details:
-            logging.error("NO TOPIC(S) FOUND OR ANALYSIS FAILED.")
+
+        # Analyze all topics in the Kafka cluster
+        if analyzer.analyze_all_topics(include_internal=include_internal,
+                                       required_consumption_throughput_factor=required_consumption_throughput_factor,
+                                       use_sample_records=use_sample_records,
+                                       sampling_days=sampling_days,
+                                       sampling_batch_size=sampling_batch_size,
+                                       topic_filter=topic_filter):
+            logging.info("TOPIC ANALYSIS COMPLETED SUCCESSFULLY.")
+        else:
+            logging.error("TOPIC ANALYSIS FAILED.")
     
     
 if __name__ == "__main__":
