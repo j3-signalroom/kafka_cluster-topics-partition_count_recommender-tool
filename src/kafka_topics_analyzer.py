@@ -468,6 +468,22 @@ class KafkaTopicsAnalyzer:
         Returns:
             float: Average record size in bytes, or 0 if no records found.
         """
+        def adaptive_poll_timeout(consecutive_nulls: int) -> float:
+            """Adjust polling timeout based on consecutive nulls encountered.
+
+            Args:
+                consecutive_nulls (int): Number of consecutive null records encountered.
+
+            Returns:
+                float: Adjusted polling timeout in seconds.
+            """
+            if consecutive_nulls < 5:
+                return sampling_timeout_seconds         # Patient at first
+            elif consecutive_nulls < 20:
+                return sampling_timeout_seconds / 2     # Getting impatient  
+            else:
+                return sampling_timeout_seconds / 4     # Very impatient, probably no data
+
         total_size = 0
         total_count = 0
         
@@ -545,7 +561,7 @@ class KafkaTopicsAnalyzer:
                         batch_attempts += 1
                         
                         try:
-                            record = consumer.poll(timeout=sampling_timeout_seconds)
+                            record = consumer.poll(timeout=adaptive_poll_timeout(consecutive_nulls))
                             
                             if record is None:
                                 consecutive_nulls += 1
