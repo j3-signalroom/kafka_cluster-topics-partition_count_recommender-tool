@@ -68,7 +68,7 @@ class KafkaTopicsAnalyzer:
             'enable.partition.eof': True,
             'fetch.message.max.bytes': 1048576,  # 1MB max message size
             'queued.min.messages': 1000,     
-            'enable.metrics.push': False    # Disable metrics pushing for consumers to registered JMX MBeans.  However, is really being set to False to not expose unneccessary noise to the logging output
+            'enable.metrics.push': False         # Disable metrics pushing for consumers to registered JMX MBeans.  However, is really being set to False to not expose unneccessary noise to the logging output
         }
 
         # Instantiate the MetricsClient class.
