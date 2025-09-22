@@ -13,6 +13,7 @@ from constants import (DEFAULT_SAMPLING_DAYS,
                        DEFAULT_SAMPLING_BATCH_SIZE,
                        DEFAULT_SAMPLING_TIMEOUT_SECONDS,
                        DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS,
+                       DEFAULT_SAMPLING_MINIMUM_BATCH_SIZE,
                        DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR,
                        DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD,
                        DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS,
@@ -483,6 +484,24 @@ class KafkaTopicsAnalyzer:
                 return sampling_timeout_seconds / 2     # Getting impatient  
             else:
                 return sampling_timeout_seconds / 4     # Very impatient, probably no data
+            
+        def calculate_optimal_batch_size(total_records: int) -> int:
+            """Calculate optimal batch size based on partition size.
+
+            Args:
+                total_records (int): Total number of records in the partition.
+
+            Returns:
+                int: Optimal batch size.
+            """
+            if total_records < 10000:
+                return min(DEFAULT_SAMPLING_MINIMUM_BATCH_SIZE, total_records)
+            elif total_records < 1000000:
+                return 5000
+            elif total_records < 10000000:
+                return DEFAULT_SAMPLING_BATCH_SIZE
+            else:
+                return 25000
 
         total_size = 0
         total_count = 0
@@ -490,6 +509,10 @@ class KafkaTopicsAnalyzer:
         for partition_detail in partition_details:
             if partition_detail.get("record_count", 0) <= 0:
                 continue
+
+            # Use the smaller of requested batch size or optimal
+            optimal_batch_size = calculate_optimal_batch_size(partition_detail["record_count"])
+            effective_batch_size = min(sampling_batch_size, optimal_batch_size)
                 
             consumer = Consumer(self.kafka_consumer_config)
             
@@ -497,6 +520,8 @@ class KafkaTopicsAnalyzer:
                 partition_number = partition_detail["partition_number"]
                 start_offset = partition_detail["offset_start"]
                 end_offset = partition_detail["offset_end"]
+
+                logging.info(f"Partition {partition_number}: using batch size {effective_batch_size:,} (requested: {sampling_batch_size:,}, optimal: {optimal_batch_size:,})")
 
                 # Validate offsets before proceeding
                 if start_offset is None or start_offset < 0:
@@ -547,14 +572,14 @@ class KafkaTopicsAnalyzer:
                 while partition_record_count < total_partition_offsets:
                     batch_records_processed = 0
                     batch_attempts = 0
-                    max_attempts_per_batch = sampling_batch_size * 3  # Safety limit
+                    max_attempts_per_batch = effective_batch_size * 3  # Safety limit
                     max_consecutive_nulls = sampling_max_consecutive_nulls
                     consecutive_nulls = 0
                     
                     logging.debug(f"Starting batch {batch_count + 1} for partition {partition_number}")
                     
                     # Process one batch with safety limits
-                    while (batch_records_processed < sampling_batch_size and 
+                    while (batch_records_processed < effective_batch_size and
                         batch_attempts < max_attempts_per_batch and
                         consecutive_nulls < max_consecutive_nulls):
                         
