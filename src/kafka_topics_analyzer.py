@@ -584,6 +584,12 @@ class KafkaTopicsAnalyzer:
                     
                     # Break if we hit safety limits
                     if consecutive_nulls >= max_consecutive_nulls:
+                        # Note:  The reason why we are breaking is because the code reached a point where the max 
+                        # attempts have been made without receiving new data in the target offset range.  This
+                        # could be due to a variety of reasons including that there is no more data to read
+                        # in the partition or that there is a gap in the offsets.  In any case, the code
+                        # will log a warning and move on to the next partition, because continuing to poll
+                        # would be futile.
                         logging.warning(f"Too many consecutive null polls ({consecutive_nulls}) - stopping partition {partition_number}")
                         break
                     
