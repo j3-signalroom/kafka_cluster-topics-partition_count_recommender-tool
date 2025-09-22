@@ -14,6 +14,7 @@ from constants import (DEFAULT_SAMPLING_DAYS,
                        DEFAULT_SAMPLING_TIMEOUT_SECONDS,
                        DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS,
                        DEFAULT_SAMPLING_MINIMUM_BATCH_SIZE,
+                       DEFAULT_SAMPLING_MAXIMUM_BATCH_SIZE,
                        DEFAULT_SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES,
                        DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR,
                        DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD,
@@ -511,7 +512,7 @@ class KafkaTopicsAnalyzer:
             elif total_records < 10000000:
                 return DEFAULT_SAMPLING_BATCH_SIZE
             else:
-                return 25000
+                return DEFAULT_SAMPLING_MAXIMUM_BATCH_SIZE
 
         total_size = 0
         total_count = 0
@@ -520,9 +521,9 @@ class KafkaTopicsAnalyzer:
             if partition_detail.get("record_count", 0) <= 0:
                 continue
 
-            # Use the smaller of requested batch size or optimal
+            # Determine effective batch size
             optimal_batch_size = calculate_optimal_batch_size(partition_detail["record_count"])
-            effective_batch_size = min(sampling_batch_size, optimal_batch_size)
+            effective_batch_size = min(max(sampling_batch_size, optimal_batch_size), DEFAULT_SAMPLING_MAXIMUM_BATCH_SIZE)
                 
             consumer = Consumer(self.kafka_consumer_config)
             
@@ -531,7 +532,7 @@ class KafkaTopicsAnalyzer:
                 start_offset = partition_detail["offset_start"]
                 end_offset = partition_detail["offset_end"]
 
-                logging.info(f"Partition {partition_number}: using batch size {effective_batch_size:,} (requested: {sampling_batch_size:,}, optimal: {optimal_batch_size:,})")
+                logging.info(f"Partition {partition_number}: using effective batch size {effective_batch_size:,} (requested: {sampling_batch_size:,}, optimal: {optimal_batch_size:,})")
 
                 # Validate offsets before proceeding
                 if start_offset is None or start_offset < 0:
