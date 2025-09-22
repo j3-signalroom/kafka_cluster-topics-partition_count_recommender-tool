@@ -186,9 +186,6 @@ class KafkaTopicsAnalyzer:
                         'is_internal': topic_name.startswith('_'),
                         'error': str(e)
                     }
-
-                # Append the result to the results list for later summary calculations
-                results.append(result)
                 
                 # Extract the partition count and compaction status
                 partition_count = result['partition_count']
@@ -202,6 +199,15 @@ class KafkaTopicsAnalyzer:
                 # Extract the partition count and compaction status
                 partition_count = len(topic_info['metadata'].partitions)
                 is_compacted_str = "yes" if topic_info['is_compacted'] else "no"
+
+                result = {
+                    'topic_name': topic_name,
+                    'is_compacted': is_compacted_str,
+                    'sampling_days': topic_info['sampling_days_based_on_retention_days'],
+                    'partition_count': partition_count,
+                    'partition_details': topic_info['metadata'].partitions,
+                    'is_internal': topic_name.startswith('_')
+                }
 
                 # Use Metrics API to get the consumer byte consumption
                 http_status_code, error_message, bytes_query_result = self.metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_BYTES, self.kafka_cluster_id, topic_name)
@@ -220,6 +226,7 @@ class KafkaTopicsAnalyzer:
                         record_count = 0
                     else:
                         record_count = record_query_result.get('sum_total', 0)
+                        result['total_record_count'] = record_count
 
                         # Calculate daily consumed average bytes per record
                         bytes_daily_totals = bytes_query_result.get('daily_total', [])
@@ -233,12 +240,16 @@ class KafkaTopicsAnalyzer:
 
                         # Calculate overall average bytes per record across all days
                         avg_bytes_per_record = sum(avg_bytes_daily_totals)/len(avg_bytes_daily_totals) if len(avg_bytes_daily_totals) > 0 else 0
+                        result['avg_bytes_per_record'] = avg_bytes_per_record
 
                         logging.info(f"Confluent Metrics API - For topic {topic_name}, the average bytes per record is {avg_bytes_per_record:,.2f} bytes/record for a total of {record_count:,.0f} records.")
 
                         # Calculate consumer throughput and required throughput
                         consumer_throughput = avg_bytes_per_record * record_count
                         required_throughput = consumer_throughput * required_consumption_throughput_factor
+
+            # Append the result to the results list for later summary calculations
+            results.append(result)
 
             # Handle cases where record count is zero or an error occurred
             if record_count == 0:
@@ -287,14 +298,14 @@ class KafkaTopicsAnalyzer:
             writer.writerow(["internal_topics_included", include_internal])
             writer.writerow(["topic_filter", topic_filter if topic_filter else "None"])
             writer.writerow(["active_topic_count", active_topic_count])
-            writer.writerow(["active_topic_percentage", f"{(active_topic_count/overall_topic_count*100):.1f}%"])
+            writer.writerow(["active_topic_percentage", (active_topic_count/active_topic_count*100)])
             writer.writerow(["total_partitions", total_partition_count])
             writer.writerow(["total_recommended_partitions", total_recommended_partitions])
             writer.writerow(["active_total_partition_count", active_total_partition_count])
             if active_total_partition_count > total_recommended_partitions:
-                writer.writerow(["recommended_percentage_decrease_in_partitions", f"{percentage_decrease:.1f}%"])
+                writer.writerow(["recommended_percentage_decrease_in_partitions", percentage_decrease])
             else:
-                writer.writerow(["recommended_percentage_increase_in_partitions", f"{percentage_increase:.1f}%"])
+                writer.writerow(["recommended_percentage_increase_in_partitions", percentage_increase])
             writer.writerow(["total_records", total_record_count])
             writer.writerow(["average_partitions_per_topic", total_partition_count/overall_topic_count])
             writer.writerow(["active_average_partitions_per_topic", total_partition_count/active_topic_count if active_topic_count > 0 else 0])
@@ -307,7 +318,7 @@ class KafkaTopicsAnalyzer:
         logging.info(f"Elapsed Time: {elapsed_time/3600:.2f} hours")
         logging.info(f"Total Topics: {overall_topic_count}")
         logging.info(f"Active Topics: {active_topic_count}")
-        logging.info(f"Active Topics %: {active_topic_count/overall_topic_count*100:.1f}%")
+        logging.info(f"Active Topics %: {active_topic_count/active_topic_count*100:.1f}%")
         logging.info(f"Total Partitions: {total_partition_count}")
         logging.info(f"Total Recommended Partitions: {total_recommended_partitions}")
         logging.info(f"Non-Empty Topics Total Partitions: {active_total_partition_count}")
