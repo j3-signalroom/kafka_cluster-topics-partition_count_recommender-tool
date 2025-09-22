@@ -30,7 +30,7 @@ logger = setup_logging()
 
 
 class KafkaTopicsAnalyzer:
-    """Class to analyze Kafka topics in a cluster."""
+    """Class to analyze Kafka cluster topics."""
 
     def __init__(self, kafka_cluster_id: str, bootstrap_server_uri: str, kafka_api_key: str, kafka_api_secret: str, metrics_config: Dict):
         """Connect to the Kafka Cluster with the AdminClient.
@@ -75,12 +75,12 @@ class KafkaTopicsAnalyzer:
 
     def analyze_all_topics(self, 
                            include_internal: bool = False, 
-                           required_consumption_throughput_factor: float = DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR ,
+                           required_consumption_throughput_factor: float = DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR,
                            use_sample_records: bool = True, 
                            sampling_days: int = DEFAULT_SAMPLING_DAYS, 
                            sampling_batch_size: int = DEFAULT_SAMPLING_BATCH_SIZE, 
-                           topic_filter: str | None = None) -> List[Dict]:
-        """Analyze all topics in the cluster.
+                           topic_filter: str | None = None) -> bool:
+        """Analyze all topics in the Kafka cluster.
         
         Args:
             include_internal (bool, optional): Whether to include internal topics. Defaults to False.
@@ -91,9 +91,9 @@ class KafkaTopicsAnalyzer:
             topic_filter (Optional[str], optional): If provided, only topics containing this string will be analyzed. Defaults to None.
         
         Returns:
-            List[Dict]: List of analysis results for each topic.
+            bool: True if analysis was successful, False otherwise.
         """
-        logging.info("Connecting to Kafka cluster and fetching metadata...")
+        logging.info("Connecting to Kafka cluster and retrieving metadata...")
         
         # Get cluster metadata
         topics_to_analyze = self.__get_topics_metadata(sampling_days=sampling_days, include_internal=include_internal, topic_filter=topic_filter)
@@ -102,15 +102,22 @@ class KafkaTopicsAnalyzer:
         
         logging.info(f"Found {len(topics_to_analyze)} topics to analyze")
 
-        # Analyze topics
+        # Initialize results list and total recommended partitions counter
         results = []
-        report_details = []
         total_recommended_partitions = 0
-        report_filename = f"{self.kafka_cluster_id}-recommender-{int(time.time())}-report.csv"
+
+        # Prepare CSV report file
+        base_filename = f"{self.kafka_cluster_id}-recommender-{int(time.time())}"
+
+        # Detail report filename
+        report_filename = f"{base_filename}-detail-report.csv"
+
+        # Create the CSV detail report file and write the header row
         with open(report_filename, 'w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             writer.writerow(["topic_name","is_compacted","number_of_records","number_of_partitions","required_throughput","consumer_throughput","recommended_partitions","status"])
 
+        # Analyze each topic
         for topic_name, topic_info in topics_to_analyze.items():
             if use_sample_records:
                 try:
@@ -141,17 +148,19 @@ class KafkaTopicsAnalyzer:
                         'error': str(e)
                     }
 
+                # Append the result to the results list for later summary calculations
                 results.append(result)
                 
-                # Extract necessary details
+                # Extract the partition count and compaction status
                 partition_count = result['partition_count']
                 is_compacted_str = "yes" if result.get('is_compacted', False) else "no"
 
-                # Use sample records to determine throughput
+                # Calculate consumer throughput and required throughput
                 record_count = result.get('total_record_count', 0)
                 consumer_throughput = result.get('avg_bytes_per_record', 0) * record_count
                 required_throughput = consumer_throughput * required_consumption_throughput_factor
             else:
+                # Extract the partition count and compaction status
                 partition_count = len(topic_info['metadata'].partitions)
                 is_compacted_str = "yes" if topic_info['is_compacted'] else "no"
 
@@ -178,10 +187,12 @@ class KafkaTopicsAnalyzer:
                         records_daily_totals = record_query_result.get('daily_total', [])
                         avg_bytes_daily_totals = []
 
+                        # Calculate the average bytes per record for each day where records were consumed
                         for index, record_total in enumerate(records_daily_totals):
                             if record_total > 0:
                                 avg_bytes_daily_totals.append(bytes_daily_totals[index]/record_total)
 
+                        # Calculate overall average bytes per record across all days
                         avg_bytes_per_record = sum(avg_bytes_daily_totals)/len(avg_bytes_daily_totals) if len(avg_bytes_daily_totals) > 0 else 0
 
                         logging.info(f"Confluent Metrics API - For topic {topic_name}, the average bytes per record is {avg_bytes_per_record:,.2f} bytes/record for a total of {record_count:,.0f} records.")
@@ -202,20 +213,41 @@ class KafkaTopicsAnalyzer:
                 else:
                     # Calculate recommended partition count
                     recommended_partition_count = round(required_throughput / consumer_throughput)
+                    
                 total_recommended_partitions += recommended_partition_count if recommended_partition_count > 0 else 0
 
                 status = "active"
 
-            # Add topic calculations to the CSV file.  Note the throughputs are converted to MBs
+            # Add the topic's calculations to the CSV detail report file.  Note the throughputs are converted to MBs
             with open(report_filename, 'a', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
                 writer.writerow([topic_name, is_compacted_str, record_count, partition_count, required_throughput/1024/1024, consumer_throughput/1024/1024, recommended_partition_count, status])
 
-        # Compute total counts
+        # Using the results list, compute the total counts
         overall_topic_count = len(results)
         total_partition_count = sum(result['partition_count'] for result in results)
         total_record_count = sum(result.get('total_record_count', 0) for result in results)
         non_empty_topic_count = len([result for result in results if result.get('total_record_count', 0) > 0])
+
+        # Summary report filename
+        report_filename = f"{base_filename}-summary-report.csv"
+
+        # Create the CSV summary report file and write the summary statistics
+        with open(report_filename, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(["stat","value"])
+            if use_sample_records:
+                writer.writerow(["sampling_records_size", sampling_batch_size])
+            writer.writerow(["required_consumption_throughput_factor", required_consumption_throughput_factor])
+            writer.writerow(["default_partition_count", DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS])
+            writer.writerow(["minimum_required_throughput_mbs", DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD/1024/1024])
+            writer.writerow(["total_topics", overall_topic_count])
+            writer.writerow(["active_topics", non_empty_topic_count])
+            writer.writerow(["total_partitions", total_partition_count])
+            writer.writerow(["total_recommended_partitions", total_recommended_partitions])
+            writer.writerow(["total_records", total_record_count])
+            writer.writerow(["average_partitions_per_topic", total_partition_count/overall_topic_count])
+            writer.writerow(["average_recommended_partitions_per_topic", total_recommended_partitions/overall_topic_count])
 
         # Log summary results
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
@@ -239,7 +271,7 @@ class KafkaTopicsAnalyzer:
         logging.info(f"Average Recommended Partitions per Topic: {total_recommended_partitions/overall_topic_count:.0f}")
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
 
-        return report_details
+        return True if len(results) > 0 else False
 
     def __get_topics_metadata(self, sampling_days: int, include_internal: bool, topic_filter: Optional[str]) -> Dict:
         """Get cluster metadata including topics, partitions, and retention.
