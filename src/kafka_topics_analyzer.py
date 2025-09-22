@@ -287,14 +287,14 @@ class KafkaTopicsAnalyzer:
             writer.writerow(["internal_topics_included", include_internal])
             writer.writerow(["topic_filter", topic_filter if topic_filter else "None"])
             writer.writerow(["active_topic_count", active_topic_count])
-            writer.writerow(["active_topic_percentage", f"{(active_topic_count/overall_topic_count*100):.1f}%"])
+            writer.writerow(["active_topic_percentage", (active_topic_count/overall_topic_count*100)])
             writer.writerow(["total_partitions", total_partition_count])
             writer.writerow(["total_recommended_partitions", total_recommended_partitions])
             writer.writerow(["active_total_partition_count", active_total_partition_count])
             if active_total_partition_count > total_recommended_partitions:
-                writer.writerow(["recommended_percentage_decrease_in_partitions", f"{percentage_decrease:.1f}%"])
+                writer.writerow(["recommended_percentage_decrease_in_partitions", percentage_decrease])
             else:
-                writer.writerow(["recommended_percentage_increase_in_partitions", f"{percentage_increase:.1f}%"])
+                writer.writerow(["recommended_percentage_increase_in_partitions", percentage_increase])
             writer.writerow(["total_records", total_record_count])
             writer.writerow(["average_partitions_per_topic", total_partition_count/overall_topic_count])
             writer.writerow(["active_average_partitions_per_topic", total_partition_count/active_topic_count if active_topic_count > 0 else 0])
