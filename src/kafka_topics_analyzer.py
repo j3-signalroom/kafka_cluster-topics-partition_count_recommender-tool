@@ -11,6 +11,7 @@ from cc_clients_python_lib.metrics_client import MetricsClient, KafkaMetric
 from utilities import setup_logging
 from constants import (DEFAULT_SAMPLING_DAYS, 
                        DEFAULT_SAMPLING_BATCH_SIZE,
+                       DEFAULT_SAMPLING_TIMEOUT_SECONDS,
                        DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS,
                        DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR,
                        DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD,
@@ -81,6 +82,7 @@ class KafkaTopicsAnalyzer:
                            sampling_days: int = DEFAULT_SAMPLING_DAYS, 
                            sampling_batch_size: int = DEFAULT_SAMPLING_BATCH_SIZE,
                            sampling_max_consecutive_nulls: int = DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS,
+                           sampling_timeout_seconds: float = DEFAULT_SAMPLING_TIMEOUT_SECONDS,
                            topic_filter: str | None = None) -> bool:
         """Analyze all topics in the Kafka cluster.
         
@@ -135,6 +137,7 @@ class KafkaTopicsAnalyzer:
                                                   topic_info=topic_info,
                                                   sampling_batch_size=sampling_batch_size,
                                                   sampling_max_consecutive_nulls=sampling_max_consecutive_nulls,
+                                                  sampling_timeout_seconds=sampling_timeout_seconds,
                                                   start_time_epoch_ms=start_time_epoch_ms,
                                                   iso_start_time=iso_start_time)
                     
@@ -451,6 +454,7 @@ class KafkaTopicsAnalyzer:
                               topic_name: str, 
                               sampling_batch_size: int, 
                               sampling_max_consecutive_nulls: int, 
+                              sampling_timeout_seconds: float,
                               partition_details: List[Dict]) -> float:
         """Sample record sizes from the specified partitions to calculate average record size.
         
@@ -458,6 +462,7 @@ class KafkaTopicsAnalyzer:
             topic_name (str): Topic name to process.
             sampling_batch_size (int): Number of records to process per batch when sampling.
             sampling_max_consecutive_nulls (int): Maximum number of consecutive null records to encounter before stopping sampling in a partition.
+            sampling_timeout_seconds (float): Maximum time in seconds to spend sampling records per topic.
             partition_details (List[Dict]): Details of the partitions to process.
 
         Returns:
@@ -540,7 +545,7 @@ class KafkaTopicsAnalyzer:
                         batch_attempts += 1
                         
                         try:
-                            record = consumer.poll(timeout=2.0)
+                            record = consumer.poll(timeout=sampling_timeout_seconds)
                             
                             if record is None:
                                 consecutive_nulls += 1
@@ -629,7 +634,8 @@ class KafkaTopicsAnalyzer:
                         topic_name: str, 
                         topic_info: Dict, 
                         sampling_batch_size: int, 
-                        sampling_max_consecutive_nulls: int, 
+                        sampling_max_consecutive_nulls: int,
+                        sampling_timeout_seconds: float,
                         start_time_epoch_ms: int, 
                         iso_start_time: datetime) -> Dict:
         """Analyze a single topic.
@@ -639,6 +645,7 @@ class KafkaTopicsAnalyzer:
             topic_info (Dict): Metadata and configuration of the topic.
             sampling_batch_size (int): Number of records to process per batch when sampling.
             sampling_max_consecutive_nulls (int): Maximum number of consecutive null records to encounter before stopping sampling in a partition.
+            sampling_timeout_seconds (float): Maximum time in seconds to spend sampling records per topic.
             start_time_epoch_ms (int): Start time in epoch milliseconds for the rolling window.
             iso_start_time (datetime): Start time as an ISO 8601 formatted datetime object.
             
@@ -683,7 +690,8 @@ class KafkaTopicsAnalyzer:
         else:
             avg_record_size = avg_record_size = self.__sample_record_sizes(topic_name=topic_name, 
                                                                            sampling_batch_size=sampling_batch_size, 
-                                                                           sampling_max_consecutive_nulls=sampling_max_consecutive_nulls, 
+                                                                           sampling_max_consecutive_nulls=sampling_max_consecutive_nulls,
+                                                                           sampling_timeout_seconds=sampling_timeout_seconds,
                                                                            partition_details=partition_details)
 
         # Compile and return the analysis results
