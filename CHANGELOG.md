@@ -10,6 +10,7 @@ The format is base on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), 
 - Issue [#143](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/143)
 - Issue [#144](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/144)
 - Issue [#145](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/145)
+- Issue [#146](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/146)
 
 ## [0.08.02.000] - 2025-09-23
 ### Changed

@@ -37,6 +37,7 @@ def setup_logging(log_file: str = "kafka-cluster-topics-partition-count-recommen
             logging.basicConfig(
                 level=logging.INFO,
                 format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                filemode=logging_config["filemode", "w"],  # This will reset the log file
                 handlers=[
                     logging.FileHandler(log_file),
                     logging.StreamHandler()
@@ -47,6 +48,7 @@ def setup_logging(log_file: str = "kafka-cluster-topics-partition-count-recommen
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            filemode="w",  # This will reset the log file
             handlers=[
                 logging.FileHandler(log_file),
                 logging.StreamHandler()
