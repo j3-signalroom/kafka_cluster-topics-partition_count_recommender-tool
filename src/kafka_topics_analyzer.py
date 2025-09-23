@@ -145,7 +145,7 @@ class KafkaTopicsAnalyzer:
         # Create the CSV detail report file and write the header row
         with open(report_filename, 'w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            writer.writerow(["topic_name","is_compacted","number_of_records","number_of_partitions","required_throughput","consumer_throughput","recommended_partitions","status"])
+            writer.writerow(["method","topic_name","is_compacted","number_of_records","number_of_partitions","required_throughput","consumer_throughput","recommended_partitions","status"])
 
         # Analyze each topic
         for topic_name, topic_info in topics_to_analyze.items():
@@ -271,7 +271,7 @@ class KafkaTopicsAnalyzer:
             # Add the topic's calculations to the CSV detail report file.  Note the throughputs are converted to MBs
             with open(report_filename, 'a', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
-                writer.writerow([topic_name, is_compacted_str, record_count, partition_count, required_throughput/1024/1024, consumer_throughput/1024/1024, recommended_partition_count, status])
+                writer.writerow([f"{"sampling_records" if use_sample_records else "metrics_api"}", topic_name, is_compacted_str, record_count, partition_count, required_throughput/1024/1024, consumer_throughput/1024/1024, recommended_partition_count, status])
 
         # Calculate summary statistics
         elapsed_time = time.time() - app_start_time
