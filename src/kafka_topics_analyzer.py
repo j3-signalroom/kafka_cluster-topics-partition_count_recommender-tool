@@ -147,6 +147,8 @@ class KafkaTopicsAnalyzer:
             writer = csv.writer(file)
             writer.writerow(["method","topic_name","is_compacted","number_of_records","number_of_partitions","required_throughput","consumer_throughput","recommended_partitions","status"])
 
+        logging.info(f"Created the {report_filename} file")
+
         # Analyze each topic
         for topic_name, topic_info in topics_to_analyze.items():
             if use_sample_records:
@@ -326,6 +328,7 @@ class KafkaTopicsAnalyzer:
         logging.info("SUMMARY STATISTICS")
         logging.info("-" * DEFAULT_CHARACTER_REPEAT)
         logging.info(f"Elapsed Time: {elapsed_time/3600:.2f} hours")
+        logging.info(f"Created the {report_filename} file")
         logging.info(f"Total Topics: {overall_topic_count}")
         logging.info(f"Active Topics: {active_topic_count}")
         logging.info(f"Active Topics %: {active_topic_count/active_topic_count*100:.1f}%")
