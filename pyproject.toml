@@ -28,7 +28,7 @@ class = "logging.FileHandler"
 filename = "kafka-cluster-topics-partition-count-recommender-app.log"
 formatter = "default"
 level = "INFO"
-filemode = "w"  # This will reset the log file
+mode = "w"
 
 [tool.logging.handlers.console]
 class = "logging.StreamHandler"
