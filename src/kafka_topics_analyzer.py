@@ -564,6 +564,7 @@ class KafkaTopicsAnalyzer:
 
         total_size = 0
         total_count = 0
+        total_partition_count = len(partition_details)
         
         for partition_detail in partition_details:
             if partition_detail.get("record_count", 0) <= 0:
@@ -580,18 +581,18 @@ class KafkaTopicsAnalyzer:
                 start_offset = partition_detail["offset_start"]
                 end_offset = partition_detail["offset_end"]
 
-                logging.info(f"Partition {partition_number}: using effective batch size {effective_batch_size:,} (requested: {sampling_batch_size:,}, optimal: {optimal_batch_size:,})")
+                logging.info(f"Partition {partition_number:03d} of {total_partition_count:03d}: using effective batch size {effective_batch_size:,} (requested: {sampling_batch_size:,}, optimal: {optimal_batch_size:,})")
 
                 # Validate offsets before proceeding
                 if start_offset is None or start_offset < 0:
-                    logging.warning(f"Invalid start_offset for {topic_name}[{partition_number}]: {start_offset}")
+                    logging.warning(f"Invalid start_offset for {topic_name} {partition_number:03d} of {total_partition_count:03d}: {start_offset}")
                     continue
                     
                 total_offsets = end_offset - start_offset
                 if total_offsets <= 0:
                     continue
-                
-                logging.info(f"    Sampling from partition {partition_number}: offsets [{start_offset}, {end_offset})")
+
+                logging.info(f"    Sampling from partition {partition_number:03d} of {total_partition_count:03d}: offsets [{start_offset}, {end_offset})")
 
                 # Setup consumer and validate watermarks
                 topic_partition = TopicPartition(topic_name, partition_number)
@@ -608,18 +609,18 @@ class KafkaTopicsAnalyzer:
                     valid_end = min(high_watermark, end_offset)
                     
                     if valid_start >= valid_end:
-                        logging.warning(f"No valid offset range for {topic_name} - partiton {partition_number}: adjusted [{valid_start}, {valid_end}]")
+                        logging.warning(f"No valid offset range for {topic_name} - partition {partition_number:03d} of {total_partition_count:03d}: adjusted [{valid_start}, {valid_end}]")
                         continue
                     
                     # Seek to safe start offset
                     topic_partition.offset = valid_start
                     consumer.seek(topic_partition)
-                    logging.debug(f"Seeking to offset {valid_start} for {topic_name}[{partition_number}]")
+                    logging.debug(f"Seeking to offset {valid_start} for {topic_name} {partition_number:03d} of {total_partition_count:03d} within valid range [{low_watermark}, {high_watermark}]")
                     
                 except Exception as seek_error:
                     # By checking watermarks first, the code ensures that it only seeks to offsets that 
                     # actually exist on the broker, eliminating the previous “Offset out of range” errors.
-                    logging.error(f"Failed to seek for {topic_name}[{partition_number}]: {seek_error}")
+                    logging.error(f"Failed to seek for {topic_name} {partition_number:03d} of {total_partition_count:03d}: {seek_error}")
                     continue
                 
                 # Initialize tracking variables
@@ -637,7 +638,7 @@ class KafkaTopicsAnalyzer:
                     max_consecutive_nulls = sampling_max_consecutive_nulls
                     consecutive_nulls = 0
                     
-                    logging.debug(f"Starting batch {batch_count + 1} for partition {partition_number}")
+                    logging.debug(f"Starting batch {batch_count + 1} for partition {partition_number:03d} of {total_partition_count:03d}")
                     
                     # Process one batch with safety limits
                     while (batch_records_processed < effective_batch_size and
@@ -666,7 +667,7 @@ class KafkaTopicsAnalyzer:
                             
                             # Verify we're in the correct partition
                             if record.partition() != partition_number:
-                                logging.warning(f"Received record from wrong partition: {record.partition()} != {partition_number}")
+                                logging.warning(f"Received record from wrong partition: {record.partition()} != {partition_number:03d} of {total_partition_count:03d}")
                                 continue
                             
                             # Calculate record size
@@ -715,17 +716,17 @@ class KafkaTopicsAnalyzer:
                         # in the partition or that there is a gap in the offsets.  In any case, the code
                         # will log a warning and move on to the next partition, because continuing to poll
                         # would be futile.
-                        logging.warning(f"Too many consecutive null polls ({consecutive_nulls}) - stopping partition {partition_number}")
+                        logging.warning(f"Too many consecutive null polls ({consecutive_nulls}) - stopping partition {partition_number:03d} of {total_partition_count:03d}")
                         break
                     
                     # If we made too many attempts without progress, stop processing this partition
                     if batch_attempts >= max_attempts_per_batch and batch_records_processed == 0:
-                        logging.warning(f"No progress after {max_attempts_per_batch} attempts - stopping partition {partition_number}")
+                        logging.warning(f"No progress after {max_attempts_per_batch} attempts - stopping partition {partition_number:03d} of {total_partition_count:03d}")
                         break
 
                     # If we have too many failed batches in a row, stop processing this partition
                     if failed_batches_in_a_row >= max_failed_batches:
-                        logging.error(f"Giving up on partition {partition_number} after {max_failed_batches} "
+                        logging.error(f"Giving up on partition {partition_number:03d} of {total_partition_count:03d} after {max_failed_batches} "
                                     f"consecutive failed batches. This partition may have:")
                         logging.error("  - Corrupted data")
                         logging.error("  - All records outside the time window")
