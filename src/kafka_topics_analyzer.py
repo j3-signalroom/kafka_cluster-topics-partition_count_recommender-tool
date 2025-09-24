@@ -110,27 +110,18 @@ class KafkaTopicsAnalyzer:
         app_start_time = time.time()
 
         # Log initial analysis parameters
-        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
-        logging.info("INITIAL ANALYSIS PARAMETERS")
-        logging.info("-" * DEFAULT_CHARACTER_REPEAT)
-        logging.info(f"Analysis Timestamp: {datetime.now().isoformat()}")
-        logging.info(f"Kafka Cluster ID: {self.kafka_cluster_id}")
-        logging.info("Connecting to Kafka cluster and retrieving metadata...")
-        logging.info(f"Found {len(topics_to_analyze)} topics to analyze")
-        logging.info(f'{"Including" if include_internal else "Excluding"} internal topics')
-        logging.info(f"Required consumption throughput factor: {required_consumption_throughput_factor:.1f}")
-        logging.info(f"Minimum required throughput threshold: {DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD/1024/1024:.1f} MB/s")
-        logging.info(f"Topic filter: {topic_filter if topic_filter else 'None'}")
-        logging.info(f"Default Partition Count: {DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS}")
-        logging.info(f'Using {"sample records" if use_sample_records else "Metrics API"} for average record size calculation')
-        if use_sample_records:
-            logging.info(f"Sampling batch size: {sampling_batch_size:,} records")
-            logging.info(f"Sampling days: {sampling_days} days")
-            logging.info(f"Sampling max consecutive nulls: {sampling_max_consecutive_nulls:,} records")
-            logging.info(f"Sampling timeout: {sampling_timeout_seconds:.1f} seconds")
-            logging.info(f"Sampling max continuous failed batches: {sampling_max_continuous_failed_batches:,} batches")
-        
-        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
+        self._log_initial_parameters({
+            "total_topics_to_analyze": len(topics_to_analyze),
+            "include_internal": include_internal,
+            "required_consumption_throughput_factor": required_consumption_throughput_factor,
+            "topic_filter": topic_filter if topic_filter else "None",
+            "use_sample_records": use_sample_records,
+            "sampling_days": sampling_days,
+            "sampling_batch_size": sampling_batch_size,
+            "sampling_max_consecutive_nulls": sampling_max_consecutive_nulls,
+            "sampling_timeout_seconds": sampling_timeout_seconds,
+            "sampling_max_continuous_failed_batches": sampling_max_continuous_failed_batches
+        })
 
         # Initialize results list and total recommended partitions counter
         results = []
@@ -285,65 +276,49 @@ class KafkaTopicsAnalyzer:
 
         if active_total_partition_count > total_recommended_partitions:
             percentage_decrease = (active_total_partition_count - total_recommended_partitions) / active_total_partition_count * 100 if active_total_partition_count > 0 else 0.0
+            percentage_increase = 0.0
         else:
             percentage_increase = (total_recommended_partitions - active_total_partition_count) / active_total_partition_count * 100 if active_total_partition_count > 0 else 0.0
-
-        # Summary report filename
-        report_filename = f"{base_filename}-summary-report.csv"
+            percentage_decrease = 0.0
 
         # Create the CSV summary report file and write the summary statistics
-        with open(report_filename, 'w', newline='', encoding='utf-8') as file:
-            writer = csv.writer(file)
-            writer.writerow(["stat","value"])
-            writer.writerow(["elapsed_time_in_hours", elapsed_time / 3600])
-            writer.writerow(["method", "sampling_records" if use_sample_records else "metrics_api"])
-            writer.writerow(["required_consumption_throughput_factor", required_consumption_throughput_factor])
-            writer.writerow(["minimum_required_throughput_threshold", DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD/1024/1024])
-            writer.writerow(["default_partition_count", DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS])
-            if use_sample_records:
-                writer.writerow(["sampling_batch_size", sampling_batch_size])
-                writer.writerow(["sampling_days", sampling_days])
-                writer.writerow(["sampling_max_consecutive_nulls", sampling_max_consecutive_nulls])
-                writer.writerow(["sampling_timeout", sampling_timeout_seconds])
-                writer.writerow(["sampling_max_continuous_failed_batches", sampling_max_continuous_failed_batches])
-            writer.writerow(["total_topics", overall_topic_count])
-            writer.writerow(["internal_topics_included", include_internal])
-            writer.writerow(["topic_filter", topic_filter if topic_filter else "None"])
-            writer.writerow(["active_topic_count", active_topic_count])
-            writer.writerow(["active_topic_percentage", (active_topic_count/active_topic_count*100)])
-            writer.writerow(["total_partitions", total_partition_count])
-            writer.writerow(["total_recommended_partitions", total_recommended_partitions])
-            writer.writerow(["active_total_partition_count", active_total_partition_count])
-            if active_total_partition_count > total_recommended_partitions:
-                writer.writerow(["recommended_percentage_decrease_in_partitions", percentage_decrease])
-            else:
-                writer.writerow(["recommended_percentage_increase_in_partitions", percentage_increase])
-            writer.writerow(["total_records", total_record_count])
-            writer.writerow(["average_partitions_per_topic", total_partition_count/overall_topic_count])
-            writer.writerow(["active_average_partitions_per_topic", total_partition_count/active_topic_count if active_topic_count > 0 else 0])
-            writer.writerow(["average_recommended_partitions_per_topic", total_recommended_partitions/active_topic_count if active_topic_count > 0 else 0])
+        self._writer_summary_report(f"{base_filename}-summary-report.csv", {
+            "elapsed_time_in_hours": elapsed_time / 3600,
+            "use_sample_records": use_sample_records,
+            "method": "sampling_records" if use_sample_records else "metrics_api",
+            "include_internal": include_internal,
+            "overall_topic_count": overall_topic_count,
+            "topic_filter": topic_filter if topic_filter else "None",
+            "active_topic_count": active_topic_count,
+            "active_topic_percentage": (active_topic_count/active_topic_count*100),
+            "required_consumption_throughput_factor": required_consumption_throughput_factor,
+            "total_partition_count": total_partition_count,
+            "total_recommended_partition_count": total_recommended_partitions,
+            "active_total_partition_count": active_total_partition_count,
+            "percentage_decrease": percentage_decrease,
+            "percentage_increase": percentage_increase,
+            "total_record_count": total_record_count,
+            "average_partitions_per_topic": total_partition_count/overall_topic_count,
+            "active_average_partitions_per_topic": total_partition_count/active_topic_count if active_topic_count > 0 else 0,
+            "average_recommended_partitions_per_topic": total_recommended_partitions/active_topic_count if active_topic_count > 0 else 0,
+        })
             
         # Log summary results
-        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
-        logging.info("SUMMARY STATISTICS")
-        logging.info("-" * DEFAULT_CHARACTER_REPEAT)
-        logging.info(f"Elapsed Time: {elapsed_time/3600:.2f} hours")
-        logging.info(f"Created the {report_filename} file")
-        logging.info(f"Total Topics: {overall_topic_count}")
-        logging.info(f"Active Topics: {active_topic_count}")
-        logging.info(f"Active Topics %: {active_topic_count/active_topic_count*100:.1f}%")
-        logging.info(f"Total Partitions: {total_partition_count}")
-        logging.info(f"Total Recommended Partitions: {total_recommended_partitions}")
-        logging.info(f"Non-Empty Topics Total Partitions: {active_total_partition_count}")
-        if active_total_partition_count > total_recommended_partitions:
-            logging.info(f"RECOMMENDED Decrease in Partitions: {percentage_decrease:.1f}%")
-        else:
-            logging.info(f"RECOMMENDED Increase in Partitions: {percentage_increase:.1f}%")
-        logging.info(f"Total Records: {total_record_count:,}")
-        logging.info(f"Average Partitions per Topic: {total_partition_count/overall_topic_count:.0f}")
-        logging.info(f"Average Partitions per Active Topic: {total_partition_count/active_topic_count:.0f}")
-        logging.info(f"Average Recommended Partitions per Topic: {total_recommended_partitions/active_topic_count:.0f}")
-        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
+        self._summary_stat_log({
+            "elapsed_time_in_hours": elapsed_time / 3600,
+            "overall_topic_count": overall_topic_count,
+            "active_topic_count": active_topic_count,
+            "active_topic_percentage": (active_topic_count/active_topic_count*100),
+            "total_partition_count": total_partition_count,
+            "total_recommended_partition_count": total_recommended_partitions,
+            "active_total_partition_count": active_total_partition_count,
+            "total_record_count": total_record_count,
+            "average_partitions_per_topic": total_partition_count/overall_topic_count,
+            "percentage_decrease": percentage_decrease,
+            "percentage_increase": percentage_increase,
+            "active_average_partitions_per_topic": total_partition_count/active_topic_count if active_topic_count > 0 else 0,
+            "average_recommended_partitions_per_topic": total_recommended_partitions/active_topic_count if active_topic_count > 0 else 0
+        })
 
         return True if len(results) > 0 else False
 
@@ -826,3 +801,87 @@ class KafkaTopicsAnalyzer:
             'partition_details': partition_details,
             'is_internal': topic_name.startswith('_')
         }
+    
+    def _log_initial_parameters(self, params: Dict) -> None:
+        """Log the initial parameters of the analysis."""
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
+        logging.info("INITIAL ANALYSIS PARAMETERS")
+        logging.info("-" * DEFAULT_CHARACTER_REPEAT)
+        logging.info(f"Analysis Timestamp: {datetime.now().isoformat()}")
+        logging.info(f"Kafka Cluster ID: {self.kafka_cluster_id}")
+        logging.info("Connecting to Kafka cluster and retrieving metadata...")
+        logging.info(f"Found {params['total_topics_to_analyze']} topics to analyze")
+        logging.info(f'{"Including" if params["include_internal"] else "Excluding"} internal topics')
+        logging.info(f"Required consumption throughput factor: {params['required_consumption_throughput_factor']:.1f}")
+        logging.info(f"Minimum required throughput threshold: {DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD/1024/1024:.1f} MB/s")
+        logging.info(f"Topic filter: {params['topic_filter'] if params['topic_filter'] else 'None'}")
+        logging.info(f"Default Partition Count: {DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS}")
+        logging.info(f'Using {"sample records" if params["use_sample_records"] else "Metrics API"} for average record size calculation')
+        if params["use_sample_records"]:
+            logging.info(f"Sampling batch size: {params['sampling_batch_size']:,} records")
+            logging.info(f"Sampling days: {params['sampling_days']} days")
+            logging.info(f"Sampling max consecutive nulls: {params['sampling_max_consecutive_nulls']:,} records")
+            logging.info(f"Sampling timeout: {params['sampling_timeout_seconds']:.1f} seconds")
+            logging.info(f"Sampling max continuous failed batches: {params['sampling_max_continuous_failed_batches']:,} batches")
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
+
+    def _writer_summary_report(self, report_filename: str, summary_stats: Dict) -> None:
+        """Create the CSV summary report file and write the summary statistics.
+
+        Args:
+            summary_stats (Dict): Summary statistics to write.
+            report_filename (str): Filename for the summary report.
+        """
+        with open(report_filename, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(["stat","value"])
+            writer.writerow(["elapsed_time_in_hours", summary_stats['elapsed_time_in_hours']])
+            writer.writerow(["method", "sampling_records" if summary_stats['use_sample_records'] else "metrics_api"])
+            writer.writerow(["required_consumption_throughput_factor", summary_stats['required_consumption_throughput_factor']])
+            writer.writerow(["minimum_required_throughput_threshold", DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD/1024/1024])
+            writer.writerow(["default_partition_count", DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS])
+            if summary_stats['use_sample_records']:
+                writer.writerow(["sampling_batch_size", summary_stats['sampling_batch_size']])
+                writer.writerow(["sampling_days", summary_stats['sampling_days']])
+                writer.writerow(["sampling_max_consecutive_nulls", summary_stats['sampling_max_consecutive_nulls']])
+                writer.writerow(["sampling_timeout", summary_stats['sampling_timeout']])
+                writer.writerow(["sampling_max_continuous_failed_batches", summary_stats['sampling_max_continuous_failed_batches']])
+            writer.writerow(["total_topics", summary_stats['overall_topic_count']])
+            writer.writerow(["internal_topics_included", summary_stats['include_internal']])
+            writer.writerow(["topic_filter", summary_stats['topic_filter']])
+            writer.writerow(["active_topic_count", summary_stats['active_topic_count']])
+            writer.writerow(["active_topic_percentage", (summary_stats['active_topic_count']/summary_stats['active_topic_count']*100)])
+            writer.writerow(["total_partition_count", summary_stats['total_partition_count']])
+            writer.writerow(["total_recommended_partition_count", summary_stats['total_recommended_partition_count']])
+            writer.writerow(["active_total_partition_count", summary_stats['active_total_partition_count']])
+            if summary_stats['active_total_partition_count'] > summary_stats['total_recommended_partition_count']:
+                writer.writerow(["recommended_percentage_decrease_in_partitions", summary_stats['percentage_decrease']])
+            else:
+                writer.writerow(["recommended_percentage_increase_in_partitions", summary_stats['percentage_increase']])
+            writer.writerow(["total_records", summary_stats['total_record_count']])
+            writer.writerow(["average_partitions_per_topic", summary_stats['total_partition_count']/summary_stats['overall_topic_count']])
+            writer.writerow(["active_average_partitions_per_topic", summary_stats['total_partition_count']/summary_stats['active_topic_count'] if summary_stats['active_topic_count'] > 0 else 0])
+            writer.writerow(["average_recommended_partitions_per_topic", summary_stats['total_recommended_partition_count']/summary_stats['active_topic_count'] if summary_stats['active_topic_count'] > 0 else 0])
+
+    def _summary_stat_log(self, summary_stats: Dict) -> None:
+        """Log summary of the analysis."""
+        
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
+        logging.info("SUMMARY STATISTICS")
+        logging.info("-" * DEFAULT_CHARACTER_REPEAT)
+        logging.info(f"Elapsed Time: {summary_stats['elapsed_time_in_hours']:.2f} hours")
+        logging.info(f"Total Topics: {summary_stats['overall_topic_count']}")
+        logging.info(f"Active Topics: {summary_stats['active_topic_count']}")
+        logging.info(f"Active Topics %: {summary_stats['active_topic_count']/summary_stats['overall_topic_count']*100:.1f}%")
+        logging.info(f"Total Partitions: {summary_stats['total_partition_count']}")
+        logging.info(f"Total Recommended Partitions: {summary_stats['total_recommended_partition_count']}")
+        logging.info(f"Non-Empty Topics Total Partitions: {summary_stats['active_total_partition_count']}")
+        if summary_stats['active_total_partition_count'] > summary_stats['total_recommended_partition_count']:
+            logging.info(f"RECOMMENDED Decrease in Partitions: {summary_stats['percentage_decrease']:.1f}%")
+        else:
+            logging.info(f"RECOMMENDED Increase in Partitions: {summary_stats['percentage_increase']:.1f}%")
+        logging.info(f"Total Records: {summary_stats['total_record_count']:,}")
+        logging.info(f"Average Partitions per Topic: {summary_stats['total_partition_count']/summary_stats['overall_topic_count']:.0f}")
+        logging.info(f"Average Partitions per Active Topic: {summary_stats['total_partition_count']/summary_stats['active_topic_count']:.0f}")
+        logging.info(f"Average Recommended Partitions per Topic: {summary_stats['total_recommended_partition_count']/summary_stats['active_topic_count']:.0f}")
+        logging.info("=" * DEFAULT_CHARACTER_REPEAT)
