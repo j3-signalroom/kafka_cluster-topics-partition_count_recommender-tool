@@ -174,7 +174,7 @@ class KafkaTopicsAnalyzer:
                     result['sampling_days'] = topic_info['sampling_days_based_on_retention_days']
                     
                 except Exception as e:
-                    logging.error(f"Failed to analyze topic {topic_name} because {e}")
+                    logging.warning(f"Failed to analyze topic {topic_name} because {e}")
 
                     # Add basic info even if analysis fails
                     result = {
@@ -472,7 +472,7 @@ class KafkaTopicsAnalyzer:
             return partition_offsets
             
         except Exception as e:
-            logging.error(f"Error getting partition offsets for topic {topic_name}: {e}")
+            logging.warning(f"Error getting partition offsets for topic {topic_name}: {e}")
             return {}
         finally:
             consumer.close()
@@ -623,7 +623,7 @@ class KafkaTopicsAnalyzer:
                 except Exception as seek_error:
                     # By checking watermarks first, the code ensures that it only seeks to offsets that 
                     # actually exist on the broker, eliminating the previous “Offset out of range” errors.
-                    logging.error(f"Failed to seek for {topic_name} {partition_number:03d} of {total_partition_count:03d}: {seek_error}")
+                    logging.warning(f"Failed to seek for {topic_name} {partition_number:03d} of {total_partition_count:03d}: {seek_error}")
                     continue
                 
                 # Initialize tracking variables
@@ -729,16 +729,16 @@ class KafkaTopicsAnalyzer:
 
                     # If we have too many failed batches in a row, stop processing this partition
                     if failed_batches_in_a_row >= max_failed_batches:
-                        logging.error(f"Giving up on partition {partition_number:03d} of {total_partition_count:03d} after {max_failed_batches} "
+                        logging.warning(f"Giving up on partition {partition_number:03d} of {total_partition_count:03d} after {max_failed_batches} "
                                     f"consecutive failed batches. This partition may have:")
-                        logging.error("  - Corrupted data")
-                        logging.error("  - All records outside the time window")
-                        logging.error("  - Network connectivity issues")
-                        logging.error("  - Broker-side problems")
+                        logging.warning("  - Corrupted data")
+                        logging.warning("  - All records outside the time window")
+                        logging.warning("  - Network connectivity issues")
+                        logging.warning("  - Broker-side problems")
                         break
             
             except Exception as e:
-                logging.error(f"    Error sampling partition {partition_detail.get('partition_number', 'unknown')}: {e}")
+                logging.warning(f"    Error sampling partition {partition_detail.get('partition_number', 'unknown')}: {e}")
             finally:
                 consumer.close()
         
