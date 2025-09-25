@@ -68,17 +68,17 @@ def analyze_kafka_cluster(kafka_credential: Dict, config: Dict) -> bool:
             max_workers=config.get('max_workers_per_cluster', DEFAULT_MAX_WORKERS_PER_CLUSTER)
         )
         
-        cluster_id = kafka_credential.get("kafka_cluster_id", "unknown")
+        kafka_cluster_id = kafka_credential.get("kafka_cluster_id", "unknown")
         if success:
-            logging.info(f"CLUSTER {cluster_id}: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.")
+            logging.info(f"CLUSTER {kafka_cluster_id}: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.")
         else:
-            logging.error(f"CLUSTER {cluster_id}: TOPIC ANALYSIS FAILED.")
+            logging.error(f"CLUSTER {kafka_cluster_id}: TOPIC ANALYSIS FAILED.")
             
         return success
         
     except Exception as e:
-        cluster_id = kafka_credential.get("kafka_cluster_id", "unknown")
-        logging.error(f"CLUSTER {cluster_id}: ANALYSIS FAILED WITH ERROR: {e}")
+        kafka_cluster_id = kafka_credential.get("kafka_cluster_id", "unknown")
+        logging.error(f"CLUSTER {kafka_cluster_id}: ANALYSIS FAILED WITH ERROR: {e}")
         return False
     
 
@@ -185,14 +185,14 @@ def main():
 
     # Analyze Kafka clusters concurrently if more than one cluster
     if len(kafka_credentials) == 1:
-        # Single cluster - no need for cluster-level threading
+        # Single Kafka cluster.  No need for cluster-level threading
         success = analyze_kafka_cluster(kafka_credentials[0], config)
         if success:
             logging.info("SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.")
         else:
             logging.error("SINGLE KAFKA CLUSTER ANALYSIS FAILED.")
     else:
-        # Multiple Kafka clusters - use ThreadPoolExecutor for cluster-level concurrency
+        # Multiple Kafka clusters.  Use ThreadPoolExecutor for cluster-level concurrency
         successful_clusters = 0
         failed_clusters = 0
         
@@ -203,20 +203,20 @@ def main():
                 for credential in kafka_credentials
             }
             
-            # Process completed cluster analyses
+            # Process completed Kafka cluster analyses
             for future in as_completed(future_to_cluster):
-                cluster_id = future_to_cluster[future]
+                kafka_cluster_id = future_to_cluster[future]
                 try:
                     success = future.result()
                     if success:
                         successful_clusters += 1
-                        logging.info(f"KAFKA CLUSTER {cluster_id}: ANALYSIS COMPLETED")
+                        logging.info(f"KAFKA CLUSTER {kafka_cluster_id}: ANALYSIS COMPLETED")
                     else:
                         failed_clusters += 1
-                        logging.error(f"KAFKA CLUSTER {cluster_id}: ANALYSIS FAILED")
+                        logging.error(f"KAFKA CLUSTER {kafka_cluster_id}: ANALYSIS FAILED")
                 except Exception as e:
                     failed_clusters += 1
-                    logging.error(f"KAFKA CLUSTER {cluster_id}: ANALYSIS FAILED WITH EXCEPTION: {e}")
+                    logging.error(f"KAFKA CLUSTER {kafka_cluster_id}: ANALYSIS FAILED WITH EXCEPTION: {e}")
 
         # Log final summary
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
