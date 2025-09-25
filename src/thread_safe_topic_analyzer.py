@@ -109,46 +109,84 @@ class ThreadSafeTopicAnalyzer:
             'is_internal': topic_name.startswith('_')
         }
 
-        # Use Metrics API to get the consumer byte consumption
-        http_status_code, error_message, bytes_query_result = self.metrics_client.get_topic_daily_aggregated_totals(
-            KafkaMetric.RECEIVED_BYTES, self.kafka_cluster_id, topic_name
-        )
-        
-        if http_status_code != HttpStatus.OK:
-            logging.warning(f"[Thread-{threading.current_thread().ident}] Failed retrieving 'RECEIVED BYTES' metric for topic {topic_name} because: {error_message}")
-            result['error'] = error_message
-            result['total_record_count'] = 0
-            result['avg_bytes_per_record'] = 0.0
-        else:
-            # Use the Confluent Metrics API to get the record count
-            http_status_code, error_message, record_query_result = self.metrics_client.get_topic_daily_aggregated_totals(
-                KafkaMetric.RECEIVED_RECORDS, self.kafka_cluster_id, topic_name
+        bytes_retry = 0
+        max_bytes_retries = 3
+        retry_delay_in_seconds = 60
+        proceed_to_records = False
+
+        while bytes_retry < max_bytes_retries:
+            # Use Metrics API to get the consumer byte consumption
+            http_status_code, error_message, bytes_query_result = self.metrics_client.get_topic_daily_aggregated_totals(
+                KafkaMetric.RECEIVED_BYTES, self.kafka_cluster_id, topic_name
             )
-            
-            if http_status_code != HttpStatus.OK:
-                logging.warning(f"[Thread-{threading.current_thread().ident}] Failed retrieving 'RECEIVED RECORDS' metric for topic {topic_name} because: {error_message}")
+            if http_status_code == HttpStatus.RATE_LIMIT_EXCEEDED:
+                bytes_retry += 1
+                if bytes_retry == max_bytes_retries:
+                    logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED BYTES' metric for topic {topic_name}. Max retries reached ({max_bytes_retries}). Aborting.")
+                    result['error'] = "Rate limit exceeded when retrieving 'RECEIVED BYTES' metric."
+                    result['total_record_count'] = 0
+                    result['avg_bytes_per_record'] = 0.0
+                    break
+                logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED BYTES' metric for topic {topic_name}. Retrying {bytes_retry}/{max_bytes_retries} after {retry_delay_in_seconds} seconds...")
+                time.sleep(retry_delay_in_seconds)
+                continue
+            elif http_status_code not in (HttpStatus.OK, HttpStatus.RATE_LIMIT_EXCEEDED):
+                logging.warning(f"[Thread-{threading.current_thread().ident}] Failed retrieving 'RECEIVED BYTES' metric for topic {topic_name} because: {error_message}")
                 result['error'] = error_message
                 result['total_record_count'] = 0
                 result['avg_bytes_per_record'] = 0.0
-            else:
-                record_count = record_query_result.get('sum_total', 0)
-                result['total_record_count'] = record_count
+                break
+            elif http_status_code == HttpStatus.OK:
+                proceed_to_records = True
+                break
 
-                # Calculate daily consumed average bytes per record
-                bytes_daily_totals = bytes_query_result.get('daily_total', [])
-                records_daily_totals = record_query_result.get('daily_total', [])
-                avg_bytes_daily_totals = []
+        if proceed_to_records:
+            records_retry = 0
+            max_records_retries = 3
 
-                # Calculate the average bytes per record for each day where records were consumed
-                for index, record_total in enumerate(records_daily_totals):
-                    if record_total > 0:
-                        avg_bytes_daily_totals.append(bytes_daily_totals[index]/record_total)
+            while records_retry < max_records_retries:
+                # Use the Confluent Metrics API to get the record count
+                http_status_code, error_message, record_query_result = self.metrics_client.get_topic_daily_aggregated_totals(
+                    KafkaMetric.RECEIVED_RECORDS, self.kafka_cluster_id, topic_name
+                )
+                if http_status_code == HttpStatus.RATE_LIMIT_EXCEEDED:
+                    records_retry += 1
+                    if records_retry == max_records_retries:
+                        logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric for topic {topic_name}. Max retries reached ({max_records_retries}). Aborting.")
+                        result['error'] = "Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric."
+                        result['total_record_count'] = 0
+                        result['avg_bytes_per_record'] = 0.0
+                        break
+                    logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric for topic {topic_name}. Retrying {records_retry}/{max_records_retries} after {retry_delay_in_seconds} seconds...")
+                    time.sleep(retry_delay_in_seconds)
+                    continue
+                elif http_status_code not in (HttpStatus.OK, HttpStatus.RATE_LIMIT_EXCEEDED):
+                    logging.warning(f"[Thread-{threading.current_thread().ident}] Failed retrieving 'RECEIVED RECORDS' metric for topic {topic_name} because: {error_message}")
+                    result['error'] = error_message
+                    result['total_record_count'] = 0
+                    result['avg_bytes_per_record'] = 0.0
+                    break
+                elif http_status_code == HttpStatus.OK:
+                    record_count = record_query_result.get('sum_total', 0)
+                    result['total_record_count'] = record_count
 
-                # Calculate overall average bytes per record across all days
-                avg_bytes_per_record = sum(avg_bytes_daily_totals)/len(avg_bytes_daily_totals) if len(avg_bytes_daily_totals) > 0 else 0
-                result['avg_bytes_per_record'] = avg_bytes_per_record
+                    # Calculate daily consumed average bytes per record
+                    bytes_daily_totals = bytes_query_result.get('daily_total', [])
+                    records_daily_totals = record_query_result.get('daily_total', [])
+                    avg_bytes_daily_totals = []
 
-                logging.info(f"[Thread-{threading.current_thread().ident}] Confluent Metrics API - For topic {topic_name}, the average bytes per record is {avg_bytes_per_record:,.2f} bytes/record for a total of {record_count:,.0f} records.")
+                    # Calculate the average bytes per record for each day where records were consumed
+                    for index, record_total in enumerate(records_daily_totals):
+                        if record_total > 0:
+                            avg_bytes_daily_totals.append(bytes_daily_totals[index]/record_total)
+
+                    # Calculate overall average bytes per record across all days
+                    avg_bytes_per_record = sum(avg_bytes_daily_totals)/len(avg_bytes_daily_totals) if len(avg_bytes_daily_totals) > 0 else 0
+                    result['avg_bytes_per_record'] = avg_bytes_per_record
+
+                    logging.info(f"[Thread-{threading.current_thread().ident}] Confluent Metrics API - For topic {topic_name}, the average bytes per record is {avg_bytes_per_record:,.2f} bytes/record for a total of {record_count:,.0f} records.")
+
+                    break
 
         return result
 
