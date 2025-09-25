@@ -15,7 +15,7 @@ The **Kafka Cluster Topics Partition Count Recommender Application** offers data
       - [**1.2.1 Create the `.env` file**](#121-create-the-env-file)
       - [**1.2.2 Using the AWS Secrets Manager (optional)**](#122-using-the-aws-secrets-manager-optional)
    + [**1.3 Run the Application**](#13-run-the-application)
-      - [**1.3.1 Did you notice we prefix `uv run` to `python src/app.py`?**](#131-did-you-notice-we-prefix-uv-run-to-python-srcapppy)
+      - [**1.3.1 Did you notice we prefix `uv run` to `python src/thread_safe_app.py`?**](#131-did-you-notice-we-prefix-uv-run-to-python-srcapppy)
       - [**1.3.2 Troubleshoot Connectivity Issues (if any)**](#132-troubleshoot-connectivity-issues-if-any)
    + [**1.4 The Results**](#14-the-results)
 - [**2.0 How the app calculates the recommended partition count**](#20-how-the-app-calculates-the-recommended-partition-count)
@@ -94,6 +94,10 @@ SAMPLING_BATCH_SIZE=<YOUR_SAMPLING_BATCH_SIZE>
 SAMPLING_MAX_CONSECUTIVE_NULLS=<YOUR_SAMPLING_MAX_CONSECUTIVE_NULLS>
 SAMPLING_TIMEOUT_SECONDS=<YOUR_SAMPLING_TIMEOUT_SECONDS>
 SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES=<YOUR_SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES>
+
+# Multithreading configuration
+MAX_CLUSTER_WORKERS=<YOUR_MAX_CLUSTER_WORKERS>
+MAX_WORKERS_PER_CLUSTER=<YOUR_MAX_WORKERS_PER_CLUSTER>
 ```
 
 The environment variables are defined as follows:
@@ -114,6 +118,8 @@ The environment variables are defined as follows:
 | `SAMPLING_TIMEOUT_SECONDS` | Float | Maximum time (in seconds) to wait for records during sampling before stopping the sampling process for a topic. Prevents long waits when there are no new records. | `1.0`, `2.5` | `2.0` | No |
 | `SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES` | Integer | Maximum number of continuous failed batches encountered during sampling before stopping the sampling process for a topic. Helps to avoid excessive retries when there are persistent issues. | `3`, `5` | `5` | No |
 | `SAMPLING_DAYS` | Integer | Time window (in days) for record sampling, creating a rolling window that looks back from the current time. Defines how far back to sample records for analysis. **Note**: Topics with retention periods shorter than this value will use their maximum available retention period instead. | `7` (last week), `30` (last month) | `7` | No |
+| `MAX_CLUSTER_WORKERS` | Integer | Maximum number of concurrent worker threads to analyze multiple Kafka clusters in parallel. Helps to speed up analysis when working with multiple clusters. | `2`, `4` | `3` | No |
+| `MAX_WORKERS_PER_CLUSTER` | Integer | Maximum number of concurrent worker threads to analyze multiple topics within a single Kafka cluster in parallel. Helps to speed up analysis for clusters with many topics. | `4`, `8` | `8` | No |
 
 #### 1.2.2 Using the AWS Secrets Manager (optional)
 If you use **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and the application will retrieve the secrets from AWS Secrets Manager using the names provided in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`.  
@@ -142,7 +148,7 @@ cd path/to/kafka_cluster-topics-partition_count_recommender-app/
 
 Then enter the following command below to run the application:
 ```shell
-uv run python src/app.py
+uv run python src/thread_safe_app.py
 ```
 
 If `USE_SAMPLE_RECORDS` environment variable is set to `True`, the application will sample records from each topic to calculate the average record size in bytes.  For example, below is a screenshot of the application running successfully:
@@ -292,7 +298,7 @@ If `USE_SAMPLE_RECORDS` is set to `False`, the application will use the Confluen
 2025-09-23 11:30:07 - INFO - main - TOPIC ANALYSIS COMPLETED SUCCESSFULLY.
 ```
 
-#### 1.3.1 Did you notice we prefix `uv run` to `python src/app.py`?
+#### 1.3.1 Did you notice we prefix `uv run` to `python src/thread_safe_app.py`?
 You maybe asking yourself why.  Well, `uv` is an incredibly fast Python package installer and dependency resolver, written in [**Rust**](https://github.blog/developer-skills/programming-languages-and-frameworks/why-rust-is-the-most-admired-language-among-developers/), and designed to seamlessly replace `pip`, `pipx`, `poetry`, `pyenv`, `twine`, `virtualenv`, and more in your workflows. By prefixing `uv run` to a command, you're ensuring that the command runs in an optimal Python environment.
 
 Now, let's go a little deeper into the magic behind `uv run`:
@@ -300,7 +306,7 @@ Now, let's go a little deeper into the magic behind `uv run`:
 - If used in a project directory, `uv` will automatically create or update the project environment before running the command.
 - Outside of a project, if there's a virtual environment present in your current directory (or any parent directory), `uv` runs the command in that environment. If no environment is found, it uses the interpreter's environment.
 
-So what does this mean when we put `uv run` before `python src/app.py`? It means `uv` takes care of all the setup—fast and seamless—right in your local environment. If you think AI/ML is magic, the work the folks at [Astral](https://astral.sh/) have done with `uv` is pure wizardry!
+So what does this mean when we put `uv run` before `python src/thread_safe_app.py`? It means `uv` takes care of all the setup—fast and seamless—right in your local environment. If you think AI/ML is magic, the work the folks at [Astral](https://astral.sh/) have done with `uv` is pure wizardry!
 
 Curious to learn more about [Astral](https://astral.sh/)'s `uv`? Check these out:
 - Documentation: Learn about [`uv`](https://docs.astral.sh/uv/).
@@ -402,7 +408,7 @@ id: 3eadd090-8b11-4a52-abc2-9755066ffc9d
 ---
 sequenceDiagram
     participant User
-    participant App as app.py
+    participant App as thread_safe_app.py
     participant KTA as KafkaTopicsAnalyzer
     participant AC as AdminClient
     participant MC as MetricsClient

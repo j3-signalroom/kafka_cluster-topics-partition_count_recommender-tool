@@ -28,3 +28,7 @@ DEFAULT_CHARACTER_REPEAT: Final[int] = 100
 # Consumer throughput threshold and minimum recommended partitions
 DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD: Final[int] = 1024 * 1024 * 10  # 10 MB/s
 DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS: Final[int] = 6
+
+# Multithreading configuration
+DEFAULT_MAX_CLUSTER_WORKERS: Final[int] = 3
+DEFAULT_MAX_WORKERS_PER_CLUSTER: Final[int] = 8
