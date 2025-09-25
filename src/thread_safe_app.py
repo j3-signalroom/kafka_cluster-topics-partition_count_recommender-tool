@@ -17,6 +17,7 @@ from constants import (DEFAULT_SAMPLING_DAYS,
                        DEFAULT_USE_SAMPLE_RECORDS,
                        DEFAULT_USE_AWS_SECRETS_MANAGER,
                        DEFAULT_INCLUDE_INTERNAL_TOPICS,
+                       DEFAULT_MAX_CLUSTER_WORKERS,
                        DEFAULT_MAX_WORKERS_PER_CLUSTER,
                        DEFAULT_CHARACTER_REPEAT)
 
@@ -100,9 +101,9 @@ def main():
         topic_filter = os.getenv("TOPIC_FILTER")
         
         # Multithreading configuration
-        max_cluster_workers = int(os.getenv("MAX_CLUSTER_WORKERS", "2"))  # Number of clusters to process concurrently
-        max_workers_per_cluster = int(os.getenv("MAX_WORKERS_PER_CLUSTER", "4"))  # Number of topics per cluster to process concurrently
-        
+        max_cluster_workers = int(os.getenv("MAX_CLUSTER_WORKERS", DEFAULT_MAX_CLUSTER_WORKERS))  # Number of clusters to process concurrently
+        max_workers_per_cluster = int(os.getenv("MAX_WORKERS_PER_CLUSTER", DEFAULT_MAX_WORKERS_PER_CLUSTER))  # Number of topics per cluster to process concurrently
+
     except Exception as e:
         logging.error(f"THE APPLICATION FAILED TO READ CONFIGURATION SETTINGS BECAUSE OF THE FOLLOWING ERROR: {e}") 
         return
@@ -176,27 +177,27 @@ def main():
     logging.info("=" * DEFAULT_CHARACTER_REPEAT)
     logging.info("MULTITHREADED KAFKA CLUSTER ANALYSIS STARTING")
     logging.info("-" * DEFAULT_CHARACTER_REPEAT)
-    logging.info(f"Number of clusters to analyze: {len(kafka_credentials)}")
-    logging.info(f"Max concurrent clusters: {max_cluster_workers}")
+    logging.info(f"Number of Kafka clusters to analyze: {len(kafka_credentials)}")
+    logging.info(f"Max concurrent Kafka clusters: {max_cluster_workers}")
     logging.info(f"Max concurrent topics per cluster: {max_workers_per_cluster}")
     logging.info(f'Analysis method: {"Record sampling" if use_sample_records else "Metrics API"}')
     logging.info("=" * DEFAULT_CHARACTER_REPEAT)
 
-    # Analyze clusters concurrently if more than one cluster
+    # Analyze Kafka clusters concurrently if more than one cluster
     if len(kafka_credentials) == 1:
         # Single cluster - no need for cluster-level threading
         success = analyze_kafka_cluster(kafka_credentials[0], config)
         if success:
-            logging.info("SINGLE CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.")
+            logging.info("SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.")
         else:
-            logging.error("SINGLE CLUSTER ANALYSIS FAILED.")
+            logging.error("SINGLE KAFKA CLUSTER ANALYSIS FAILED.")
     else:
-        # Multiple clusters - use ThreadPoolExecutor for cluster-level concurrency
+        # Multiple Kafka clusters - use ThreadPoolExecutor for cluster-level concurrency
         successful_clusters = 0
         failed_clusters = 0
         
         with ThreadPoolExecutor(max_workers=max_cluster_workers) as executor:
-            # Submit cluster analysis tasks
+            # Submit Kafka cluster analysis tasks
             future_to_cluster = {
                 executor.submit(analyze_kafka_cluster, credential, config): credential.get("kafka_cluster_id", "unknown")
                 for credential in kafka_credentials
@@ -209,28 +210,28 @@ def main():
                     success = future.result()
                     if success:
                         successful_clusters += 1
-                        logging.info(f"CLUSTER {cluster_id}: ANALYSIS COMPLETED")
+                        logging.info(f"KAFKA CLUSTER {cluster_id}: ANALYSIS COMPLETED")
                     else:
                         failed_clusters += 1
-                        logging.error(f"CLUSTER {cluster_id}: ANALYSIS FAILED")
+                        logging.error(f"KAFKA CLUSTER {cluster_id}: ANALYSIS FAILED")
                 except Exception as e:
                     failed_clusters += 1
-                    logging.error(f"CLUSTER {cluster_id}: ANALYSIS FAILED WITH EXCEPTION: {e}")
+                    logging.error(f"KAFKA CLUSTER {cluster_id}: ANALYSIS FAILED WITH EXCEPTION: {e}")
 
         # Log final summary
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("MULTITHREADED ANALYSIS SUMMARY")
         logging.info("-" * DEFAULT_CHARACTER_REPEAT)
-        logging.info(f"Total clusters analyzed: {len(kafka_credentials)}")
-        logging.info(f"Successful cluster analyses: {successful_clusters}")
-        logging.info(f"Failed cluster analyses: {failed_clusters}")
-        
+        logging.info(f"Total Kafka clusters analyzed: {len(kafka_credentials)}")
+        logging.info(f"Successful Kafka cluster analyses: {successful_clusters}")
+        logging.info(f"Failed Kafka cluster analyses: {failed_clusters}")
+
         if successful_clusters == len(kafka_credentials):
-            logging.info("ALL CLUSTER ANALYSES COMPLETED SUCCESSFULLY.")
+            logging.info("ALL KAFKA CLUSTER ANALYSES COMPLETED SUCCESSFULLY.")
         elif successful_clusters > 0:
-            logging.warning(f"PARTIAL SUCCESS: {successful_clusters}/{len(kafka_credentials)} CLUSTERS ANALYZED SUCCESSFULLY.")
+            logging.warning(f"PARTIAL SUCCESS: {successful_clusters}/{len(kafka_credentials)} KAFKA CLUSTERS ANALYZED SUCCESSFULLY.")
         else:
-            logging.error("ALL CLUSTER ANALYSES FAILED.")
+            logging.error("ALL KAFKA CLUSTER ANALYSES FAILED.")
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
     
     
