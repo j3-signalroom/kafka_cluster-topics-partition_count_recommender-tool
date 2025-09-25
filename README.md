@@ -408,102 +408,78 @@ The **50 partitions** ensure that the consumer can achieve the required throughp
 
 #### 2.1 End-to-End Application Workflow
 ```mermaid
----
-id: 3eadd090-8b11-4a52-abc2-9755066ffc9d
----
 sequenceDiagram
-    participant User
-    participant App as thread_safe_app.py
-    participant KTA as KafkaTopicsAnalyzer
-    participant AC as AdminClient
-    participant MC as MetricsClient
-    participant KC as Consumer
-    participant AWS as AWS Secrets Manager
-    participant CSV as CSV Report
+    participant Main as thread_safe_app.py
+    participant TP as ThreadPoolExecutor (Clusters)
+    participant Analyzer as ThreadSafeKafkaTopicsAnalyzer
+    participant TopicTP as ThreadPoolExecutor (Topics)
+    participant TopicAnalyzer as ThreadSafeTopicAnalyzer
+    participant Consumer as Kafka Consumer
+    participant Admin as Kafka AdminClient
+    participant Metrics as MetricsClient
+    participant CSV as ThreadSafeCSVWriter
 
-    User->>App: Run application
-    App->>App: Load environment variables
-    App->>App: Read configuration settings
+    Main->>Main: Load configuration and credentials
+    Main->>TP: Create cluster-level thread pool
     
-    alt Use AWS Secrets Manager
-        App->>AWS: Get Confluent Cloud credentials
-        AWS-->>App: Return credentials
-        App->>AWS: Get Kafka API credentials
-        AWS-->>App: Return Kafka credentials
-    else Use Environment Variables
-        App->>App: Read credentials from env vars
-    end
-
     loop For each Kafka cluster
-        App->>KTA: Initialize(cluster_id, bootstrap_server, api_key, api_secret, metrics_config)
-        KTA->>AC: Create AdminClient
-        KTA->>MC: Create MetricsClient
+        TP->>Analyzer: analyze_kafka_cluster()
         
-        App->>KTA: analyze_all_topics(parameters)
+        Analyzer->>Admin: Get topics metadata
+        Admin-->>Analyzer: Return topic list and configs
         
-        KTA->>AC: list_topics()
-        AC-->>KTA: Return topics metadata
+        Analyzer->>CSV: Create thread-safe CSV writer
+        CSV-->>Analyzer: CSV writer ready
         
-        KTA->>AC: describe_configs(topics)
-        AC-->>KTA: Return topic configurations
+        Analyzer->>TopicTP: Create topic-level thread pool
         
-        KTA->>KTA: Filter topics (internal, topic_filter)
-        
-        KTA->>CSV: Create report file with headers
-        
-        loop For each topic to analyze
-            alt Use Sample Records
+        loop For each topic (parallel)
+            TopicTP->>TopicAnalyzer: analyze_topic_worker()
+            
+            alt Sample Records Method
                 rect rgb(173, 216, 230)
-                    KTA->>KTA: Calculate rolling window timeframe
-                    KTA->>KTA: __analyze_topic()
+                    TopicAnalyzer->>Consumer: Get partition offsets
+                    Consumer-->>TopicAnalyzer: Return watermarks
                     
-                    KTA->>KC: Create Consumer
-                    KTA->>KC: get_watermark_offsets()
-                    KC-->>KTA: Return low/high offsets
-                    
-                    KTA->>KC: offsets_for_times()
-                    KC-->>KTA: Return offset at timestamp
-                    
-                    KTA->>KTA: __sample_record_sizes()
+                    TopicAnalyzer->>Consumer: Get timestamp-based offsets
+                    Consumer-->>TopicAnalyzer: Return start offsets
                     
                     loop For each partition
-                        KTA->>KC: assign() and seek()
-                        
-                        loop Sample records in batches
-                            KTA->>KC: poll()
-                            KC-->>KTA: Return record
-                            KTA->>KTA: Calculate record size
-                            KTA->>KTA: Update running totals
-                        end
+                        TopicAnalyzer->>Consumer: Sample record sizes
+                        Consumer-->>TopicAnalyzer: Return record data
                     end
                     
-                    KTA->>KC: close()
-                    KTA->>KTA: Calculate average record size
+                    TopicAnalyzer-->>TopicTP: Return analysis result
                 end
                 
-            else Use Metrics API
-                rect rgb(255, 182, 193)
-                    KTA->>MC: get_topic_daily_aggregated_totals(RECEIVED_BYTES)
-                    MC-->>KTA: Return bytes metrics
+            else Metrics API Method
+                rect rgb(144, 238, 144)
+                    TopicAnalyzer->>Metrics: Get RECEIVED_BYTES metric
+                    Metrics-->>TopicAnalyzer: Return bytes data
                     
-                    KTA->>MC: get_topic_daily_aggregated_totals(RECEIVED_RECORDS)
-                    MC-->>KTA: Return records metrics
+                    TopicAnalyzer->>Metrics: Get RECEIVED_RECORDS metric  
+                    Metrics-->>TopicAnalyzer: Return records data
                     
-                    KTA->>KTA: Calculate average bytes per record
+                    TopicAnalyzer-->>TopicTP: Return analysis result
                 end
             end
             
-            KTA->>KTA: Calculate required throughput
-            KTA->>KTA: Determine recommended partitions
-            KTA->>CSV: Write topic analysis to report
+            TopicTP->>Analyzer: Process result
+            Analyzer->>CSV: Write row (thread-safe)
+            CSV-->>Analyzer: Row written
         end
         
-        KTA->>KTA: Generate summary statistics
-        KTA-->>App: Return analysis results
+        TopicTP-->>Analyzer: All topics completed
+        
+        Analyzer->>Analyzer: Calculate summary statistics
+        Analyzer->>CSV: Write summary report
+        CSV-->>Analyzer: Summary written
+        
+        Analyzer-->>TP: Cluster analysis complete
     end
     
-    App->>User: Display completion message
-    App->>CSV: Save report file
+    TP-->>Main: All clusters completed
+    Main->>Main: Log final summary
 ```
 
 ### 3.0 Unlocking High-Performance Consumer Throughput
