@@ -93,7 +93,9 @@ class ThreadSafeKafkaTopicsAnalyzer:
                            sampling_timeout_seconds: float = DEFAULT_SAMPLING_TIMEOUT_SECONDS,
                            sampling_max_continuous_failed_batches: int = DEFAULT_SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES,
                            topic_filter: str | None = None,
-                           max_workers: int = DEFAULT_MAX_WORKERS_PER_CLUSTER) -> bool:
+                           max_workers: int = DEFAULT_MAX_WORKERS_PER_CLUSTER,
+                           min_recommended_partitions: int = DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS,
+                           min_consumption_throughput: float = DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD) -> bool:
         """Analyze all topics in the Kafka cluster.
         
         Args:
@@ -105,6 +107,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
             sampling_max_consecutive_nulls (int, optional): Maximum number of consecutive null records to encounter before stopping sampling in a partition. Defaults to 50.
             topic_filter (Optional[str], optional): If provided, only topics containing this string will be analyzed. Defaults to None.
             max_workers (int, optional): Maximum number of worker threads for concurrent topic analysis. Defaults to 4.
+            min_recommended_partitions (int, optional): The minimum recommended partitions. Defaults to 6.
+            min_consumption_throughput (float, optional): The minimum consumption throughput threshold. Defaults to 10 MB/s.
         
         Returns:
             bool: True if analysis was successful, False otherwise.
@@ -129,7 +133,9 @@ class ThreadSafeKafkaTopicsAnalyzer:
             "sampling_batch_size": sampling_batch_size,
             "sampling_max_consecutive_nulls": sampling_max_consecutive_nulls,
             "sampling_timeout_seconds": sampling_timeout_seconds,
-            "sampling_max_continuous_failed_batches": sampling_max_continuous_failed_batches
+            "sampling_max_continuous_failed_batches": sampling_max_continuous_failed_batches,
+            "min_recommended_partitions": min_recommended_partitions,
+            "min_consumption_throughput": min_consumption_throughput
         })
 
         # Initialize results list and total recommended partitions counter
@@ -251,6 +257,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
                     # Process result and write to CSV
                     self.__process_and_write_result(
                         result, 
+                        min_recommended_partitions,
+                        min_consumption_throughput,
                         required_consumption_throughput_factor, 
                         use_sample_records, 
                         csv_writer
@@ -265,6 +273,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
         # Calculate summary statistics
         summary_stats = self.__calculate_summary_stats(results, 
                                                        time.time() - app_start_time, 
+                                                       min_recommended_partitions,
+                                                       min_consumption_throughput,
                                                        required_consumption_throughput_factor, 
                                                        use_sample_records, 
                                                        sampling_batch_size, 
@@ -283,11 +293,19 @@ class ThreadSafeKafkaTopicsAnalyzer:
 
         return True if len(results) > 0 else False
 
-    def __process_and_write_result(self, result: Dict, required_consumption_throughput_factor: float, use_sample_records: bool, csv_writer: ThreadSafeCSVWriter) -> None:
+    def __process_and_write_result(self, 
+                                   result: Dict, 
+                                   min_recommended_partitions: int, 
+                                   min_consumer_throughput: float, 
+                                   required_consumption_throughput_factor: float, 
+                                   use_sample_records: bool, 
+                                   csv_writer: ThreadSafeCSVWriter) -> None:
         """Process analysis result and write to CSV.
 
         Args:
             result (Dict): The analysis result for a single topic.
+            min_recommended_partitions (int): The minimum recommended partitions.
+            min_consumer_throughput (float): The minimum consumption throughput threshold.
             required_consumption_throughput_factor (float): The factor to adjust the required throughput.
             use_sample_records (bool): Whether to use sample records for the analysis.
             csv_writer (ThreadSafeCSVWriter): The CSV writer instance to write the results.
@@ -305,8 +323,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
             consumer_throughput = avg_bytes_per_record * record_count
             required_throughput = consumer_throughput * required_consumption_throughput_factor
             
-            if required_throughput < DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD:
-                recommended_partition_count = DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS
+            if required_throughput < min_consumer_throughput:
+                recommended_partition_count = min_recommended_partitions
             else:
                 recommended_partition_count = round(required_throughput / consumer_throughput)
             
@@ -327,7 +345,9 @@ class ThreadSafeKafkaTopicsAnalyzer:
 
     def __calculate_summary_stats(self, 
                                  results: List[Dict], 
-                                 elapsed_time: float, 
+                                 elapsed_time: float,
+                                 min_recommended_partitions: int,
+                                 min_consumption_throughput: float,
                                  required_consumption_throughput_factor: float, 
                                  use_sample_records: bool, 
                                  sampling_batch_size: int, 
@@ -342,6 +362,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
         Args:
             results (List[Dict]): List of analysis results for all topics.
             elapsed_time (float): Total elapsed time for the analysis in seconds.
+            min_recommended_partitions (int): The minimum recommended partitions.
+            min_consumption_throughput (float): The minimum consumption throughput threshold.
             required_consumption_throughput_factor (float): The factor to adjust the required throughput.
             use_sample_records (bool): Whether sample records were used for the analysis.
             sampling_batch_size (int): The batch size used for sampling records.
@@ -371,8 +393,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
                 consumer_throughput = avg_bytes_per_record * record_count
                 required_throughput = consumer_throughput * required_consumption_throughput_factor
                 
-                if required_throughput < DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD:
-                    recommended_partition_count = DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS
+                if required_throughput < min_consumption_throughput:
+                    recommended_partition_count = min_recommended_partitions
                 else:
                     recommended_partition_count = round(required_throughput / consumer_throughput)
                 
@@ -390,8 +412,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
             'elapsed_time_hours': elapsed_time / 3600,
             'method': "sampling_records" if use_sample_records else "metrics_api",
             'required_consumption_throughput_factor': required_consumption_throughput_factor,
-            'minimum_required_throughput_threshold': DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD/1024/1024,
-            'default_partition_count': DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS,
+            'minimum_required_throughput_threshold': min_consumption_throughput/1024/1024,
+            'default_partition_count': min_recommended_partitions,
             'sampling_batch_size': sampling_batch_size if use_sample_records else None,
             'sampling_days': sampling_days if use_sample_records else None,
             'sampling_max_consecutive_nulls': sampling_max_consecutive_nulls if use_sample_records else None,
@@ -432,9 +454,9 @@ class ThreadSafeKafkaTopicsAnalyzer:
         logging.info(f"Found {params['total_topics_to_analyze']} topics to analyze")
         logging.info(f'{"Including" if params["include_internal"] else "Excluding"} internal topics')
         logging.info(f"Required consumption throughput factor: {params['required_consumption_throughput_factor']:.1f}")
-        logging.info(f"Minimum required throughput threshold: {DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD/1024/1024:.1f} MB/s")
+        logging.info(f"Minimum required throughput threshold: {params['min_consumption_throughput'] / 1024 / 1024:.1f} MB/s")
         logging.info(f"Topic filter: {params['topic_filter'] if params['topic_filter'] else 'None'}")
-        logging.info(f"Default Partition Count: {DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS}")
+        logging.info(f"Default Partition Count: {params['min_recommended_partitions']}")
         logging.info(f'Using {"sample records" if params["use_sample_records"] else "Metrics API"} for average record size calculation')
         if params["use_sample_records"]:
             logging.info(f"Sampling batch size: {params['sampling_batch_size']:,} records")
