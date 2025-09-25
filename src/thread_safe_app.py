@@ -19,7 +19,9 @@ from constants import (DEFAULT_SAMPLING_DAYS,
                        DEFAULT_INCLUDE_INTERNAL_TOPICS,
                        DEFAULT_MAX_CLUSTER_WORKERS,
                        DEFAULT_MAX_WORKERS_PER_CLUSTER,
-                       DEFAULT_CHARACTER_REPEAT)
+                       DEFAULT_CHARACTER_REPEAT,
+                       DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS,
+                       DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD)
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -65,7 +67,9 @@ def analyze_kafka_cluster(kafka_credential: Dict, config: Dict) -> bool:
             sampling_timeout_seconds=config['sampling_timeout_seconds'],
             sampling_max_continuous_failed_batches=config['sampling_max_continuous_failed_batches'],
             topic_filter=config['topic_filter'],
-            max_workers=config.get('max_workers_per_cluster', DEFAULT_MAX_WORKERS_PER_CLUSTER)
+            max_workers=config.get('max_workers_per_cluster', DEFAULT_MAX_WORKERS_PER_CLUSTER),
+            min_recommended_partitions=config.get('min_recommended_partitions', DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS),
+            min_consumption_throughput=config.get('min_consumption_throughput', DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD)
         )
         
         kafka_cluster_id = kafka_credential.get("kafka_cluster_id", "unknown")
@@ -99,7 +103,9 @@ def main():
         sampling_batch_size = int(os.getenv("SAMPLING_BATCH_SIZE", DEFAULT_SAMPLING_BATCH_SIZE))
         sampling_max_continuous_failed_batches = int(os.getenv("SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES", DEFAULT_SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES))
         topic_filter = os.getenv("TOPIC_FILTER")
-        
+        min_recommended_partitions = int(os.getenv("MIN_RECOMMENDED_PARTITIONS", DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS))
+        min_consumption_throughput = float(os.getenv("MIN_CONSUMPTION_THROUGHPUT", DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD))
+
         # Multithreading configuration
         max_cluster_workers = int(os.getenv("MAX_CLUSTER_WORKERS", DEFAULT_MAX_CLUSTER_WORKERS))  # Number of clusters to process concurrently
         max_workers_per_cluster = int(os.getenv("MAX_WORKERS_PER_CLUSTER", DEFAULT_MAX_WORKERS_PER_CLUSTER))  # Number of topics per cluster to process concurrently
@@ -171,7 +177,9 @@ def main():
         'sampling_timeout_seconds': sampling_timeout_seconds,
         'sampling_max_continuous_failed_batches': sampling_max_continuous_failed_batches,
         'topic_filter': topic_filter,
-        'max_workers_per_cluster': max_workers_per_cluster
+        'max_workers_per_cluster': max_workers_per_cluster,
+        'min_recommended_partitions': min_recommended_partitions,
+        'min_consumption_throughput': min_consumption_throughput
     }
 
     logging.info("=" * DEFAULT_CHARACTER_REPEAT)
