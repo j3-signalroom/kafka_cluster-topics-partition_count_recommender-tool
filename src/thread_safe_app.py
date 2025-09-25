@@ -70,9 +70,9 @@ def analyze_kafka_cluster(kafka_credential: Dict, config: Dict) -> bool:
         
         kafka_cluster_id = kafka_credential.get("kafka_cluster_id", "unknown")
         if success:
-            logging.info(f"CLUSTER {kafka_cluster_id}: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.")
+            logging.info(f"KAFKA CLUSTER {kafka_cluster_id}: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.")
         else:
-            logging.error(f"CLUSTER {kafka_cluster_id}: TOPIC ANALYSIS FAILED.")
+            logging.error(f"KAFKA CLUSTER {kafka_cluster_id}: TOPIC ANALYSIS FAILED.")
             
         return success
         

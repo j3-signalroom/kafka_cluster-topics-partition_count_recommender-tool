@@ -115,6 +115,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
             return []
         
         app_start_time = time.time()
+        self.total_topics = len(topics_to_analyze)
 
         # Log initial analysis parameters
         self.__log_initial_parameters({
