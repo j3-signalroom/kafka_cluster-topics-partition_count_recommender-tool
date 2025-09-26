@@ -361,15 +361,15 @@ The application automatically generates two comprehensive CSV reports for each K
 
     ```csv
     method,topic_name,is_compacted,number_of_records,number_of_partitions,required_throughput,consumer_throughput,recommended_partitions,status
-    sampling_records,stock_trades,no,24022,6,18.77706720286864,1.877706720286864,10,active
-    sampling_records,stock_trades_with_totals,no,24345,6,8.232389887466407,0.8232389887466408,6,active
+    sampling_records,stock_trades,no,270426,6,220.29825789713522,22.02982578971352,10,active
+    sampling_records,stock_trades_with_totals,no,274120,6,92.68430746373485,9.268430746373486,10,active
     ```
 
 - **Summary Report CSV.**  Once all topics have been evaluated, this report consolidates the results into a high-level overview, providing a clear, data-driven snapshot of cluster-wide throughput patterns and partitioning recommendations.  Below is a screenshot of a sample summary report:
 
     ```csv
     stat,value
-    elapsed_time_in_hours,0.02666729642285241
+    elapsed_time_hours,0.02721131139331394
     method,sampling_records
     required_consumption_throughput_factor,10
     minimum_required_throughput_threshold,10.0
@@ -385,13 +385,14 @@ The application automatically generates two comprehensive CSV reports for each K
     active_topic_count,2
     active_topic_percentage,100.0
     total_partitions,12
-    total_recommended_partitions,16
+    total_recommended_partitions,20
     active_total_partition_count,12
-    recommended_percentage_increase_in_partitions,33.33333333333333
-    total_records,48367
+    percentage_decrease,0.0
+    percentage_increase,66.66666666666666
+    total_records,544546
     average_partitions_per_topic,6.0
     active_average_partitions_per_topic,6.0
-    average_recommended_partitions_per_topic,8.0
+    average_recommended_partitions_per_topic,10.0
     ```
 
  > The names of the CSV comprises of the `<KAFKA CLUSTER ID>-recommender-<CURRENT EPOCH TIME IN SECONDS WHEN THE APP STARTED>-detail-report.csv` and `<KAFKA CLUSTER ID>-recommender-<CURRENT EPOCH TIME IN SECONDS WHEN THE APP STARTED>-summary-report.csv`, respectively.
