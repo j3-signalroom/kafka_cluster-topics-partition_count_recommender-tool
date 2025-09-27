@@ -369,7 +369,7 @@ wheels = [
 ]
 
 [[package]]
-name = "kafka-cluster-topics-partition-count-recommender-app"
+name = "kafka-cluster-topics-partition-count-recommender-tool"
 version = "0.9.0.0"
 source = { virtual = "." }
 dependencies = [
