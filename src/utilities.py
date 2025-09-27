@@ -12,7 +12,7 @@ __email__      = "j3@thej3.com"
 __status__     = "dev"
 
 
-def setup_logging(log_file: str = "kafka-cluster-topics-partition-count-recommender-app.log") -> logging.Logger:
+def setup_logging(log_file: str = "kafka-cluster-topics-partition-count-recommender-tool.log") -> logging.Logger:
     """Load logging configuration from pyproject.toml.  If not found, use default logging.
     
     Args:

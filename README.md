@@ -1,25 +1,25 @@
-# Kafka Topics Partition Count Recommender [MULTITHREADED] Application
+# Kafka Topics Partition Count Recommender [MULTITHREADED] Tool
 
 > **TL;DR:** _**End Kafka performance headaches.** This smart recommender reads your historical consumption data and delivers precise partition recommendations that optimize throughput and enable effortless scaling—no more over-provisioning or under-utilizing your topics._
 
 
-The **Kafka Cluster Topics Partition Count Recommender [MULTITHREADED] Application** offers data-driven accuracy for Kafka topic sizing. By analyzing past consumption trends, that is, the average consumption records in bytes, it uses this information to determine consumer throughput. Then, over a rolling **n-day** period, it identifies the average consumption of records in bytes, scaling that number by **n-factor** to forecast future demand and calculate the required throughput. Next, it divides the required throughput by the consumer throughput and rounds the result to the nearest whole number to determine the optimal number of partitions. The result is an intelligent, automated recommendation system that ensures each Kafka topic has the appropriate number of partitions to handle current workload and support future growth effectively.
+The **Kafka Cluster Topics Partition Count Recommender [MULTITHREADED] Tool** offers data-driven accuracy for Kafka topic sizing. By analyzing past consumption trends, that is, the average consumption records in bytes, it uses this information to determine consumer throughput. Then, over a rolling **n-day** period, it identifies the average consumption of records in bytes, scaling that number by **n-factor** to forecast future demand and calculate the required throughput. Next, it divides the required throughput by the consumer throughput and rounds the result to the nearest whole number to determine the optimal number of partitions. The result is an intelligent, automated recommendation system that ensures each Kafka topic has the appropriate number of partitions to handle current workload and support future growth effectively.
 
 **Table of Contents**
 
 <!-- toc -->
 - [**1.0 To get started**](#10-to-get-started)
-   + [**1.1 Download the Application**](#11-download-the-application)
+   + [**1.1 Download the Tool**](#11-download-the-tool)
       - [**1.1.1 Special Note on two custom dependencies**](#111-special-note-on-two-custom-dependencies)
-   + [**1.2 Configure the Application**](#12-configure-the-application)
+   + [**1.2 Configure the Tool**](#12-configure-the-tool)
       - [**1.2.1 Create the `.env` file**](#121-create-the-env-file)
       - [**1.2.2 Using the AWS Secrets Manager (optional)**](#122-using-the-aws-secrets-manager-optional)
-   + [**1.3 Run the Application**](#13-run-the-application)
+   + [**1.3 Run the Tool**](#13-run-the-tool)
       - [**1.3.1 Did you notice we prefix `uv run` to `python src/thread_safe_app.py`?**](#131-did-you-notice-we-prefix-uv-run-to-python-srcapppy)
       - [**1.3.2 Troubleshoot Connectivity Issues (if any)**](#132-troubleshoot-connectivity-issues-if-any)
    + [**1.4 The Results**](#14-the-results)
-- [**2.0 How the app calculates the recommended partition count**](#20-how-the-app-calculates-the-recommended-partition-count)
-   + [**2.1 End-to-End Application Workflow**](#21-end-to-end-application-workflow)
+- [**2.0 How the tool calculates the recommended partition count**](#20-how-the-tool-calculates-the-recommended-partition-count)
+   + [**2.1 End-to-End Tool Workflow**](#21-end-to-end-tool-workflow)
 - [**3.0 Unlocking High-Performance Consumer Throughput**](#30-unlocking-high-performance-consumer-throughput)
    + [**3.1 Key Factors Affecting Consumer Throughput**](#31-key-factors-affecting-consumer-throughput)
       - [**3.1.1 Partitions**](#311-partitions)
@@ -42,12 +42,12 @@ The **Kafka Cluster Topics Partition Count Recommender [MULTITHREADED] Applicati
 
 ## 1.0 To get started
 
-**_Download_** ---> **_Configure_** ---> **_Run_** ---> **_Results_**
+[**_Download_**](#11-download-the-tool) ---> [**_Configure_**](#12-configure-the-tool) ---> [**_Run_**](#13-run-the-tool) ---> [**_Results_**](#14-the-results)
 
-### 1.1 Download the Application
+### 1.1 Download the Tool
 Clone the repo:
     ```shell
-    git clone https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app.git
+    git clone https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-tool.git
     ```
 
 Since this project was built using [**`uv`**](https://docs.astral.sh/uv/), please [install](https://docs.astral.sh/uv/getting-started/installation/) it, and then run the following command to install all the project dependencies:
@@ -60,11 +60,11 @@ This project has _two custom dependencies_ that we want to bring to your attenti
 
 1. **[`cc-clients-python_lib`](https://github.com/j3-signalroom/cc-clients-python_lib)**: _This library offers a simple way to interact with Confluent Cloud services, including the Metrics API. It makes it easier to send API requests and manage responses. It is used in this project to connect to the Confluent Cloud Metrics API and retrieve topic consumption metrics._
 
-2. **[`aws-clients-python_lib`](https://github.com/j3-signalroom/aws-clients-python_lib)**: _This library is used to interact with AWS services, specifically AWS Secrets Manager in this case. It enables the application to securely retrieve secrets stored in AWS Secrets Manager._
+2. **[`aws-clients-python_lib`](https://github.com/j3-signalroom/aws-clients-python_lib)**: _This library is used to interact with AWS services, specifically AWS Secrets Manager in this case. It enables the tool to securely retrieve secrets stored in AWS Secrets Manager._
 
-### 1.2 Configure the Application
+### 1.2 Configure the Tool
 
-Now, you need to set up the application by creating a `.env` file in the root directory of your project. This file will store all the essential environment variables required for the application to connect to your Confluent Cloud Kafka cluster and function correctly. Additionally, you can choose to use **AWS Secrets Manager** to manage your secrets.
+Now, you need to set up the tool by creating a `.env` file in the root directory of your project. This file will store all the essential environment variables required for the tool to connect to your Confluent Cloud Kafka cluster and function correctly. Additionally, you can choose to use **AWS Secrets Manager** to manage your secrets.
 
 > **Note**: _Your Confluent Cloud API Key, Secret, and Kafka Cluster ID are required to access the [Confluent Cloud Metrics API](https://api.telemetry.confluent.cloud/docs#section/Authentication) and retrieve topic metrics. Additionally, your Bootstrap Server URI, along with your Kafka API Key and Secret, are necessary to access the designated Kafka Cluster._
 
@@ -145,7 +145,7 @@ The environment variables are defined as follows:
 | `MAX_WORKERS_PER_CLUSTER` | Integer | Maximum number of concurrent worker threads to analyze multiple topics within a single Kafka cluster in parallel. Helps to speed up analysis for clusters with many topics. | `4`, `8` | `8` | No |
 
 #### 1.2.2 Using the AWS Secrets Manager (optional)
-If you use **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and the application will retrieve the secrets from AWS Secrets Manager using the names provided in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`.  
+If you use **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and the tool will retrieve the secrets from AWS Secrets Manager using the names provided in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`.  
 
 The code expects the `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` to be stored in JSON format with these keys:
 - `confluent_cloud_api_key`
@@ -157,24 +157,24 @@ The code expects the `KAFKA_API_KEY_AWS_SECRETS` to be stored in JSON format wit
 - `sasl.username`
 - `sasl.password`
 
-### 1.3 Run the Application
+### 1.3 Run the Tool
 
 **Navigate to the Project Root Directory**
 
-Open your Terminal and navigate to the root folder of the `kafka_cluster-topics-partition_count_recommender-app/` repository that you have cloned. You can do this by executing:
+Open your Terminal and navigate to the root folder of the `kafka_cluster-topics-partition_count_recommender-tool/` repository that you have cloned. You can do this by executing:
 
 ```shell
-cd path/to/kafka_cluster-topics-partition_count_recommender-app/
+cd path/to/kafka_cluster-topics-partition_count_recommender-tool/
 ```
 
 > Replace `path/to/` with the actual path where your repository is located.
 
-Then enter the following command below to run the application:
+Then enter the following command below to run the tool:
 ```shell
 uv run python src/thread_safe_app.py
 ```
 
-If `USE_SAMPLE_RECORDS` environment variable is set to `True`, the application will sample records from each topic to calculate the average record size in bytes.  For example, below is a screenshot of the application running successfully:
+If `USE_SAMPLE_RECORDS` environment variable is set to `True`, the tool will sample records from each topic to calculate the average record size in bytes.  For example, below is a screenshot of the tool running successfully:
 
 ```log
 2025-09-27 12:52:13 - INFO - main - Retrieving the Confluent Cloud credentials from the .env file.
@@ -297,7 +297,7 @@ If `USE_SAMPLE_RECORDS` environment variable is set to `True`, the application w
 2025-09-27 12:53:59 - INFO - main - SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.
 ```
 
-If `USE_SAMPLE_RECORDS` is set to `False`, the application will use the Confluent Cloud Metrics API to retrieve the average and peak consumption in bytes over a rolling seven-day period.  For example, below is a screenshot of the application running successfully:
+If `USE_SAMPLE_RECORDS` is set to `False`, the tool will use the Confluent Cloud Metrics API to retrieve the average and peak consumption in bytes over a rolling seven-day period.  For example, below is a screenshot of the tool running successfully:
 
 ```log
 2025-09-27 16:13:35 - INFO - main - Retrieving the Confluent Cloud credentials from the .env file.
@@ -394,7 +394,7 @@ Finally, run the following command to list all topics in your Kafka cluster:
 If the connection is successful, you should see a list of topics in your Kafka cluster. If you encounter any errors, double-check your credentials and network connectivity.
 
 ### 1.4 The Results
-The application automatically generates two comprehensive CSV reports for each Kafka Cluster that transform raw analysis into actionable insights:
+The tool automatically generates two comprehensive CSV reports for each Kafka Cluster that transform raw analysis into actionable insights:
 
 - **Detail Report CSV.**  For every topic analyzed, this report captures the topic’s average consumer throughput (MB/s), its required throughput (MB/s), and a calculated recommended partition count, ensuring precise alignment between workload demand and partitioning strategy.  Below is a screenshot of a sample detail report:
 
@@ -434,12 +434,12 @@ The application automatically generates two comprehensive CSV reports for each K
     average_recommended_partitions_per_topic,10.0
     ```
 
- > The names of the CSV comprises of the `<KAFKA CLUSTER ID>-recommender-<CURRENT EPOCH TIME IN SECONDS WHEN THE APP STARTED>-detail-report.csv` and `<KAFKA CLUSTER ID>-recommender-<CURRENT EPOCH TIME IN SECONDS WHEN THE APP STARTED>-summary-report.csv`, respectively.
+ > The names of the CSV comprises of the `<KAFKA CLUSTER ID>-recommender-<CURRENT EPOCH TIME IN SECONDS WHEN THE TOOL STARTED>-detail-report.csv` and `<KAFKA CLUSTER ID>-recommender-<CURRENT EPOCH TIME IN SECONDS WHEN THE TOOL STARTED>-summary-report.csv`, respectively.
 
-## 2.0 How the app calculates the recommended partition count
-The app uses the Kafka `AdminClient` to retrieve all Kafka Topics (based on the `TOPIC_FILTER` specified) stored in your Kafka Cluster, including the original partition count per topic. Then, it iterates through each Kafka Topic, calling the Confluent Cloud Metrics RESTful API to retrieve the topic’s average (i.e., the _Consumer Throughput_) and peak consumption in bytes over a rolling seven-day period. Next, it calculates the required throughput by multiplying the peak consumption by the `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` (i.e., the _Required Throughput_). Finally, it divides the required throughput by the consumer throughput and rounds the result to the nearest whole number to determine the optimal number of partitions.
+## 2.0 How the tool calculates the recommended partition count
+The tool uses the Kafka `AdminClient` to retrieve all Kafka Topics (based on the `TOPIC_FILTER` specified) stored in your Kafka Cluster, including the original partition count per topic. Then, it iterates through each Kafka Topic, calling the Confluent Cloud Metrics RESTful API to retrieve the topic’s average (i.e., the _Consumer Throughput_) and peak consumption in bytes over a rolling seven-day period. Next, it calculates the required throughput by multiplying the peak consumption by the `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` (i.e., the _Required Throughput_). Finally, it divides the required throughput by the consumer throughput and rounds the result to the nearest whole number to determine the optimal number of partitions.
 
-> **Note**: _This why the app requires the Kafka API Key and Secret to connect to your Kafka Cluster via the AdminClient, and the Confluent Cloud API Key and Secret to connect to the Confluent Cloud Metrics API._
+> **Note**: _This why the tool requires the Kafka API Key and Secret to connect to your Kafka Cluster via the AdminClient, and the Confluent Cloud API Key and Secret to connect to the Confluent Cloud Metrics API._
 
 For example, suppose you have a consumer that consumes at **25MB/s**, but the the consumer requirement is a throughput of **1.22GB/s**.  How many partitions should you have?
 
@@ -458,7 +458,7 @@ To determine the number of partitions needed to support a throughput of **1.22GB
 
 The **50 partitions** ensure that the consumer can achieve the required throughput of **1.22GB/s** while consuming at a rate of **25MB/s** per partition. This will allow the workload to be distributed across partitions so that multiple consumers can work in parallel to meet the throughput requirement.
 
-#### 2.1 End-to-End Application Workflow
+#### 2.1 End-to-End Tool Workflow
 ```mermaid
 sequenceDiagram
     participant Main as Main Thread
@@ -580,12 +580,12 @@ sequenceDiagram
 
     KTA-->>Main: Return analysis success/failure
     Main->>Main: Log final results
-    Main->>Main: Exit application
+    Main->>Main: Exit tool
 ```
 
 ### 3.0 Unlocking High-Performance Consumer Throughput
 
-The throughput of a **Kafka consumer** refers to the rate at which it can read data from Kafka topics, typically measured in terms of **megabytes per second (MB/s)** or **records per second**. Consumer throughput depends on several factors, including the configuration of Kafka, the consumer application, and the underlying infrastructure.
+The throughput of a **Kafka consumer** refers to the rate at which it can read data from Kafka topics, typically measured in terms of **megabytes per second (MB/s)** or **records per second**. Consumer throughput depends on several factors, including the configuration of Kafka, the consumer tool, and the underlying infrastructure.
 
 #### 3.1 Key Factors Affecting Consumer Throughput
 
