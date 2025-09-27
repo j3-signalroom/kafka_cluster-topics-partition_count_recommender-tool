@@ -41,8 +41,8 @@ logger = setup_logging()
 
 def _fetch_kafka_credentials_via_confluent_cloud_api_key(principal_id: str, 
                                                          environment_config: Dict, 
-                                                         environment_filter: str | None, 
-                                                         kafka_cluster_filter: str | None) -> list[Dict]:
+                                                         environment_filter: str | None = None, 
+                                                         kafka_cluster_filter: str | None = None) -> list[Dict]:
     """Fetch Kafka credentials using Confluent Cloud API key.
     
     Args:
@@ -117,7 +117,7 @@ def _fetch_kafka_credentials_via_confluent_cloud_api_key(principal_id: str,
         return kafka_credentials
 
 
-def _fetch_kafka_credentials_via_environment_variables(use_aws_secrets_manager: bool, kafka_cluster_filter: str | None) -> list[Dict]:
+def _fetch_kafka_credentials_via_environment_variables(use_aws_secrets_manager: bool, kafka_cluster_filter: str | None = None) -> list[Dict]:
     """Fetch Kafka credentials from environment variable or AWS Secrets Manager.
 
     Args:
