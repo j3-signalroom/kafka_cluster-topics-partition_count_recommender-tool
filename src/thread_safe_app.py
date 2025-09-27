@@ -39,12 +39,18 @@ __status__     = "dev"
 logger = setup_logging()
 
 
-def _fetch_kafka_credentials_via_confluent_cloud_api_key(environment_config: Dict) -> list[Dict]:
+def _fetch_kafka_credentials_via_confluent_cloud_api_key(principal_id: str, 
+                                                         environment_config: Dict, 
+                                                         environment_filter: str | None, 
+                                                         kafka_cluster_filter: str | None) -> list[Dict]:
     """Fetch Kafka credentials using Confluent Cloud API key.
     
     Args:
+        principal_id (str): The owner of the application's Confluent Cloud principal ID
         environment_config (Dict): Confluent Cloud API credentials
-        
+        environment_filter (str | None): Optional filter for specific environment IDs
+        kafka_cluster_filter (str | None): Optional filter for specific Kafka cluster IDs
+
     Returns:
         list[Dict]: List of Kafka credentials dictionaries.
     """
@@ -58,14 +64,66 @@ def _fetch_kafka_credentials_via_confluent_cloud_api_key(environment_config: Dic
         logger.error(f"FAILED TO RETRIEVE KAFKA CREDENTIALS FROM CONFLUENT CLOUD BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
         return []
     else:
-        for environment in environments:
-            beautified = json.dumps(environment, indent=4, sort_keys=True)
-            logger.info(beautified)
-    
+        # Filter environments if an environment filter is provided
+        if environment_filter is None:
+            filter_environments = environments
+        else:
+            environment_ids = [environment_id.strip() for environment_id in environment_filter.split(',')]
+            filter_environments = [environment for environment in environments if environment.get("id") in environment_ids]
+        
+        # Retrieve Kafka cluster credentials for each environment
+        for environment in filter_environments:
+            http_status_code, error_message, kafka_clusters = environment_client.get_kafka_cluster_list(environment_id=environment.get("id"))
 
-def _fetch_kafka_credentials_via_environment_variables(use_aws_secrets_manager: bool) -> list[Dict]:
+            if http_status_code != HttpStatus.OK:
+                logger.error(f"FAILED TO RETRIEVE KAFKA CLUSTER LIST FOR ENVIRONMENT {environment.get('id')} FROM CONFLUENT CLOUD BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
+                return []
+            else:
+                # Filter Kafka clusters if a Kafka cluster filter is provided
+                if kafka_cluster_filter is None:
+                    filter_kafka_clusters = kafka_clusters
+                else:
+                    # Filter Kafka clusters based on provided IDs
+                    kafka_cluster_ids = [kafka_cluster_id.strip() for kafka_cluster_id in kafka_cluster_filter.split(',')]
+                    filter_kafka_clusters = [kafka_cluster for kafka_cluster in kafka_clusters if kafka_cluster.get("id") in kafka_cluster_ids]
+
+                # Retrieve API key pair for each Kafka cluster
+                for kafka_cluster in filter_kafka_clusters:
+                    http_status_code, error_message, api_key_pair = environment_client.create_kafka_api_key(kafka_cluster_id=kafka_cluster.get("id"), 
+                                                                                                            principal_id=principal_id)
+                    
+                    # If unable to retrieve the API key pair, log the error and attempt to clean up any previously created API keys
+                    if http_status_code != HttpStatus.OK:
+                        logger.error(f"FAILED TO RETRIEVE KAFKA CLUSTER CREDENTIALS FOR KAFKA CLUSTER {kafka_cluster.get('id')} IN ENVIRONMENT {environment.get('id')} FROM CONFLUENT CLOUD BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
+
+                        for kafka_credential in kafka_credentials:
+                            if kafka_credential.get("kafka_cluster_id") == kafka_cluster.get("id"):
+                                http_status_code, error_message = environment_client.delete_kafka_api_key(api_key=kafka_credential["sasl.username"])
+                                if http_status_code != HttpStatus.NO_CONTENT:
+                                    logger.warning(f"FAILED TO DELETE KAFKA API KEY {kafka_credential['sasl.username']} FOR KAFKA CLUSTER {kafka_credential['kafka_cluster_id']} BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
+                                else:
+                                    logger.info(f"KAFKA API KEY {kafka_credential['sasl.username']} FOR KAFKA CLUSTER {kafka_credential['kafka_cluster_id']} DELETED SUCCESSFULLY.")
+
+                                kafka_credentials.remove(kafka_credential)
+                        return []
+                    else:
+                        kafka_credentials.append({
+                            "bootstrap.servers": kafka_cluster.get("kafka_bootstrap_endpoint"),
+                            "sasl.username": api_key_pair.get("key"),
+                            "sasl.password": api_key_pair.get("secret"),
+                            "kafka_cluster_id": kafka_cluster.get("id")
+                        })
+
+        return kafka_credentials
+
+
+def _fetch_kafka_credentials_via_environment_variables(use_aws_secrets_manager: bool, kafka_cluster_filter: str | None) -> list[Dict]:
     """Fetch Kafka credentials from environment variable or AWS Secrets Manager.
-    
+
+    Args:
+        use_aws_secrets_manager (bool): Whether to use AWS Secrets Manager for credentials retrieval
+        kafka_cluster_filter (str | None): Optional filter for specific Kafka cluster IDs
+
     Returns:
         list[Dict]: List of Kafka credentials dictionaries.
     """
@@ -94,6 +152,10 @@ def _fetch_kafka_credentials_via_environment_variables(use_aws_secrets_manager: 
             
         if not kafka_credentials:
             logging.error("NO KAFKA CREDENTIALS FOUND. PLEASE CHECK YOUR CONFIGURATION.")
+        else:
+            if kafka_cluster_filter is not None:
+                kafka_cluster_ids = [kafka_cluster_id.strip() for kafka_cluster_id in kafka_cluster_filter.split(',')]
+                kafka_credentials = [kafka_credential for kafka_credential in kafka_credentials if kafka_credential.get("kafka_cluster_id") in kafka_cluster_ids]
 
         return kafka_credentials
             
@@ -122,6 +184,9 @@ def _analyze_kafka_cluster(kafka_credential: Dict, config: Dict) -> bool:
 
         # Analyze all topics in the Kafka cluster with multithreading
         success = analyzer.analyze_all_topics(use_confluent_cloud_api_key_to_fetch_kafka_credentials=config['use_confluent_cloud_api_key_to_fetch_kafka_credentials'],
+                                              environment_filter=config['environment_filter'],
+                                              kafka_cluster_filter=config['kafka_cluster_filter'],
+                                              principal_id=config['principal_id'],
                                               include_internal=config['include_internal'],
                                               required_consumption_throughput_factor=config['required_consumption_throughput_factor'],
                                               use_sample_records=config['use_sample_records'],
@@ -157,6 +222,9 @@ def main():
     # Read core configuration settings from environment variables
     try:
         use_confluent_cloud_api_key_to_fetch_kafka_credentials = os.getenv("USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS", DEFAULT_USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS) == "True"
+        environment_filter = os.getenv("ENVIRONMENT_FILTER")
+        kafka_cluster_filter = os.getenv("KAFKA_CLUSTER_FILTER")
+        principal_id = os.getenv("PRINCIPAL_ID")
         required_consumption_throughput_factor = int(os.getenv("REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR", DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR))
         use_sample_records = os.getenv("USE_SAMPLE_RECORDS", DEFAULT_USE_SAMPLE_RECORDS) == "True"
         use_aws_secrets_manager = os.getenv("USE_AWS_SECRETS_MANAGER", DEFAULT_USE_AWS_SECRETS_MANAGER) == "True"
@@ -197,42 +265,27 @@ def main():
         logging.error(f"THE APPLICATION FAILED TO READ CONFLUENT CLOUD CONFIGURATION SETTINGS BECAUSE OF THE FOLLOWING ERROR: {e}") 
         return
     
-    # Read the Kafka Cluster credentials from the environment variable or AWS Secrets Manager
-    try:
-        # Check if using AWS Secrets Manager for credentials retrieval
-        if use_aws_secrets_manager:
-            # Retrieve Kafka API Key/Secret from AWS Secrets Manager
-            kafka_api_secrets_paths = json.loads(os.getenv("KAFKA_API_SECRET_PATHS", "[]"))
-            kafka_credentials = []
-            for kafka_api_secrets_path in kafka_api_secrets_paths:
-                settings, error_message = get_secrets(kafka_api_secrets_path["region_name"], kafka_api_secrets_path["secret_name"])
-                if settings == {}:
-                    logging.error(f"FAILED TO RETRIEVE KAFKA API KEY/SECRET FROM AWS SECRETS MANAGER BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
-                    return
-                else:
-                    kafka_credentials.append({
-                        "bootstrap.servers": settings.get("bootstrap.servers"),
-                        "sasl.username": settings.get("sasl.username"),
-                        "sasl.password": settings.get("sasl.password"),
-                        "kafka_cluster_id": settings.get("kafka_cluster_id")
-                    })
-            logging.info("Retrieving the Kafka Cluster credentials from the AWS Secrets Manager.")
-        else:
-            kafka_credentials = json.loads(os.getenv("KAFKA_CREDENTIALS", "[]"))
-            logging.info("Retrieving the Kafka Cluster credentials from the .env file.")
-            
-    except Exception as e:
-        logging.error(f"THE APPLICATION FAILED TO RUN BECAUSE OF THE FOLLOWING ERROR: {e}")
-        return
+    # Fetch Kafka credentials
+    if use_confluent_cloud_api_key_to_fetch_kafka_credentials:
+        # Read the Kafka Cluster credentials using Confluent Cloud API key
+        kafka_credentials = _fetch_kafka_credentials_via_confluent_cloud_api_key(principal_id, 
+                                                                                  metrics_config, 
+                                                                                  environment_filter, 
+                                                                                  kafka_cluster_filter)
+    else:
+        # Read the Kafka Cluster credentials from the environment variable or AWS Secrets Manager
+        kafka_credentials = _fetch_kafka_credentials_via_environment_variables(use_aws_secrets_manager)
 
     if not kafka_credentials:
-        logging.error("NO KAFKA CREDENTIALS FOUND. PLEASE CHECK YOUR CONFIGURATION.")
         return
 
     # Prepare configuration object
     config = {
         'metrics_config': metrics_config,
         'use_confluent_cloud_api_key_to_fetch_kafka_credentials': use_confluent_cloud_api_key_to_fetch_kafka_credentials,
+        'environment_filter': environment_filter,
+        'kafka_cluster_filter': kafka_cluster_filter,
+        'principal_id': principal_id,
         'kafka_credentials': kafka_credentials,
         'include_internal': include_internal,
         'required_consumption_throughput_factor': required_consumption_throughput_factor,

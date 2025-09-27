@@ -85,6 +85,9 @@ class ThreadSafeKafkaTopicsAnalyzer:
 
     def analyze_all_topics(self, 
                            use_confluent_cloud_api_key_to_fetch_kafka_credentials: bool = False,
+                           environment_filter: str | None = None,
+                           kafka_cluster_filter: str | None = None,
+                           principal_id: str | None = None,
                            include_internal: bool = False, 
                            required_consumption_throughput_factor: float = DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR,
                            use_sample_records: bool = True, 
@@ -101,6 +104,9 @@ class ThreadSafeKafkaTopicsAnalyzer:
         
         Args:
             use_confluent_cloud_api_key_to_fetch_kafka_credentials (bool, optional): Whether to use Confluent Cloud API key to fetch Kafka credentials. Defaults to False.
+            environment_filter (str | None, optional): Comma-separated list of environment IDs to filter. Defaults to None.
+            kafka_cluster_filter (str | None, optional): Comma-separated list of Kafka cluster IDs to filter. Defaults to None.
+            principal_id (str | None, optional): Comma-separated list of principal IDs to filter. Defaults to None.
             include_internal (bool, optional): Whether to include internal topics. Defaults to False.
             required_consumption_throughput_factor (float, optional): Factor to multiply the consumer throughput to determine required consumption throughput. Defaults to 3.0.
             use_sample_records (bool, optional): Whether to sample records for average size. Defaults to True.
@@ -126,6 +132,9 @@ class ThreadSafeKafkaTopicsAnalyzer:
         # Log initial analysis parameters
         self.__log_initial_parameters({
             "use_confluent_cloud_api_key_to_fetch_kafka_credentials": use_confluent_cloud_api_key_to_fetch_kafka_credentials,
+            "environment_filter": environment_filter,
+            "kafka_cluster_filter": kafka_cluster_filter,
+            "principal_id": principal_id,
             "max_workers": max_workers,
             "total_topics_to_analyze": len(topics_to_analyze),
             "include_internal": include_internal,
@@ -452,6 +461,9 @@ class ThreadSafeKafkaTopicsAnalyzer:
         logging.info("-" * DEFAULT_CHARACTER_REPEAT)
         logging.info(f"Analysis Timestamp: {datetime.now().isoformat()}")
         logging.info(f"Using Confluent Cloud API Key to fetch Kafka credential: {params['use_confluent_cloud_api_key_to_fetch_kafka_credentials']}")
+        logging.info(f"Environment Filter: {params['environment_filter'] if params['environment_filter'] else 'None'}")
+        logging.info(f"Kafka Cluster Filter: {params['kafka_cluster_filter'] if params['kafka_cluster_filter'] else 'None'}")
+        logging.info(f"Principal ID Filter: {params['principal_id'] if params['principal_id'] else 'None'}")
         logging.info(f"Kafka Cluster ID: {self.kafka_cluster_id}")
         logging.info(f"Max worker threads: {params['max_workers']}")
         logging.info("Connecting to Kafka cluster and retrieving metadata...")

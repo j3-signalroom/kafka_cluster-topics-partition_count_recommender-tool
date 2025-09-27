@@ -75,9 +75,19 @@ Create the `.env` file and add the following environment variables, filling them
 # the KAFKA_CREDENTIALS or KAFKA_API_SECRET_PATHS variable will be used
 USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS=<True|False>
 
+# Environment and Kafka cluster filters (comma-separated IDs)
+# Example: ENVIRONMENT_FILTER="env-123,env-456"
+# Example: KAFKA_CLUSTER_FILTER="lkc-123,lkc-456"
+ENVIRONMENT_FILTER=<YOUR_ENVIRONMENT_FILTER, IF ANY>
+KAFKA_CLUSTER_FILTER=<YOUR_KAFKA_CLUSTER_FILTER, IF ANY>
+
 # Environment variables credentials for Confluent Cloud and Kafka clusters
 CONFLUENT_CLOUD_CREDENTIAL={"confluent_cloud_api_key":"<YOUR_CONFLUENT_CLOUD_API_KEY>", "confluent_cloud_api_secret": "<YOUR_CONFLUENT_CLOUD_API_SECRETS>"}
 KAFKA_CREDENTIALS=[{"kafka_cluster_id": "<YOUR_KAFKA_CLUSTER_ID>", "bootstrap.servers": "<YOUR_BOOTSTRAP_SERVER_URI>", "sasl.username": "<YOUR_KAFKA_API_KEY>", "sasl.password": "<YOUR_KAFKA_API_SECRET>"}]
+
+# Confluent Cloud principal ID (user or service account) for API key creation
+# Example: PRINCIPAL_ID="u-abc123" or PRINCIPAL_ID="sa-xyz789"
+PRINCIPAL_ID=<YOUR_PRINCIPAL_ID>
 
 # AWS Secrets Manager Secrets for Confluent Cloud and Kafka clusters
 USE_AWS_SECRETS_MANAGER=<True|False>
@@ -112,6 +122,9 @@ The environment variables are defined as follows:
 | Environment Variable Name | Type | Description | Example | Default | Required |
 |---------------|------|-------------|---------|---------|----------|
 | `USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS` | Boolean | Flag to use Confluent Cloud API key to fetch Kafka credentials; otherwise, the KAFKA_CREDENTIALS or KAFKA_API_SECRET_PATHS variable will be used. | `True` or `False` | `False` | No |
+| `ENVIRONMENT_FILTER` | Comma-separated String | A list of specific Confluent Cloud environment IDs to filter. When provided, only these environments will be used to fetch Kafka cluster credentials. Use commas to separate multiple environment IDs. Leave blank or unset to use all available environments. | `"env-123,env-456"` | Empty (all environments) | No |
+| `PRINCIPAL_ID` | String | Confluent Cloud principal ID (user or service account) for API key creation. | `"u-abc123"` or `"sa-xyz789"` | None | Yes |
+| `KAFKA_CLUSTER_FILTER` | Comma-separated String | A list of specific Kafka cluster IDs to filter. When provided, only these Kafka clusters will be analyzed. Use commas to separate multiple cluster IDs. Leave blank or unset to analyze all available clusters. | `"lkc-123,lkc-456"` | Empty (all clusters) | No |
 | `CONFLUENT_CLOUD_CREDENTIAL` | JSON Object | Contains authentication credentials for Confluent Cloud API access. Must include `confluent_cloud_api_key` and `confluent_cloud_api_secret` fields for authenticating with Confluent Cloud services. | `{"confluent_cloud_api_key": "CKABCD123456", "confluent_cloud_api_secret": "xyz789secretkey"}` | None | Yes (if not using AWS Secrets Manager) |
 | `KAFKA_CREDENTIALS` | JSON Array | Array of Kafka cluster connection objects. Each object must contain `sasl.username`, `sasl.password`, `kafka_cluster_id`, and `bootstrap.servers` for connecting to specific Kafka clusters. | `[{"sasl.username": "ABC123", "sasl.password": "secret123", "kafka_cluster_id": "lkc-abc123", "bootstrap.servers": "pkc-123.us-east-1.aws.confluent.cloud:9092"}]` | None | Yes (if not using AWS Secrets Manager) |
 | `USE_AWS_SECRETS_MANAGER` | Boolean | Controls whether to retrieve credentials from AWS Secrets Manager instead of using direct environment variables. When `True`, credentials are fetched from AWS Secrets Manager using the paths specified in other variables. | `True` or `False` | `False` | No |
