@@ -48,23 +48,19 @@ def _fetch_kafka_credentials_via_confluent_cloud_api_key(environment_config: Dic
     Returns:
         list[Dict]: List of Kafka credentials dictionaries.
     """
+    kafka_credentials = []
     # Instantiate the EnvironmentClient class.
     environment_client = EnvironmentClient(environment_config=environment_config)
 
     http_status_code, error_message, environments = environment_client.get_environment_list()
  
-    try:
-        assert http_status_code == HttpStatus.OK, f"HTTP Status Code: {http_status_code}"
-
-        logger.info(f"Environments: {len(environments)}")
-
+    if http_status_code != HttpStatus.OK:
+        logger.error(f"FAILED TO RETRIEVE KAFKA CREDENTIALS FROM CONFLUENT CLOUD BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
+        return []
+    else:
         for environment in environments:
             beautified = json.dumps(environment, indent=4, sort_keys=True)
             logger.info(beautified)
-    except AssertionError as e:
-        logger.error(e)
-        logger.error("HTTP Status Code: %d, Error Message: %s, Environments: %s", http_status_code, error_message, environments)
-        return
     
 
 def _fetch_kafka_credentials_via_environment_variables(use_aws_secrets_manager: bool) -> list[Dict]:
