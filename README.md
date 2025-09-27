@@ -71,6 +71,10 @@ Now, you need to set up the application by creating a `.env` file in the root di
 #### 1.2.1 Create the `.env` file
 Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
 ```shell
+# Flag to use Confluent Cloud API key to fetch Kafka credentials; otherwise,
+# the KAFKA_CREDENTIALS or KAFKA_API_SECRET_PATHS variable will be used
+USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS=<True|False>
+
 # Environment variables credentials for Confluent Cloud and Kafka clusters
 CONFLUENT_CLOUD_CREDENTIAL={"confluent_cloud_api_key":"<YOUR_CONFLUENT_CLOUD_API_KEY>", "confluent_cloud_api_secret": "<YOUR_CONFLUENT_CLOUD_API_SECRETS>"}
 KAFKA_CREDENTIALS=[{"kafka_cluster_id": "<YOUR_KAFKA_CLUSTER_ID>", "bootstrap.servers": "<YOUR_BOOTSTRAP_SERVER_URI>", "sasl.username": "<YOUR_KAFKA_API_KEY>", "sasl.password": "<YOUR_KAFKA_API_SECRET>"}]
@@ -107,6 +111,7 @@ The environment variables are defined as follows:
 
 | Environment Variable Name | Type | Description | Example | Default | Required |
 |---------------|------|-------------|---------|---------|----------|
+| `USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS` | Boolean | Flag to use Confluent Cloud API key to fetch Kafka credentials; otherwise, the KAFKA_CREDENTIALS or KAFKA_API_SECRET_PATHS variable will be used. | `True` or `False` | `False` | No |
 | `CONFLUENT_CLOUD_CREDENTIAL` | JSON Object | Contains authentication credentials for Confluent Cloud API access. Must include `confluent_cloud_api_key` and `confluent_cloud_api_secret` fields for authenticating with Confluent Cloud services. | `{"confluent_cloud_api_key": "CKABCD123456", "confluent_cloud_api_secret": "xyz789secretkey"}` | None | Yes (if not using AWS Secrets Manager) |
 | `KAFKA_CREDENTIALS` | JSON Array | Array of Kafka cluster connection objects. Each object must contain `sasl.username`, `sasl.password`, `kafka_cluster_id`, and `bootstrap.servers` for connecting to specific Kafka clusters. | `[{"sasl.username": "ABC123", "sasl.password": "secret123", "kafka_cluster_id": "lkc-abc123", "bootstrap.servers": "pkc-123.us-east-1.aws.confluent.cloud:9092"}]` | None | Yes (if not using AWS Secrets Manager) |
 | `USE_AWS_SECRETS_MANAGER` | Boolean | Controls whether to retrieve credentials from AWS Secrets Manager instead of using direct environment variables. When `True`, credentials are fetched from AWS Secrets Manager using the paths specified in other variables. | `True` or `False` | `False` | No |

@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 from thread_safe_kafka_topics_analyzer import ThreadSafeKafkaTopicsAnalyzer
 from utilities import setup_logging
 from aws_clients_python_lib.secrets_manager import get_secrets
-from constants import (DEFAULT_SAMPLING_DAYS, 
+from constants import (DEFAULT_USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS,
+                       DEFAULT_SAMPLING_DAYS,
                        DEFAULT_SAMPLING_BATCH_SIZE,
                        DEFAULT_SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES,
                        DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS,
@@ -93,6 +94,7 @@ def main():
  
     # Read core configuration settings from environment variables
     try:
+        use_confluent_cloud_api_key_to_fetch_kafka_credentials = os.getenv("USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS", DEFAULT_USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS) == "True"
         required_consumption_throughput_factor = int(os.getenv("REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR", DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR))
         use_sample_records = os.getenv("USE_SAMPLE_RECORDS", DEFAULT_USE_SAMPLE_RECORDS) == "True"
         use_aws_secrets_manager = os.getenv("USE_AWS_SECRETS_MANAGER", DEFAULT_USE_AWS_SECRETS_MANAGER) == "True"
