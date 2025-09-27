@@ -461,77 +461,126 @@ The **50 partitions** ensure that the consumer can achieve the required throughp
 #### 2.1 End-to-End Application Workflow
 ```mermaid
 sequenceDiagram
-    participant Main as thread_safe_app.py
-    participant TP as ThreadPoolExecutor (Clusters)
-    participant Analyzer as ThreadSafeKafkaTopicsAnalyzer
-    participant TopicTP as ThreadPoolExecutor (Topics)
-    participant TopicAnalyzer as ThreadSafeTopicAnalyzer
-    participant Consumer as Kafka Consumer
-    participant Admin as Kafka AdminClient
-    participant Metrics as MetricsClient
-    participant CSV as ThreadSafeCSVWriter
+    participant Main as Main Thread
+    participant EC as EnvironmentClient
+    participant AWS as AWS Secrets Manager
+    participant KTA as KafkaTopicsAnalyzer
+    participant TPE as ThreadPoolExecutor
+    participant Worker as Worker Thread
+    participant TA as TopicAnalyzer
+    participant KC as Kafka Consumer
+    participant MC as MetricsClient
+    participant CSV as CSV Writer
 
-    Main->>Main: Load configuration and credentials
-    Main->>TP: Create cluster-level thread pool
+    Main->>Main: Load environment variables
+    Main->>Main: Read configuration settings
+
+    alt Use AWS Secrets Manager
+        Main->>AWS: get_secrets(region, secret_name)
+        AWS-->>Main: Return credentials
+    else Use environment variables
+        Main->>Main: Read from .env file
+    end
+
+    alt Use Confluent Cloud API Key
+        Main->>EC: Create EnvironmentClient
+        Main->>EC: get_environment_list()
+        EC-->>Main: Return environments
+        Main->>EC: get_kafka_cluster_list(env_id)
+        EC-->>Main: Return kafka clusters
+        loop For each cluster
+            Main->>EC: create_kafka_api_key(cluster_id, principal_id)
+            EC-->>Main: Return API key pair
+        end
+    else Use existing credentials
+        Main->>Main: Load kafka credentials from env/secrets
+    end
+
+    Main->>KTA: Create ThreadSafeKafkaTopicsAnalyzer
+    Main->>KTA: analyze_all_topics()
+
+    KTA->>KTA: __get_topics_metadata()
+    KTA->>KTA: Get cluster metadata via AdminClient
+    KTA->>KTA: Filter topics (internal, topic_filter)
+    KTA->>KTA: Get topic configurations (retention, cleanup policy)
+
+    KTA->>CSV: Create ThreadSafeCSVWriter
+    CSV->>CSV: Initialize CSV file with headers
+
+    alt Single cluster
+        KTA->>KTA: _analyze_kafka_cluster() directly
+    else Multiple clusters
+        KTA->>TPE: Create ThreadPoolExecutor(max_cluster_workers)
+        loop For each cluster
+            KTA->>TPE: Submit _analyze_kafka_cluster task
+        end
+    end
+
+    KTA->>TPE: Create ThreadPoolExecutor(max_workers_per_cluster)
     
-    loop For each Kafka cluster
-        TP->>Analyzer: analyze_kafka_cluster()
+    loop For each topic
+        KTA->>TPE: Submit analyze_topic_worker task
         
-        Analyzer->>Admin: Get topics metadata
-        Admin-->>Analyzer: Return topic list and configs
+        TPE->>Worker: Execute in worker thread
+        Worker->>TA: Create ThreadSafeTopicAnalyzer
         
-        Analyzer->>CSV: Create thread-safe CSV writer
-        CSV-->>Analyzer: CSV writer ready
-        
-        Analyzer->>TopicTP: Create topic-level thread pool
-        
-        loop For each topic (parallel)
-            TopicTP->>TopicAnalyzer: analyze_topic_worker()
-            
-            alt Sample Records Method
-                rect rgb(173, 216, 230)
-                    TopicAnalyzer->>Consumer: Get partition offsets
-                    Consumer-->>TopicAnalyzer: Return watermarks
-                    
-                    TopicAnalyzer->>Consumer: Get timestamp-based offsets
-                    Consumer-->>TopicAnalyzer: Return start offsets
-                    
-                    loop For each partition
-                        TopicAnalyzer->>Consumer: Sample record sizes
-                        Consumer-->>TopicAnalyzer: Return record data
-                    end
-                    
-                    TopicAnalyzer-->>TopicTP: Return analysis result
-                end
+        alt Use sample records
+            rect rgb(173, 216, 230)
+                Worker->>TA: analyze_topic()
+                TA->>KC: Create unique Consumer instance
+                TA->>KC: get_watermark_offsets()
+                KC-->>TA: Return low/high watermarks
+                TA->>KC: offsets_for_times() for timestamp
+                KC-->>TA: Return offset at timestamp
                 
-            else Metrics API Method
-                rect rgb(144, 238, 144)
-                    TopicAnalyzer->>Metrics: Get RECEIVED_BYTES metric
-                    Metrics-->>TopicAnalyzer: Return bytes data
-                    
-                    TopicAnalyzer->>Metrics: Get RECEIVED_RECORDS metric  
-                    Metrics-->>TopicAnalyzer: Return records data
-                    
-                    TopicAnalyzer-->>TopicTP: Return analysis result
+                loop For each partition
+                    TA->>KC: assign([TopicPartition])
+                    TA->>KC: seek(offset)
+                    loop Batch processing
+                        TA->>KC: poll(timeout)
+                        KC-->>TA: Return record or None
+                        TA->>TA: Calculate record size
+                        TA->>TA: Update running totals
+                    end
                 end
+                TA->>KC: close()
+                TA-->>Worker: Return analysis result
             end
             
-            TopicTP->>Analyzer: Process result
-            Analyzer->>CSV: Write row (thread-safe)
-            CSV-->>Analyzer: Row written
+        else Use Metrics API
+            rect rgb(255, 182, 193)
+                Worker->>TA: analyze_topic_with_metrics()
+                TA->>MC: Create MetricsClient
+                TA->>MC: get_topic_daily_aggregated_totals(RECEIVED_BYTES)
+                MC-->>TA: Return bytes metrics
+                TA->>MC: get_topic_daily_aggregated_totals(RECEIVED_RECORDS)
+                MC-->>TA: Return records metrics
+                TA->>TA: Calculate avg bytes per record
+                TA-->>Worker: Return analysis result
+            end
         end
         
-        TopicTP-->>Analyzer: All topics completed
-        
-        Analyzer->>Analyzer: Calculate summary statistics
-        Analyzer->>CSV: Write summary report
-        CSV-->>Analyzer: Summary written
-        
-        Analyzer-->>TP: Cluster analysis complete
+        Worker->>KTA: __process_and_write_result()
+        KTA->>KTA: Calculate recommendations
+        KTA->>CSV: write_row() [thread-safe]
+        Worker-->>TPE: Return success/failure
     end
-    
-    TP-->>Main: All clusters completed
-    Main->>Main: Log final summary
+
+    TPE-->>KTA: All topic analysis complete
+    KTA->>KTA: __calculate_summary_stats()
+    KTA->>KTA: __write_summary_report()
+    KTA->>KTA: __log_summary_stats()
+
+    alt Confluent Cloud API cleanup
+        loop For each created API key
+            KTA->>EC: delete_kafka_api_key(api_key)
+            EC-->>KTA: Confirm deletion
+        end
+    end
+
+    KTA-->>Main: Return analysis success/failure
+    Main->>Main: Log final results
+    Main->>Main: Exit application
 ```
 
 ### 3.0 Unlocking High-Performance Consumer Throughput
