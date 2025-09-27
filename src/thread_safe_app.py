@@ -204,7 +204,8 @@ def _analyze_kafka_cluster(metrics_config: Dict,
                                               topic_filter=config['topic_filter'],
                                               max_workers=config.get('max_workers_per_cluster', DEFAULT_MAX_WORKERS_PER_CLUSTER),
                                               min_recommended_partitions=config.get('min_recommended_partitions', DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS),
-                                              min_consumption_throughput=config.get('min_consumption_throughput', DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD))
+                                              min_consumption_throughput=config.get('min_consumption_throughput', DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD),
+                                              metrics_config=metrics_config)
         
         # Log the result of the analysis
         if success:

@@ -9,7 +9,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from thread_safe_topic_analyzer import ThreadSafeTopicAnalyzer
 from thread_safe_csv_writer import ThreadSafeCSVWriter
-from cc_clients_python_lib.metrics_client import MetricsClient
 from utilities import setup_logging
 from constants import (DEFAULT_SAMPLING_DAYS, 
                        DEFAULT_SAMPLING_BATCH_SIZE,
@@ -75,9 +74,6 @@ class ThreadSafeKafkaTopicsAnalyzer:
             'enable.metrics.push': False         # Disable metrics pushing for consumers to registered JMX MBeans.  However, is really being set to False to not expose unneccessary noise to the logging output
         }
 
-        # Instantiate the MetricsClient class.
-        self.metrics_client = MetricsClient(metrics_config)
-
         # Thread-safe progress tracking
         self.progress_lock = threading.Lock()
         self.completed_topics = 0
@@ -99,7 +95,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
                            topic_filter: str | None = None,
                            max_workers: int = DEFAULT_MAX_WORKERS_PER_CLUSTER,
                            min_recommended_partitions: int = DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS,
-                           min_consumption_throughput: float = DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD) -> bool:
+                           min_consumption_throughput: float = DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD,
+                           metrics_config: Dict | None = None) -> bool:
         """Analyze all topics in the Kafka cluster.
         
         Args:
@@ -198,12 +195,11 @@ class ThreadSafeKafkaTopicsAnalyzer:
                 }
                 
                 # Create a temporary analyzer instance for this thread
-                thread_analyzer = ThreadSafeTopicAnalyzer(self.admin_client, 
-                                                          unique_consumer_config, 
-                                                          self.metrics_client,
-                                                          self.kafka_cluster_id)
+                thread_analyzer = ThreadSafeTopicAnalyzer(self.admin_client, unique_consumer_config, self.kafka_cluster_id)
 
                 if use_sample_records:
+                    # Use sample records approach
+
                     # Calculate the ISO 8601 formatted start timestamp of the rolling window
                     utc_now = datetime.now(timezone.utc)
                     rolling_start = utc_now - timedelta(days=topic_info['sampling_days_based_on_retention_days'])
@@ -211,15 +207,14 @@ class ThreadSafeKafkaTopicsAnalyzer:
                     start_time_epoch_ms = int(rolling_start.timestamp() * 1000)
 
                     # Analyze the topic
-                    result = thread_analyzer.analyze_topic(
-                        topic_name=topic_name, 
-                        topic_info=topic_info,
-                        sampling_batch_size=sampling_batch_size,
-                        sampling_max_consecutive_nulls=sampling_max_consecutive_nulls,
-                        sampling_timeout_seconds=sampling_timeout_seconds,
-                        sampling_max_continuous_failed_batches=sampling_max_continuous_failed_batches,
-                        start_time_epoch_ms=start_time_epoch_ms,
-                        iso_start_time=iso_start_time
+                    result = thread_analyzer.analyze_topic(topic_name=topic_name, 
+                                                           topic_info=topic_info,
+                                                           sampling_batch_size=sampling_batch_size,
+                                                           sampling_max_consecutive_nulls=sampling_max_consecutive_nulls,
+                                                           sampling_timeout_seconds=sampling_timeout_seconds,
+                                                           sampling_max_continuous_failed_batches=sampling_max_continuous_failed_batches,
+                                                           start_time_epoch_ms=start_time_epoch_ms,
+                                                           iso_start_time=iso_start_time
                     )
                     
                     # Add compaction and sampling days info to the result
@@ -228,7 +223,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
                     
                 else:
                     # Use Metrics API approach
-                    result = thread_analyzer.analyze_topic_with_metrics(topic_name, topic_info)
+                    result = thread_analyzer.analyze_topic_with_metrics(metrics_config, topic_name, topic_info)
                 
                 return result
                 
