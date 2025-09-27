@@ -11,8 +11,7 @@ from cc_clients_python_lib.http_status import HttpStatus
 from constants import (DEFAULT_SAMPLING_BATCH_SIZE,
                        DEFAULT_SAMPLING_MINIMUM_BATCH_SIZE,
                        DEFAULT_SAMPLING_MAXIMUM_BATCH_SIZE,
-                       DEFAULT_RESTFUL_API_MAX_RETRIES,
-                       DEFAULT_RESTFUL_API_RETRY_DELAY_IN_SECONDS)
+                       DEFAULT_RESTFUL_API_MAX_RETRIES)
 
 
 
@@ -150,15 +149,14 @@ class ThreadSafeTopicAnalyzer:
         metrics_client = MetricsClient(metrics_config)
 
         bytes_retry = 0
-        max_bytes_retries = 3
-        retry_delay_in_seconds = 60
+        max_bytes_retries = DEFAULT_RESTFUL_API_MAX_RETRIES
         proceed_to_records = False
 
         while bytes_retry < max_bytes_retries:
             # Use Metrics API to get the consumer byte consumption
-            http_status_code, error_message, bytes_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_BYTES, 
-                                                                                                                   self.kafka_cluster_id, 
-                                                                                                                   topic_name)
+            http_status_code, error_message, rate_limits, bytes_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_BYTES, 
+                                                                                                                                self.kafka_cluster_id, 
+                                                                                                                                topic_name)
             if http_status_code == HttpStatus.RATE_LIMIT_EXCEEDED:
                 bytes_retry += 1
                 if bytes_retry == max_bytes_retries:
@@ -167,8 +165,9 @@ class ThreadSafeTopicAnalyzer:
                     result['total_record_count'] = 0
                     result['avg_bytes_per_record'] = 0.0
                     break
-                logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED BYTES' metric for topic {topic_name}. Retrying {bytes_retry}/{max_bytes_retries} after {retry_delay_in_seconds} seconds...")
-                time.sleep(bytes_query_result.get("rate_limits").get("reset_in_seconds", DEFAULT_RESTFUL_API_RETRY_DELAY_IN_SECONDS))
+                logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED BYTES' metric for topic {topic_name}."
+                                f" Retrying {bytes_retry}/{max_bytes_retries} after {rate_limits['reset_in_seconds']} seconds...")
+                time.sleep(rate_limits['reset_in_seconds'])
                 continue
             elif http_status_code not in (HttpStatus.OK, HttpStatus.RATE_LIMIT_EXCEEDED):
                 logging.warning(f"[Thread-{threading.current_thread().ident}] Failed retrieving 'RECEIVED BYTES' metric for topic {topic_name} because: {error_message}")
@@ -186,9 +185,9 @@ class ThreadSafeTopicAnalyzer:
 
             while records_retry < max_records_retries:
                 # Use the Confluent Metrics API to get the record count
-                http_status_code, error_message, record_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_RECORDS, 
-                                                                                                                        self.kafka_cluster_id, 
-                                                                                                                        topic_name)
+                http_status_code, error_message, rate_limits, record_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_RECORDS, 
+                                                                                                                                     self.kafka_cluster_id, 
+                                                                                                                                     topic_name)
                 if http_status_code == HttpStatus.RATE_LIMIT_EXCEEDED:
                     records_retry += 1
                     if records_retry == max_records_retries:
@@ -197,8 +196,9 @@ class ThreadSafeTopicAnalyzer:
                         result['total_record_count'] = 0
                         result['avg_bytes_per_record'] = 0.0
                         break
-                    logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric for topic {topic_name}. Retrying {records_retry}/{max_records_retries} after {retry_delay_in_seconds} seconds...")
-                    time.sleep(record_query_result.get("rate_limits").get("reset_in_seconds", DEFAULT_RESTFUL_API_RETRY_DELAY_IN_SECONDS))
+                    logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric for topic {topic_name}."
+                                    f"Retrying {records_retry}/{max_records_retries} after {rate_limits['reset_in_seconds']} seconds...")
+                    time.sleep(rate_limits['reset_in_seconds'])
                     continue
                 elif http_status_code not in (HttpStatus.OK, HttpStatus.RATE_LIMIT_EXCEEDED):
                     logging.warning(f"[Thread-{threading.current_thread().ident}] Failed retrieving 'RECEIVED RECORDS' metric for topic {topic_name} because: {error_message}")

@@ -300,54 +300,58 @@ If `USE_SAMPLE_RECORDS` environment variable is set to `True`, the application w
 If `USE_SAMPLE_RECORDS` is set to `False`, the application will use the Confluent Cloud Metrics API to retrieve the average and peak consumption in bytes over a rolling seven-day period.  For example, below is a screenshot of the application running successfully:
 
 ```log
-2025-09-25 23:19:39 - INFO - main - Retrieving the Confluent Cloud credentials from the .env file.
-2025-09-25 23:19:39 - INFO - main - Retrieving the Kafka Cluster credentials from the .env file.
-2025-09-25 23:19:39 - INFO - main - ====================================================================================================
-2025-09-25 23:19:39 - INFO - main - MULTITHREADED KAFKA CLUSTER ANALYSIS STARTING
-2025-09-25 23:19:39 - INFO - main - ----------------------------------------------------------------------------------------------------
-2025-09-25 23:19:39 - INFO - main - Number of Kafka clusters to analyze: 1
-2025-09-25 23:19:39 - INFO - main - Max concurrent Kafka clusters: 4
-2025-09-25 23:19:39 - INFO - main - Max concurrent topics per cluster: 8
-2025-09-25 23:19:39 - INFO - main - Analysis method: Metrics API
-2025-09-25 23:19:39 - INFO - main - ====================================================================================================
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - ====================================================================================================
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - INITIAL ANALYSIS PARAMETERS
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - ----------------------------------------------------------------------------------------------------
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Analysis Timestamp: 2025-09-25T23:19:51.973369
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Kafka Cluster ID: lkc-r9mvmp
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Max worker threads: 8
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Connecting to Kafka cluster and retrieving metadata...
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Found 2 topics to analyze
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Excluding internal topics
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Required consumption throughput factor: 10.0
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Minimum required throughput threshold: 10.0 MB/s
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Topic filter: None
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Default Partition Count: 6
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Using Metrics API for average record size calculation
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - ====================================================================================================
-2025-09-25 23:19:51 - INFO - analyze_all_topics - Created the lkc-r9mvmp-recommender-1758856791-detail-report.csv file
-2025-09-25 23:20:01 - INFO - analyze_topic_with_metrics - [Thread-6123843584] Confluent Metrics API - For topic stock_trades, the average bytes per record is 157.23 bytes/record for a total of 270,800 records.
-2025-09-25 23:20:01 - INFO - analyze_topic_with_metrics - [Thread-6140669952] Confluent Metrics API - For topic stock_trades_with_totals, the average bytes per record is 112.22 bytes/record for a total of 270,813 records.
-2025-09-25 23:20:01 - INFO - update_progress - Progress: 1/2 (50.0%) topics completed
-2025-09-25 23:20:01 - INFO - update_progress - Progress: 2/2 (100.0%) topics completed
-2025-09-25 23:20:01 - INFO - __log_summary_stats - ====================================================================================================
-2025-09-25 23:20:01 - INFO - __log_summary_stats - ANALYSIS SUMMARY STATISTICS
-2025-09-25 23:20:01 - INFO - __log_summary_stats - ----------------------------------------------------------------------------------------------------
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Elapsed Time: 0.00 hours
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Total Topics: 2
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Active Topics: 2
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Active Topics %: 100.0%
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Total Partitions: 12
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Total Recommended Partitions: 20
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Non-Empty Topics Total Partitions: 12
-2025-09-25 23:20:01 - INFO - __log_summary_stats - RECOMMENDED Increase in Partitions: 66.7%
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Total Records: 541,613.0
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Average Partitions per Topic: 6
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Average Partitions per Active Topic: 6
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Average Recommended Partitions per Topic: 10
-2025-09-25 23:20:01 - INFO - __log_summary_stats - ====================================================================================================
-2025-09-25 23:20:01 - INFO - analyze_kafka_cluster - KAFKA CLUSTER lkc-r9mvmp: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.
-2025-09-25 23:20:01 - INFO - main - SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.
+2025-09-27 16:13:35 - INFO - main - Retrieving the Confluent Cloud credentials from the .env file.
+2025-09-27 16:13:38 - INFO - main - ====================================================================================================
+2025-09-27 16:13:38 - INFO - main - MULTITHREADED KAFKA CLUSTER ANALYSIS STARTING
+2025-09-27 16:13:38 - INFO - main - ----------------------------------------------------------------------------------------------------
+2025-09-27 16:13:38 - INFO - main - Number of Kafka clusters to analyze: 1
+2025-09-27 16:13:38 - INFO - main - Max concurrent Kafka clusters: 4
+2025-09-27 16:13:38 - INFO - main - Max concurrent topics per cluster: 8
+2025-09-27 16:13:38 - INFO - main - Analysis method: Metrics API
+2025-09-27 16:13:38 - INFO - main - ====================================================================================================
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - ====================================================================================================
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - INITIAL ANALYSIS PARAMETERS
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - ----------------------------------------------------------------------------------------------------
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Analysis Timestamp: 2025-09-27T16:13:44.387435
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Using Confluent Cloud API Key to fetch Kafka credential: True
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Environment Filter: None
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Kafka Cluster Filter: None
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Principal ID Filter: u-vzw2nj
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Kafka Cluster ID: lkc-r9mvmp
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Max worker threads: 8
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Connecting to Kafka cluster and retrieving metadata...
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Found 2 topics to analyze
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Excluding internal topics
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Required consumption throughput factor: 10.0
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Minimum required throughput threshold: 10.0 MB/s
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Topic filter: None
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Default Partition Count: 6
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Using Metrics API for average record size calculation
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - ====================================================================================================
+2025-09-27 16:13:44 - INFO - analyze_all_topics - Created the lkc-r9mvmp-recommender-1759004024-detail-report.csv file
+2025-09-27 16:13:49 - INFO - analyze_topic_with_metrics - [Thread-6111768576] Confluent Metrics API - For topic stock_trades, the average bytes per record is 157.33 bytes/record for a total of 565,163 records.
+2025-09-27 16:13:49 - INFO - update_progress - Progress: 1 of 2 (50.0%) topics completed
+2025-09-27 16:13:49 - INFO - analyze_topic_with_metrics - [Thread-6128594944] Confluent Metrics API - For topic stock_trades_with_totals, the average bytes per record is 112.36 bytes/record for a total of 565,161 records.
+2025-09-27 16:13:49 - INFO - update_progress - Progress: 2 of 2 (100.0%) topics completed
+2025-09-27 16:13:49 - INFO - __log_summary_stats - ====================================================================================================
+2025-09-27 16:13:49 - INFO - __log_summary_stats - ANALYSIS SUMMARY STATISTICS
+2025-09-27 16:13:49 - INFO - __log_summary_stats - ----------------------------------------------------------------------------------------------------
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Elapsed Time: 0.00 hours
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Total Topics: 2
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Active Topics: 2
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Active Topics %: 100.0%
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Total Partitions: 12
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Total Recommended Partitions: 20
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Non-Empty Topics Total Partitions: 12
+2025-09-27 16:13:49 - INFO - __log_summary_stats - RECOMMENDED Increase in Partitions: 66.7%
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Total Records: 1,130,324.0
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Average Partitions per Topic: 6
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Average Partitions per Active Topic: 6
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Average Recommended Partitions per Topic: 10
+2025-09-27 16:13:49 - INFO - __log_summary_stats - ====================================================================================================
+2025-09-27 16:13:49 - INFO - _analyze_kafka_cluster - KAFKA CLUSTER lkc-r9mvmp: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.
+2025-09-27 16:13:50 - INFO - _analyze_kafka_cluster - Kafka API key PNL3OSIP6DGYDGVW for Kafka Cluster lkc-r9mvmp deleted successfully.
+2025-09-27 16:13:50 - INFO - main - SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.
 ```
 
 #### 1.3.1 Did you notice we prefix `uv run` to `python src/thread_safe_app.py`?
