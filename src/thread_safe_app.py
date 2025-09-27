@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 
 from thread_safe_kafka_topics_analyzer import ThreadSafeKafkaTopicsAnalyzer
 from utilities import setup_logging
+from cc_clients_python_lib.environment_client import EnvironmentClient
+from cc_clients_python_lib.http_status import HttpStatus
 from aws_clients_python_lib.secrets_manager import get_secrets
 from constants import (DEFAULT_USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS,
                        DEFAULT_SAMPLING_DAYS,
@@ -37,7 +39,74 @@ __status__     = "dev"
 logger = setup_logging()
 
 
-def analyze_kafka_cluster(kafka_credential: Dict, config: Dict) -> bool:
+def _fetch_kafka_credentials_via_confluent_cloud_api_key(environment_config: Dict) -> list[Dict]:
+    """Fetch Kafka credentials using Confluent Cloud API key.
+    
+    Args:
+        environment_config (Dict): Confluent Cloud API credentials
+        
+    Returns:
+        list[Dict]: List of Kafka credentials dictionaries.
+    """
+    # Instantiate the EnvironmentClient class.
+    environment_client = EnvironmentClient(environment_config=environment_config)
+
+    http_status_code, error_message, environments = environment_client.get_environment_list()
+ 
+    try:
+        assert http_status_code == HttpStatus.OK, f"HTTP Status Code: {http_status_code}"
+
+        logger.info(f"Environments: {len(environments)}")
+
+        for environment in environments:
+            beautified = json.dumps(environment, indent=4, sort_keys=True)
+            logger.info(beautified)
+    except AssertionError as e:
+        logger.error(e)
+        logger.error("HTTP Status Code: %d, Error Message: %s, Environments: %s", http_status_code, error_message, environments)
+        return
+    
+
+def _fetch_kafka_credentials_via_environment_variables(use_aws_secrets_manager: bool) -> list[Dict]:
+    """Fetch Kafka credentials from environment variable or AWS Secrets Manager.
+    
+    Returns:
+        list[Dict]: List of Kafka credentials dictionaries.
+    """
+    try:
+        # Check if using AWS Secrets Manager for credentials retrieval
+        if use_aws_secrets_manager:
+            # Retrieve Kafka API Key/Secret from AWS Secrets Manager
+            kafka_api_secrets_paths = json.loads(os.getenv("KAFKA_API_SECRET_PATHS", "[]"))
+            kafka_credentials = []
+            for kafka_api_secrets_path in kafka_api_secrets_paths:
+                settings, error_message = get_secrets(kafka_api_secrets_path["region_name"], kafka_api_secrets_path["secret_name"])
+                if settings == {}:
+                    logging.error(f"FAILED TO RETRIEVE KAFKA API KEY/SECRET FROM AWS SECRETS MANAGER BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
+                    return []
+                else:
+                    kafka_credentials.append({
+                        "bootstrap.servers": settings.get("bootstrap.servers"),
+                        "sasl.username": settings.get("sasl.username"),
+                        "sasl.password": settings.get("sasl.password"),
+                        "kafka_cluster_id": settings.get("kafka_cluster_id")
+                    })
+            logging.info("Retrieving the Kafka Cluster credentials from the AWS Secrets Manager.")
+        else:
+            kafka_credentials = json.loads(os.getenv("KAFKA_CREDENTIALS", "[]"))
+            logging.info("Retrieving the Kafka Cluster credentials from the .env file.")
+            
+        if not kafka_credentials:
+            logging.error("NO KAFKA CREDENTIALS FOUND. PLEASE CHECK YOUR CONFIGURATION.")
+
+        return kafka_credentials
+            
+    except Exception as e:
+        logging.error(f"THE APPLICATION FAILED TO READ KAFKA CREDENTIALS BECAUSE OF THE FOLLOWING ERROR: {e}")
+        return []
+    
+
+def _analyze_kafka_cluster(kafka_credential: Dict, config: Dict) -> bool:
     """Analyze a single Kafka cluster.
     
     Args:
@@ -49,29 +118,26 @@ def analyze_kafka_cluster(kafka_credential: Dict, config: Dict) -> bool:
     """
     try:
         # Instantiate the Kafka Topics Analyzer
-        analyzer = ThreadSafeKafkaTopicsAnalyzer(
-            kafka_cluster_id=kafka_credential.get("kafka_cluster_id"),
-            bootstrap_server_uri=kafka_credential.get("bootstrap.servers"),
-            kafka_api_key=kafka_credential.get("sasl.username"),
-            kafka_api_secret=kafka_credential.get("sasl.password"),
-            metrics_config=config['metrics_config']
-        )
+        analyzer = ThreadSafeKafkaTopicsAnalyzer(kafka_cluster_id=kafka_credential.get("kafka_cluster_id"),
+                                                 bootstrap_server_uri=kafka_credential.get("bootstrap.servers"),
+                                                 kafka_api_key=kafka_credential.get("sasl.username"),
+                                                 kafka_api_secret=kafka_credential.get("sasl.password"),
+                                                 metrics_config=config['metrics_config'])
 
         # Analyze all topics in the Kafka cluster with multithreading
-        success = analyzer.analyze_all_topics(
-            include_internal=config['include_internal'],
-            required_consumption_throughput_factor=config['required_consumption_throughput_factor'],
-            use_sample_records=config['use_sample_records'],
-            sampling_days=config['sampling_days'],
-            sampling_batch_size=config['sampling_batch_size'],
-            sampling_max_consecutive_nulls=config['sampling_max_consecutive_nulls'],
-            sampling_timeout_seconds=config['sampling_timeout_seconds'],
-            sampling_max_continuous_failed_batches=config['sampling_max_continuous_failed_batches'],
-            topic_filter=config['topic_filter'],
-            max_workers=config.get('max_workers_per_cluster', DEFAULT_MAX_WORKERS_PER_CLUSTER),
-            min_recommended_partitions=config.get('min_recommended_partitions', DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS),
-            min_consumption_throughput=config.get('min_consumption_throughput', DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD)
-        )
+        success = analyzer.analyze_all_topics(use_confluent_cloud_api_key_to_fetch_kafka_credentials=config['use_confluent_cloud_api_key_to_fetch_kafka_credentials'],
+                                              include_internal=config['include_internal'],
+                                              required_consumption_throughput_factor=config['required_consumption_throughput_factor'],
+                                              use_sample_records=config['use_sample_records'],
+                                              sampling_days=config['sampling_days'],
+                                              sampling_batch_size=config['sampling_batch_size'],
+                                              sampling_max_consecutive_nulls=config['sampling_max_consecutive_nulls'],
+                                              sampling_timeout_seconds=config['sampling_timeout_seconds'],
+                                              sampling_max_continuous_failed_batches=config['sampling_max_continuous_failed_batches'],
+                                              topic_filter=config['topic_filter'],
+                                              max_workers=config.get('max_workers_per_cluster', DEFAULT_MAX_WORKERS_PER_CLUSTER),
+                                              min_recommended_partitions=config.get('min_recommended_partitions', DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS),
+                                              min_consumption_throughput=config.get('min_consumption_throughput', DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD))
         
         kafka_cluster_id = kafka_credential.get("kafka_cluster_id", "unknown")
         if success:
@@ -170,6 +236,8 @@ def main():
     # Prepare configuration object
     config = {
         'metrics_config': metrics_config,
+        'use_confluent_cloud_api_key_to_fetch_kafka_credentials': use_confluent_cloud_api_key_to_fetch_kafka_credentials,
+        'kafka_credentials': kafka_credentials,
         'include_internal': include_internal,
         'required_consumption_throughput_factor': required_consumption_throughput_factor,
         'use_sample_records': use_sample_records,
@@ -196,7 +264,7 @@ def main():
     # Analyze Kafka clusters concurrently if more than one cluster
     if len(kafka_credentials) == 1:
         # Single Kafka cluster.  No need for cluster-level threading
-        success = analyze_kafka_cluster(kafka_credentials[0], config)
+        success = _analyze_kafka_cluster(kafka_credentials[0], config)
         if success:
             logging.info("SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.")
         else:
@@ -209,7 +277,7 @@ def main():
         with ThreadPoolExecutor(max_workers=max_cluster_workers) as executor:
             # Submit Kafka cluster analysis tasks
             future_to_cluster = {
-                executor.submit(analyze_kafka_cluster, credential, config): credential.get("kafka_cluster_id", "unknown")
+                executor.submit(_analyze_kafka_cluster, credential, config): credential.get("kafka_cluster_id", "unknown")
                 for credential in kafka_credentials
             }
             

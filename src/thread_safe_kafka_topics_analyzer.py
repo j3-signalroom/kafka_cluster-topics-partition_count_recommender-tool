@@ -84,6 +84,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
         self.total_topics = 0
 
     def analyze_all_topics(self, 
+                           use_confluent_cloud_api_key_to_fetch_kafka_credentials: bool = False,
                            include_internal: bool = False, 
                            required_consumption_throughput_factor: float = DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR,
                            use_sample_records: bool = True, 
@@ -99,6 +100,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
         """Analyze all topics in the Kafka cluster.
         
         Args:
+            use_confluent_cloud_api_key_to_fetch_kafka_credentials (bool, optional): Whether to use Confluent Cloud API key to fetch Kafka credentials. Defaults to False.
             include_internal (bool, optional): Whether to include internal topics. Defaults to False.
             required_consumption_throughput_factor (float, optional): Factor to multiply the consumer throughput to determine required consumption throughput. Defaults to 3.0.
             use_sample_records (bool, optional): Whether to sample records for average size. Defaults to True.
@@ -123,6 +125,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
 
         # Log initial analysis parameters
         self.__log_initial_parameters({
+            "use_confluent_cloud_api_key_to_fetch_kafka_credentials": use_confluent_cloud_api_key_to_fetch_kafka_credentials,
             "max_workers": max_workers,
             "total_topics_to_analyze": len(topics_to_analyze),
             "include_internal": include_internal,
@@ -448,6 +451,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
         logging.info("INITIAL ANALYSIS PARAMETERS")
         logging.info("-" * DEFAULT_CHARACTER_REPEAT)
         logging.info(f"Analysis Timestamp: {datetime.now().isoformat()}")
+        logging.info(f"Using Confluent Cloud API Key to fetch Kafka credential: {params['use_confluent_cloud_api_key_to_fetch_kafka_credentials']}")
         logging.info(f"Kafka Cluster ID: {self.kafka_cluster_id}")
         logging.info(f"Max worker threads: {params['max_workers']}")
         logging.info("Connecting to Kafka cluster and retrieving metadata...")
