@@ -35,10 +35,15 @@ class ThreadSafeTopicAnalyzer:
         self.metrics_client = metrics_client
         self.kafka_cluster_id = kafka_cluster_id
 
-    def analyze_topic(self, topic_name: str, topic_info: Dict, sampling_batch_size: int, 
-                     sampling_max_consecutive_nulls: int, sampling_timeout_seconds: float,
-                     sampling_max_continuous_failed_batches: int, start_time_epoch_ms: int, 
-                     iso_start_time: datetime) -> Dict:
+    def analyze_topic(self, 
+                      topic_name: str, 
+                      topic_info: Dict, 
+                      sampling_batch_size: int,
+                      sampling_max_consecutive_nulls: int, 
+                      sampling_timeout_seconds: float,
+                      sampling_max_continuous_failed_batches: int, 
+                      start_time_epoch_ms: int, 
+                      iso_start_time: datetime) -> Dict:
         """Analyze a single topic using record sampling."""
         topic_metadata = topic_info['metadata']
         sampling_days = topic_info['sampling_days_based_on_retention_days']

@@ -1,7 +1,7 @@
 import csv
 from datetime import datetime, timedelta, timezone
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List
 from confluent_kafka.admin import AdminClient, ConfigResource
 import logging
 import threading
@@ -113,7 +113,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
             sampling_days (int, optional): Number of days to look back for sampling. Defaults to 7.
             sampling_batch_size (int, optional): Number of records to process per batch when sampling. Defaults to 10,000.
             sampling_max_consecutive_nulls (int, optional): Maximum number of consecutive null records to encounter before stopping sampling in a partition. Defaults to 50.
-            topic_filter (Optional[str], optional): If provided, only topics containing this string will be analyzed. Defaults to None.
+            topic_filter (str | None, optional): If provided, only topics containing this string will be analyzed. Defaults to None.
             max_workers (int, optional): Maximum number of worker threads for concurrent topic analysis. Defaults to 4.
             min_recommended_partitions (int, optional): The minimum recommended partitions. Defaults to 6.
             min_consumption_throughput (float, optional): The minimum consumption throughput threshold. Defaults to 10 MB/s.
@@ -177,7 +177,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
             with self.progress_lock:
                 self.completed_topics += 1
                 progress = (self.completed_topics / self.total_topics) * 100
-                logging.info(f"Progress: {self.completed_topics}/{self.total_topics} ({progress:.1f}%) topics completed")
+                logging.info(f"Progress: {self.completed_topics} of {self.total_topics} ({progress:.1f}%) topics completed")
 
         def analyze_topic_worker(topic_name: str, topic_info: Dict) -> Dict:
             """Worker function to analyze a single topic.
@@ -198,12 +198,10 @@ class ThreadSafeKafkaTopicsAnalyzer:
                 }
                 
                 # Create a temporary analyzer instance for this thread
-                thread_analyzer = ThreadSafeTopicAnalyzer(
-                    self.admin_client, 
-                    unique_consumer_config, 
-                    self.metrics_client,
-                    self.kafka_cluster_id
-                )
+                thread_analyzer = ThreadSafeTopicAnalyzer(self.admin_client, 
+                                                          unique_consumer_config, 
+                                                          self.metrics_client,
+                                                          self.kafka_cluster_id)
 
                 if use_sample_records:
                     # Calculate the ISO 8601 formatted start timestamp of the rolling window
@@ -482,13 +480,13 @@ class ThreadSafeKafkaTopicsAnalyzer:
             logging.info(f"Sampling max continuous failed batches: {params['sampling_max_continuous_failed_batches']:,} batches")
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
 
-    def __get_topics_metadata(self, sampling_days: int, include_internal: bool, topic_filter: Optional[str]) -> Dict:
+    def __get_topics_metadata(self, sampling_days: int, include_internal: bool, topic_filter: str | None = None) -> Dict:
         """Get cluster metadata including topics, partitions, and retention.
 
         Args:
             sampling_days (int): Number of days to look back for sampling.
             include_internal (bool): Whether to include internal topics.
-            topic_filter (Optional[str]): If provided, only topics containing this string will be analyzed.
+            topic_filter (str | None): If provided, only topics containing this string will be analyzed.
         
         Returns:
             Dict: Metadata of topics in the cluster.

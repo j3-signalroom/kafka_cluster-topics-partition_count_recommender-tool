@@ -55,6 +55,7 @@ def _fetch_kafka_credentials_via_confluent_cloud_api_key(principal_id: str,
         list[Dict]: List of Kafka credentials dictionaries.
     """
     kafka_credentials = []
+
     # Instantiate the EnvironmentClient class.
     environment_client = EnvironmentClient(environment_config=environment_config)
 
@@ -65,12 +66,12 @@ def _fetch_kafka_credentials_via_confluent_cloud_api_key(principal_id: str,
         return []
     else:
         # Filter environments if an environment filter is provided
-        if environment_filter is None:
-            filter_environments = environments
-        else:
+        if environment_filter:
             environment_ids = [environment_id.strip() for environment_id in environment_filter.split(',')]
             filter_environments = [environment for environment in environments if environment.get("id") in environment_ids]
-        
+        else:
+            filter_environments = environments
+
         # Retrieve Kafka cluster credentials for each environment
         for environment in filter_environments:
             http_status_code, error_message, kafka_clusters = environment_client.get_kafka_cluster_list(environment_id=environment.get("id"))
@@ -80,12 +81,12 @@ def _fetch_kafka_credentials_via_confluent_cloud_api_key(principal_id: str,
                 return []
             else:
                 # Filter Kafka clusters if a Kafka cluster filter is provided
-                if kafka_cluster_filter is None:
-                    filter_kafka_clusters = kafka_clusters
-                else:
+                if kafka_cluster_filter:
                     # Filter Kafka clusters based on provided IDs
                     kafka_cluster_ids = [kafka_cluster_id.strip() for kafka_cluster_id in kafka_cluster_filter.split(',')]
                     filter_kafka_clusters = [kafka_cluster for kafka_cluster in kafka_clusters if kafka_cluster.get("id") in kafka_cluster_ids]
+                else:
+                    filter_kafka_clusters = kafka_clusters
 
                 # Retrieve API key pair for each Kafka cluster
                 for kafka_cluster in filter_kafka_clusters:
@@ -93,13 +94,13 @@ def _fetch_kafka_credentials_via_confluent_cloud_api_key(principal_id: str,
                                                                                                             principal_id=principal_id)
                     
                     # If unable to retrieve the API key pair, log the error and attempt to clean up any previously created API keys
-                    if http_status_code != HttpStatus.OK:
+                    if http_status_code != HttpStatus.ACCEPTED:
                         logger.error(f"FAILED TO RETRIEVE KAFKA CLUSTER CREDENTIALS FOR KAFKA CLUSTER {kafka_cluster.get('id')} IN ENVIRONMENT {environment.get('id')} FROM CONFLUENT CLOUD BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
 
                         for kafka_credential in kafka_credentials:
                             if kafka_credential.get("kafka_cluster_id") == kafka_cluster.get("id"):
                                 http_status_code, error_message = environment_client.delete_kafka_api_key(api_key=kafka_credential["sasl.username"])
-                                if http_status_code != HttpStatus.NO_CONTENT:
+                                if http_status_code != HttpStatus.ACCEPTED:
                                     logger.warning(f"FAILED TO DELETE KAFKA API KEY {kafka_credential['sasl.username']} FOR KAFKA CLUSTER {kafka_credential['kafka_cluster_id']} BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
                                 else:
                                     logger.info(f"KAFKA API KEY {kafka_credential['sasl.username']} FOR KAFKA CLUSTER {kafka_credential['kafka_cluster_id']} DELETED SUCCESSFULLY.")
@@ -164,10 +165,15 @@ def _fetch_kafka_credentials_via_environment_variables(use_aws_secrets_manager: 
         return []
     
 
-def _analyze_kafka_cluster(kafka_credential: Dict, config: Dict) -> bool:
+def _analyze_kafka_cluster(metrics_config: Dict, 
+                           use_confluent_cloud_api_key_to_fetch_kafka_credentials: bool, 
+                           kafka_credential: Dict, 
+                           config: Dict) -> bool:
     """Analyze a single Kafka cluster.
     
     Args:
+        metrics_config (Dict): Confluent Cloud API credentials
+        use_confluent_cloud_api_key_to_fetch_kafka_credentials (bool): Whether the Kafka credentials were fetched using Confluent Cloud API key
         kafka_credential (Dict): Kafka cluster credentials
         config (Dict): Configuration parameters
         
@@ -200,12 +206,23 @@ def _analyze_kafka_cluster(kafka_credential: Dict, config: Dict) -> bool:
                                               min_recommended_partitions=config.get('min_recommended_partitions', DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS),
                                               min_consumption_throughput=config.get('min_consumption_throughput', DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD))
         
-        kafka_cluster_id = kafka_credential.get("kafka_cluster_id", "unknown")
+        # Log the result of the analysis
         if success:
-            logging.info(f"KAFKA CLUSTER {kafka_cluster_id}: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.")
+            logging.info(f"KAFKA CLUSTER {kafka_credential.get('kafka_cluster_id')}: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.")
         else:
-            logging.error(f"KAFKA CLUSTER {kafka_cluster_id}: TOPIC ANALYSIS FAILED.")
+            logging.error(f"KAFKA CLUSTER {kafka_credential.get("kafka_cluster_id")}: TOPIC ANALYSIS FAILED.")
             
+        # Clean up the created Kafka API key if it was created using Confluent Cloud API key
+        if use_confluent_cloud_api_key_to_fetch_kafka_credentials:
+            # Instantiate the EnvironmentClient class.
+            environment_client = EnvironmentClient(environment_config=metrics_config)
+
+            http_status_code, error_message = environment_client.delete_kafka_api_key(api_key=kafka_credential["sasl.username"])
+            if http_status_code != HttpStatus.NO_CONTENT:
+                logging.warning(f"FAILED TO DELETE KAFKA API KEY {kafka_credential['sasl.username']} FOR KAFKA CLUSTER {kafka_credential['kafka_cluster_id']} BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
+            else:
+                logging.info(f"Kafka API key {kafka_credential['sasl.username']} for Kafka Cluster {kafka_credential['kafka_cluster_id']} deleted successfully.")
+
         return success
         
     except Exception as e:
@@ -313,7 +330,10 @@ def main():
     # Analyze Kafka clusters concurrently if more than one cluster
     if len(kafka_credentials) == 1:
         # Single Kafka cluster.  No need for cluster-level threading
-        success = _analyze_kafka_cluster(kafka_credentials[0], config)
+        success = _analyze_kafka_cluster(metrics_config, 
+                                         use_confluent_cloud_api_key_to_fetch_kafka_credentials, 
+                                         kafka_credentials[0], 
+                                         config)
         if success:
             logging.info("SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.")
         else:
