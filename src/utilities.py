@@ -56,3 +56,5 @@ def setup_logging(log_file: str = "kafka-cluster-topics-partition-count-recommen
         )
 
     return logging.getLogger()
+
+

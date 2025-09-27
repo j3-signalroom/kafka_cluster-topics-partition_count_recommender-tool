@@ -1,7 +1,7 @@
 import csv
 from datetime import datetime, timedelta, timezone
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List
 from confluent_kafka.admin import AdminClient, ConfigResource
 import logging
 import threading
@@ -9,7 +9,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from thread_safe_topic_analyzer import ThreadSafeTopicAnalyzer
 from thread_safe_csv_writer import ThreadSafeCSVWriter
-from cc_clients_python_lib.metrics_client import MetricsClient
 from utilities import setup_logging
 from constants import (DEFAULT_SAMPLING_DAYS, 
                        DEFAULT_SAMPLING_BATCH_SIZE,
@@ -75,15 +74,16 @@ class ThreadSafeKafkaTopicsAnalyzer:
             'enable.metrics.push': False         # Disable metrics pushing for consumers to registered JMX MBeans.  However, is really being set to False to not expose unneccessary noise to the logging output
         }
 
-        # Instantiate the MetricsClient class.
-        self.metrics_client = MetricsClient(metrics_config)
-
         # Thread-safe progress tracking
         self.progress_lock = threading.Lock()
         self.completed_topics = 0
         self.total_topics = 0
 
     def analyze_all_topics(self, 
+                           use_confluent_cloud_api_key_to_fetch_kafka_credentials: bool = False,
+                           environment_filter: str | None = None,
+                           kafka_cluster_filter: str | None = None,
+                           principal_id: str | None = None,
                            include_internal: bool = False, 
                            required_consumption_throughput_factor: float = DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR,
                            use_sample_records: bool = True, 
@@ -95,17 +95,22 @@ class ThreadSafeKafkaTopicsAnalyzer:
                            topic_filter: str | None = None,
                            max_workers: int = DEFAULT_MAX_WORKERS_PER_CLUSTER,
                            min_recommended_partitions: int = DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS,
-                           min_consumption_throughput: float = DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD) -> bool:
+                           min_consumption_throughput: float = DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD,
+                           metrics_config: Dict | None = None) -> bool:
         """Analyze all topics in the Kafka cluster.
         
         Args:
+            use_confluent_cloud_api_key_to_fetch_kafka_credentials (bool, optional): Whether to use Confluent Cloud API key to fetch Kafka credentials. Defaults to False.
+            environment_filter (str | None, optional): Comma-separated list of environment IDs to filter. Defaults to None.
+            kafka_cluster_filter (str | None, optional): Comma-separated list of Kafka cluster IDs to filter. Defaults to None.
+            principal_id (str | None, optional): Comma-separated list of principal IDs to filter. Defaults to None.
             include_internal (bool, optional): Whether to include internal topics. Defaults to False.
             required_consumption_throughput_factor (float, optional): Factor to multiply the consumer throughput to determine required consumption throughput. Defaults to 3.0.
             use_sample_records (bool, optional): Whether to sample records for average size. Defaults to True.
             sampling_days (int, optional): Number of days to look back for sampling. Defaults to 7.
             sampling_batch_size (int, optional): Number of records to process per batch when sampling. Defaults to 10,000.
             sampling_max_consecutive_nulls (int, optional): Maximum number of consecutive null records to encounter before stopping sampling in a partition. Defaults to 50.
-            topic_filter (Optional[str], optional): If provided, only topics containing this string will be analyzed. Defaults to None.
+            topic_filter (str | None, optional): If provided, only topics containing this string will be analyzed. Defaults to None.
             max_workers (int, optional): Maximum number of worker threads for concurrent topic analysis. Defaults to 4.
             min_recommended_partitions (int, optional): The minimum recommended partitions. Defaults to 6.
             min_consumption_throughput (float, optional): The minimum consumption throughput threshold. Defaults to 10 MB/s.
@@ -123,6 +128,10 @@ class ThreadSafeKafkaTopicsAnalyzer:
 
         # Log initial analysis parameters
         self.__log_initial_parameters({
+            "use_confluent_cloud_api_key_to_fetch_kafka_credentials": use_confluent_cloud_api_key_to_fetch_kafka_credentials,
+            "environment_filter": environment_filter,
+            "kafka_cluster_filter": kafka_cluster_filter,
+            "principal_id": principal_id,
             "max_workers": max_workers,
             "total_topics_to_analyze": len(topics_to_analyze),
             "include_internal": include_internal,
@@ -165,7 +174,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
             with self.progress_lock:
                 self.completed_topics += 1
                 progress = (self.completed_topics / self.total_topics) * 100
-                logging.info(f"Progress: {self.completed_topics}/{self.total_topics} ({progress:.1f}%) topics completed")
+                logging.info(f"Progress: {self.completed_topics} of {self.total_topics} ({progress:.1f}%) topics completed")
 
         def analyze_topic_worker(topic_name: str, topic_info: Dict) -> Dict:
             """Worker function to analyze a single topic.
@@ -186,14 +195,11 @@ class ThreadSafeKafkaTopicsAnalyzer:
                 }
                 
                 # Create a temporary analyzer instance for this thread
-                thread_analyzer = ThreadSafeTopicAnalyzer(
-                    self.admin_client, 
-                    unique_consumer_config, 
-                    self.metrics_client,
-                    self.kafka_cluster_id
-                )
+                thread_analyzer = ThreadSafeTopicAnalyzer(self.admin_client, unique_consumer_config, self.kafka_cluster_id)
 
                 if use_sample_records:
+                    # Use sample records approach
+
                     # Calculate the ISO 8601 formatted start timestamp of the rolling window
                     utc_now = datetime.now(timezone.utc)
                     rolling_start = utc_now - timedelta(days=topic_info['sampling_days_based_on_retention_days'])
@@ -201,15 +207,14 @@ class ThreadSafeKafkaTopicsAnalyzer:
                     start_time_epoch_ms = int(rolling_start.timestamp() * 1000)
 
                     # Analyze the topic
-                    result = thread_analyzer.analyze_topic(
-                        topic_name=topic_name, 
-                        topic_info=topic_info,
-                        sampling_batch_size=sampling_batch_size,
-                        sampling_max_consecutive_nulls=sampling_max_consecutive_nulls,
-                        sampling_timeout_seconds=sampling_timeout_seconds,
-                        sampling_max_continuous_failed_batches=sampling_max_continuous_failed_batches,
-                        start_time_epoch_ms=start_time_epoch_ms,
-                        iso_start_time=iso_start_time
+                    result = thread_analyzer.analyze_topic(topic_name=topic_name, 
+                                                           topic_info=topic_info,
+                                                           sampling_batch_size=sampling_batch_size,
+                                                           sampling_max_consecutive_nulls=sampling_max_consecutive_nulls,
+                                                           sampling_timeout_seconds=sampling_timeout_seconds,
+                                                           sampling_max_continuous_failed_batches=sampling_max_continuous_failed_batches,
+                                                           start_time_epoch_ms=start_time_epoch_ms,
+                                                           iso_start_time=iso_start_time
                     )
                     
                     # Add compaction and sampling days info to the result
@@ -218,7 +223,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
                     
                 else:
                     # Use Metrics API approach
-                    result = thread_analyzer.analyze_topic_with_metrics(topic_name, topic_info)
+                    result = thread_analyzer.analyze_topic_with_metrics(metrics_config, topic_name, topic_info)
                 
                 return result
                 
@@ -448,6 +453,10 @@ class ThreadSafeKafkaTopicsAnalyzer:
         logging.info("INITIAL ANALYSIS PARAMETERS")
         logging.info("-" * DEFAULT_CHARACTER_REPEAT)
         logging.info(f"Analysis Timestamp: {datetime.now().isoformat()}")
+        logging.info(f"Using Confluent Cloud API Key to fetch Kafka credential: {params['use_confluent_cloud_api_key_to_fetch_kafka_credentials']}")
+        logging.info(f"Environment Filter: {params['environment_filter'] if params['environment_filter'] else 'None'}")
+        logging.info(f"Kafka Cluster Filter: {params['kafka_cluster_filter'] if params['kafka_cluster_filter'] else 'None'}")
+        logging.info(f"Principal ID Filter: {params['principal_id'] if params['principal_id'] else 'None'}")
         logging.info(f"Kafka Cluster ID: {self.kafka_cluster_id}")
         logging.info(f"Max worker threads: {params['max_workers']}")
         logging.info("Connecting to Kafka cluster and retrieving metadata...")
@@ -466,13 +475,13 @@ class ThreadSafeKafkaTopicsAnalyzer:
             logging.info(f"Sampling max continuous failed batches: {params['sampling_max_continuous_failed_batches']:,} batches")
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
 
-    def __get_topics_metadata(self, sampling_days: int, include_internal: bool, topic_filter: Optional[str]) -> Dict:
+    def __get_topics_metadata(self, sampling_days: int, include_internal: bool, topic_filter: str | None = None) -> Dict:
         """Get cluster metadata including topics, partitions, and retention.
 
         Args:
             sampling_days (int): Number of days to look back for sampling.
             include_internal (bool): Whether to include internal topics.
-            topic_filter (Optional[str]): If provided, only topics containing this string will be analyzed.
+            topic_filter (str | None): If provided, only topics containing this string will be analyzed.
         
         Returns:
             Dict: Metadata of topics in the cluster.

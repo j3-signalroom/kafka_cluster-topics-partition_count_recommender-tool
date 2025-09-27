@@ -114,7 +114,7 @@ wheels = [
 
 [[package]]
 name = "cc-clients-python-lib"
-version = "0.28.0.0"
+version = "0.28.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
@@ -131,9 +131,9 @@ dependencies = [
     { name = "urllib3" },
     { name = "wheel" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2a/24/430a2cb3d76ba606d3054ca2c8517f43e14d1aab7ad13d2b0dd78c9fa907/cc_clients_python_lib-0.28.0.0.tar.gz", hash = "sha256:4a43ba41c5462511696476e006bb265afcae7a2c3866c48fd7e5696095b5db7c", size = 2788203 }
+sdist = { url = "https://files.pythonhosted.org/packages/a1/ad/7a73462d304de1045946b20e656e7ed0c9aa1b2a5e53c0b40cdb7abdafe9/cc_clients_python_lib-0.28.4.0.tar.gz", hash = "sha256:571186177a4374a05cbc1a3303afb1b515bb84b68dd2a1a5ab8fcb798a7e30d8", size = 2787866 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/dc/2d/0b8013730acafde09ed034aa4af3c2482ca8191a521126eb020c759c3650/cc_clients_python_lib-0.28.0.0-py3-none-any.whl", hash = "sha256:ce20bde8a2a32e71dc85d7aecf8a1480fc64d26f9539e4d65a658be449e281b0", size = 381681 },
+    { url = "https://files.pythonhosted.org/packages/f2/56/1b703074498963e9567b324611af7e67865425b31d4f10f87241f84fa001/cc_clients_python_lib-0.28.4.0-py3-none-any.whl", hash = "sha256:b6ded22fd397642d74a6db357e4825d940eace64d8792a50b3f7853b3fc215bd", size = 382044 },
 ]
 
 [[package]]
@@ -383,7 +383,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "aws-clients-python-lib", specifier = ">=0.10.0.0" },
-    { name = "cc-clients-python-lib", specifier = ">=0.28.0.0" },
+    { name = "cc-clients-python-lib", specifier = "==0.28.4.0" },
     { name = "confluent-kafka", specifier = ">=2.11.1" },
     { name = "dotenv", specifier = ">=0.9.9" },
     { name = "pytest", specifier = ">=8.4.2" },

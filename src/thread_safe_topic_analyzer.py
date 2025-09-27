@@ -6,11 +6,12 @@ import threading
 from confluent_kafka import Consumer, TopicPartition
 
 from utilities import setup_logging
-from cc_clients_python_lib.metrics_client import KafkaMetric
+from cc_clients_python_lib.metrics_client import MetricsClient, KafkaMetric
 from cc_clients_python_lib.http_status import HttpStatus
 from constants import (DEFAULT_SAMPLING_BATCH_SIZE,
                        DEFAULT_SAMPLING_MINIMUM_BATCH_SIZE,
-                       DEFAULT_SAMPLING_MAXIMUM_BATCH_SIZE)
+                       DEFAULT_SAMPLING_MAXIMUM_BATCH_SIZE,
+                       DEFAULT_RESTFUL_API_MAX_RETRIES)
 
 
 
@@ -29,17 +30,42 @@ logger = setup_logging()
 class ThreadSafeTopicAnalyzer:
     """Thread-safe helper class for analyzing individual topics."""
     
-    def __init__(self, admin_client, consumer_config: Dict, metrics_client, kafka_cluster_id: str):
+    def __init__(self, admin_client, consumer_config: Dict, kafka_cluster_id: str):
+        """"Initialize the ThreadSafeTopicAnalyzer.
+        
+        Args:
+            admin_client: An instance of confluent_kafka.AdminClient for Kafka operations.
+            consumer_config (Dict): Configuration dictionary for Kafka consumers.
+            kafka_cluster_id (str): The Kafka cluster ID for Metrics API queries.
+        """
         self.admin_client = admin_client
         self.consumer_config = consumer_config
-        self.metrics_client = metrics_client
         self.kafka_cluster_id = kafka_cluster_id
 
-    def analyze_topic(self, topic_name: str, topic_info: Dict, sampling_batch_size: int, 
-                     sampling_max_consecutive_nulls: int, sampling_timeout_seconds: float,
-                     sampling_max_continuous_failed_batches: int, start_time_epoch_ms: int, 
-                     iso_start_time: datetime) -> Dict:
-        """Analyze a single topic using record sampling."""
+    def analyze_topic(self, 
+                      topic_name: str, 
+                      topic_info: Dict, 
+                      sampling_batch_size: int,
+                      sampling_max_consecutive_nulls: int, 
+                      sampling_timeout_seconds: float,
+                      sampling_max_continuous_failed_batches: int, 
+                      start_time_epoch_ms: int, 
+                      iso_start_time: datetime) -> Dict:
+        """Analyze a single topic using record sampling.
+
+        Args:
+            topic_name (str): The name of the topic to analyze.
+            topic_info (Dict): Metadata and retention info about the topic.
+            sampling_batch_size (int): Number of records to process per batch when sampling.
+            sampling_max_consecutive_nulls (int): Maximum number of consecutive null records to encounter before stopping sampling in a partition.
+            sampling_timeout_seconds (float): Timeout in seconds for polling records.
+            sampling_max_continuous_failed_batches (int): Maximum number of continuous failed batches before stopping sampling in a partition.
+            start_time_epoch_ms (int): The start time in epoch milliseconds for sampling.
+            iso_start_time (datetime): The ISO 8601 formatted start time for logging.
+
+        Returns:
+            Dict: Analysis results including partition count, total record count, and average bytes per record.
+        """
         topic_metadata = topic_info['metadata']
         sampling_days = topic_info['sampling_days_based_on_retention_days']
 
@@ -49,7 +75,7 @@ class ThreadSafeTopicAnalyzer:
         partition_count = len(partitions)
         
         # Get partition offsets to calculate total records
-        partition_offsets = self._get_partition_offsets(topic_name, partitions)
+        partition_offsets = self.__get_partition_offsets(topic_name, partitions)
         partition_details = []
         total_record_count = 0
         
@@ -59,7 +85,7 @@ class ThreadSafeTopicAnalyzer:
             
             if record_count > 0:
                 # Get the earliest offset in the partition whose record timestamp is >= start_time_epoch_ms
-                offset_at_start_time = self._get_record_timestamp_from_offset(topic_name, partition_number, start_time_epoch_ms)
+                offset_at_start_time = self.__get_record_timestamp_from_offset(topic_name, partition_number, start_time_epoch_ms)
                 if offset_at_start_time is None:
                     offset_at_start_time = high
             else:
@@ -76,7 +102,7 @@ class ThreadSafeTopicAnalyzer:
             logging.info(f"[Thread-{threading.current_thread().ident}] No records available in topic '{topic_name}' for sampling.")
             avg_record_size = 0.0
         else:
-            avg_record_size = self._sample_record_sizes(
+            avg_record_size = self.__sample_record_sizes(
                 topic_name=topic_name, 
                 sampling_batch_size=sampling_batch_size, 
                 sampling_max_consecutive_nulls=sampling_max_consecutive_nulls,
@@ -95,8 +121,18 @@ class ThreadSafeTopicAnalyzer:
             'is_internal': topic_name.startswith('_')
         }
 
-    def analyze_topic_with_metrics(self, topic_name: str, topic_info: Dict) -> Dict:
-        """Analyze a single topic using Metrics API."""
+    def analyze_topic_with_metrics(self, metrics_config: Dict, topic_name: str, topic_info: Dict) -> Dict:
+        """Analyze a single topic using Metrics API.
+
+        Args:
+            metrics_config (Dict): Configuration dictionary for Metrics API client.
+            topic_name (str): The name of the topic to analyze.
+            topic_info (Dict): Metadata and retention info about the topic.
+
+        Returns:
+            Dict: Analysis results including partition count, compaction status,
+                  total record count, and average bytes per record.
+        """
         partition_count = len(topic_info['metadata'].partitions)
         is_compacted_str = "yes" if topic_info['is_compacted'] else "no"
 
@@ -109,16 +145,18 @@ class ThreadSafeTopicAnalyzer:
             'is_internal': topic_name.startswith('_')
         }
 
+        # Instantiate the MetricsClient class.
+        metrics_client = MetricsClient(metrics_config)
+
         bytes_retry = 0
-        max_bytes_retries = 3
-        retry_delay_in_seconds = 60
+        max_bytes_retries = DEFAULT_RESTFUL_API_MAX_RETRIES
         proceed_to_records = False
 
         while bytes_retry < max_bytes_retries:
             # Use Metrics API to get the consumer byte consumption
-            http_status_code, error_message, bytes_query_result = self.metrics_client.get_topic_daily_aggregated_totals(
-                KafkaMetric.RECEIVED_BYTES, self.kafka_cluster_id, topic_name
-            )
+            http_status_code, error_message, rate_limits, bytes_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_BYTES, 
+                                                                                                                                self.kafka_cluster_id, 
+                                                                                                                                topic_name)
             if http_status_code == HttpStatus.RATE_LIMIT_EXCEEDED:
                 bytes_retry += 1
                 if bytes_retry == max_bytes_retries:
@@ -127,8 +165,9 @@ class ThreadSafeTopicAnalyzer:
                     result['total_record_count'] = 0
                     result['avg_bytes_per_record'] = 0.0
                     break
-                logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED BYTES' metric for topic {topic_name}. Retrying {bytes_retry}/{max_bytes_retries} after {retry_delay_in_seconds} seconds...")
-                time.sleep(retry_delay_in_seconds)
+                logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED BYTES' metric for topic {topic_name}."
+                                f" Retrying {bytes_retry}/{max_bytes_retries} after {rate_limits['reset_in_seconds']} seconds...")
+                time.sleep(rate_limits['reset_in_seconds'])
                 continue
             elif http_status_code not in (HttpStatus.OK, HttpStatus.RATE_LIMIT_EXCEEDED):
                 logging.warning(f"[Thread-{threading.current_thread().ident}] Failed retrieving 'RECEIVED BYTES' metric for topic {topic_name} because: {error_message}")
@@ -142,13 +181,13 @@ class ThreadSafeTopicAnalyzer:
 
         if proceed_to_records:
             records_retry = 0
-            max_records_retries = 3
+            max_records_retries = DEFAULT_RESTFUL_API_MAX_RETRIES
 
             while records_retry < max_records_retries:
                 # Use the Confluent Metrics API to get the record count
-                http_status_code, error_message, record_query_result = self.metrics_client.get_topic_daily_aggregated_totals(
-                    KafkaMetric.RECEIVED_RECORDS, self.kafka_cluster_id, topic_name
-                )
+                http_status_code, error_message, rate_limits, record_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_RECORDS, 
+                                                                                                                                     self.kafka_cluster_id, 
+                                                                                                                                     topic_name)
                 if http_status_code == HttpStatus.RATE_LIMIT_EXCEEDED:
                     records_retry += 1
                     if records_retry == max_records_retries:
@@ -157,8 +196,9 @@ class ThreadSafeTopicAnalyzer:
                         result['total_record_count'] = 0
                         result['avg_bytes_per_record'] = 0.0
                         break
-                    logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric for topic {topic_name}. Retrying {records_retry}/{max_records_retries} after {retry_delay_in_seconds} seconds...")
-                    time.sleep(retry_delay_in_seconds)
+                    logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric for topic {topic_name}."
+                                    f"Retrying {records_retry}/{max_records_retries} after {rate_limits['reset_in_seconds']} seconds...")
+                    time.sleep(rate_limits['reset_in_seconds'])
                     continue
                 elif http_status_code not in (HttpStatus.OK, HttpStatus.RATE_LIMIT_EXCEEDED):
                     logging.warning(f"[Thread-{threading.current_thread().ident}] Failed retrieving 'RECEIVED RECORDS' metric for topic {topic_name} because: {error_message}")
@@ -190,8 +230,16 @@ class ThreadSafeTopicAnalyzer:
 
         return result
 
-    def _get_partition_offsets(self, topic_name: str, partitions: List[int]) -> Dict[int, Tuple[int, int]]:
-        """Get low and high watermarks for the topic's partitions."""
+    def __get_partition_offsets(self, topic_name: str, partitions: List[int]) -> Dict[int, Tuple[int, int]]:
+        """Get low and high watermarks for the topic's partitions.
+
+        Args:
+            topic_name (str): The name of the topic.
+            partitions (List[int]): List of partition numbers.
+
+        Returns:
+            Dict[int, Tuple[int, int]]: Mapping of partition number to (low, high) watermarks.
+        """
         # Create unique consumer config for this thread
         thread_consumer_config = {
             **self.consumer_config,
@@ -228,8 +276,18 @@ class ThreadSafeTopicAnalyzer:
         finally:
             consumer.close()
 
-    def _get_record_timestamp_from_offset(self, topic_name: str, partition: int, timestamp_ms: int) -> int:
-        """Get the offset of the first record with a timestamp greater than or equal to the specified timestamp."""
+    def __get_record_timestamp_from_offset(self, topic_name: str, partition: int, timestamp_ms: int) -> int:
+        """Get the offset of the first record with a timestamp greater than or equal
+        to the specified timestamp.
+
+        Args:
+            topic_name (str): The name of the topic.
+            partition (int): The partition number.
+            timestamp_ms (int): The timestamp in milliseconds.
+
+        Returns:
+            int: The offset of the first record with a timestamp greater than or equal to the specified timestamp.
+        """
         # Create unique consumer config for this thread
         thread_consumer_config = {
             **self.consumer_config,
@@ -258,10 +316,13 @@ class ThreadSafeTopicAnalyzer:
         finally:
             consumer.close()
 
-    def _sample_record_sizes(self, topic_name: str, sampling_batch_size: int, 
-                           sampling_max_consecutive_nulls: int, sampling_timeout_seconds: float,
-                           sampling_max_continuous_failed_batches: int,
-                           partition_details: List[Dict]) -> float:
+    def __sample_record_sizes(self, 
+                              topic_name: str, 
+                              sampling_batch_size: int,
+                              sampling_max_consecutive_nulls: int, 
+                              sampling_timeout_seconds: float,
+                              sampling_max_continuous_failed_batches: int,
+                              partition_details: List[Dict]) -> float:
         """Sample record sizes from the specified partitions to calculate average record size."""
         
         def adaptive_poll_timeout(consecutive_nulls: int) -> float:

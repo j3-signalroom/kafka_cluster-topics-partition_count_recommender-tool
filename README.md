@@ -71,9 +71,23 @@ Now, you need to set up the application by creating a `.env` file in the root di
 #### 1.2.1 Create the `.env` file
 Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
 ```shell
+# Flag to use Confluent Cloud API key to fetch Kafka credentials; otherwise,
+# the KAFKA_CREDENTIALS or KAFKA_API_SECRET_PATHS variable will be used
+USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS=<True|False>
+
+# Environment and Kafka cluster filters (comma-separated IDs)
+# Example: ENVIRONMENT_FILTER="env-123,env-456"
+# Example: KAFKA_CLUSTER_FILTER="lkc-123,lkc-456"
+ENVIRONMENT_FILTER=<YOUR_ENVIRONMENT_FILTER, IF ANY>
+KAFKA_CLUSTER_FILTER=<YOUR_KAFKA_CLUSTER_FILTER, IF ANY>
+
 # Environment variables credentials for Confluent Cloud and Kafka clusters
 CONFLUENT_CLOUD_CREDENTIAL={"confluent_cloud_api_key":"<YOUR_CONFLUENT_CLOUD_API_KEY>", "confluent_cloud_api_secret": "<YOUR_CONFLUENT_CLOUD_API_SECRETS>"}
 KAFKA_CREDENTIALS=[{"kafka_cluster_id": "<YOUR_KAFKA_CLUSTER_ID>", "bootstrap.servers": "<YOUR_BOOTSTRAP_SERVER_URI>", "sasl.username": "<YOUR_KAFKA_API_KEY>", "sasl.password": "<YOUR_KAFKA_API_SECRET>"}]
+
+# Confluent Cloud principal ID (user or service account) for API key creation
+# Example: PRINCIPAL_ID="u-abc123" or PRINCIPAL_ID="sa-xyz789"
+PRINCIPAL_ID=<YOUR_PRINCIPAL_ID>
 
 # AWS Secrets Manager Secrets for Confluent Cloud and Kafka clusters
 USE_AWS_SECRETS_MANAGER=<True|False>
@@ -107,6 +121,10 @@ The environment variables are defined as follows:
 
 | Environment Variable Name | Type | Description | Example | Default | Required |
 |---------------|------|-------------|---------|---------|----------|
+| `USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS` | Boolean | Flag to use Confluent Cloud API key to fetch Kafka credentials; otherwise, the KAFKA_CREDENTIALS or KAFKA_API_SECRET_PATHS variable will be used. | `True` or `False` | `False` | No |
+| `ENVIRONMENT_FILTER` | Comma-separated String | A list of specific Confluent Cloud environment IDs to filter. When provided, only these environments will be used to fetch Kafka cluster credentials. Use commas to separate multiple environment IDs. Leave blank or unset to use all available environments. | `"env-123,env-456"` | Empty (all environments) | No |
+| `PRINCIPAL_ID` | String | Confluent Cloud principal ID (user or service account) for API key creation. | `"u-abc123"` or `"sa-xyz789"` | None | Yes |
+| `KAFKA_CLUSTER_FILTER` | Comma-separated String | A list of specific Kafka cluster IDs to filter. When provided, only these Kafka clusters will be analyzed. Use commas to separate multiple cluster IDs. Leave blank or unset to analyze all available clusters. | `"lkc-123,lkc-456"` | Empty (all clusters) | No |
 | `CONFLUENT_CLOUD_CREDENTIAL` | JSON Object | Contains authentication credentials for Confluent Cloud API access. Must include `confluent_cloud_api_key` and `confluent_cloud_api_secret` fields for authenticating with Confluent Cloud services. | `{"confluent_cloud_api_key": "CKABCD123456", "confluent_cloud_api_secret": "xyz789secretkey"}` | None | Yes (if not using AWS Secrets Manager) |
 | `KAFKA_CREDENTIALS` | JSON Array | Array of Kafka cluster connection objects. Each object must contain `sasl.username`, `sasl.password`, `kafka_cluster_id`, and `bootstrap.servers` for connecting to specific Kafka clusters. | `[{"sasl.username": "ABC123", "sasl.password": "secret123", "kafka_cluster_id": "lkc-abc123", "bootstrap.servers": "pkc-123.us-east-1.aws.confluent.cloud:9092"}]` | None | Yes (if not using AWS Secrets Manager) |
 | `USE_AWS_SECRETS_MANAGER` | Boolean | Controls whether to retrieve credentials from AWS Secrets Manager instead of using direct environment variables. When `True`, credentials are fetched from AWS Secrets Manager using the paths specified in other variables. | `True` or `False` | `False` | No |
@@ -159,160 +177,181 @@ uv run python src/thread_safe_app.py
 If `USE_SAMPLE_RECORDS` environment variable is set to `True`, the application will sample records from each topic to calculate the average record size in bytes.  For example, below is a screenshot of the application running successfully:
 
 ```log
-2025-09-25 23:15:35 - INFO - main - Retrieving the Confluent Cloud credentials from the .env file.
-2025-09-25 23:15:35 - INFO - main - Retrieving the Kafka Cluster credentials from the .env file.
-2025-09-25 23:15:35 - INFO - main - ====================================================================================================
-2025-09-25 23:15:35 - INFO - main - MULTITHREADED KAFKA CLUSTER ANALYSIS STARTING
-2025-09-25 23:15:35 - INFO - main - ----------------------------------------------------------------------------------------------------
-2025-09-25 23:15:35 - INFO - main - Number of Kafka clusters to analyze: 1
-2025-09-25 23:15:35 - INFO - main - Max concurrent Kafka clusters: 4
-2025-09-25 23:15:35 - INFO - main - Max concurrent topics per cluster: 8
-2025-09-25 23:15:35 - INFO - main - Analysis method: Record sampling
-2025-09-25 23:15:35 - INFO - main - ====================================================================================================
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - ====================================================================================================
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - INITIAL ANALYSIS PARAMETERS
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - ----------------------------------------------------------------------------------------------------
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Analysis Timestamp: 2025-09-25T23:15:53.448048
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Kafka Cluster ID: lkc-r9mvmp
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Max worker threads: 8
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Connecting to Kafka cluster and retrieving metadata...
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Found 2 topics to analyze
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Excluding internal topics
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Required consumption throughput factor: 10.0
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Minimum required throughput threshold: 10.0 MB/s
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Topic filter: None
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Default Partition Count: 6
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Using sample records for average record size calculation
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Sampling batch size: 10,000 records
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Sampling days: 1 days
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Sampling max consecutive nulls: 50 records
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Sampling timeout: 2.0 seconds
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - Sampling max continuous failed batches: 5 batches
-2025-09-25 23:15:53 - INFO - __log_initial_parameters - ====================================================================================================
-2025-09-25 23:15:53 - INFO - analyze_all_topics - Created the lkc-r9mvmp-recommender-1758856553-detail-report.csv file
-2025-09-25 23:15:53 - INFO - analyze_topic - [Thread-6156627968] Analyzing topic stock_trades with 1-day rolling window (from 2025-09-25T03:15:53+00:00)
-2025-09-25 23:15:53 - INFO - analyze_topic - [Thread-6173454336] Analyzing topic stock_trades_with_totals with 1-day rolling window (from 2025-09-25T03:15:53+00:00)
-2025-09-25 23:16:43 - INFO - _sample_record_sizes - [Thread-6156627968] Partition 000 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
-2025-09-25 23:16:43 - INFO - _sample_record_sizes - [Thread-6156627968]     Sampling from partition 000 of 006: offsets [28396, 77350)
-2025-09-25 23:16:48 - WARNING - _sample_record_sizes - [Thread-6156627968] Failed to seek for stock_trades 000 of 006: KafkaError{code=_ALL_BROKERS_DOWN,val=-187,str="Failed to get watermark offsets: Local: All broker connections are down"}
-2025-09-25 23:16:48 - INFO - _sample_record_sizes - [Thread-6156627968] Partition 002 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
-2025-09-25 23:16:48 - INFO - _sample_record_sizes - [Thread-6156627968]     Sampling from partition 002 of 006: offsets [14046, 38707)
-2025-09-25 23:17:00 - INFO - _sample_record_sizes - [Thread-6173454336] Partition 000 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
-2025-09-25 23:17:00 - INFO - _sample_record_sizes - [Thread-6173454336]     Sampling from partition 000 of 006: offsets [14889, 41999)
-2025-09-25 23:17:03 - WARNING - _sample_record_sizes - [Thread-6173454336] Failed to seek for stock_trades_with_totals 000 of 006: KafkaError{code=_STATE,val=-172,str="Failed to seek to offset 14889: Local: Erroneous state"}
-2025-09-25 23:17:03 - INFO - _sample_record_sizes - [Thread-6173454336] Partition 001 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
-2025-09-25 23:17:03 - INFO - _sample_record_sizes - [Thread-6173454336]     Sampling from partition 001 of 006: offsets [17432, 49459)
-2025-09-25 23:17:04 - INFO - _sample_record_sizes - [Thread-6156627968]       Batch 1: 5,000 valid records (3 errors/nulls), progress: 20.3%, running avg: 85.39 bytes
-2025-09-25 23:17:04 - INFO - _sample_record_sizes - [Thread-6156627968]       Batch 2: 5,000 valid records (0 errors/nulls), progress: 40.5%, running avg: 85.41 bytes
-2025-09-25 23:17:04 - INFO - _sample_record_sizes - [Thread-6173454336]       Batch 1: 5,000 valid records (0 errors/nulls), progress: 15.6%, running avg: 35.43 bytes
-2025-09-25 23:17:06 - INFO - _sample_record_sizes - [Thread-6173454336]       Batch 2: 5,000 valid records (0 errors/nulls), progress: 31.2%, running avg: 35.44 bytes
-2025-09-25 23:17:07 - INFO - _sample_record_sizes - [Thread-6156627968]       Batch 3: 5,000 valid records (1 errors/nulls), progress: 60.8%, running avg: 85.42 bytes
-2025-09-25 23:17:08 - INFO - _sample_record_sizes - [Thread-6173454336]       Batch 3: 5,000 valid records (1 errors/nulls), progress: 46.8%, running avg: 35.44 bytes
-2025-09-25 23:17:08 - INFO - _sample_record_sizes - [Thread-6173454336]       Batch 4: 5,000 valid records (0 errors/nulls), progress: 62.4%, running avg: 35.45 bytes
-2025-09-25 23:17:08 - INFO - _sample_record_sizes - [Thread-6156627968]       Batch 4: 5,000 valid records (0 errors/nulls), progress: 81.1%, running avg: 85.42 bytes
-2025-09-25 23:17:10 - INFO - _sample_record_sizes - [Thread-6173454336]       Batch 5: 5,000 valid records (1 errors/nulls), progress: 78.1%, running avg: 35.45 bytes
-2025-09-25 23:17:11 - INFO - _sample_record_sizes - [Thread-6156627968]       Batch 5: 4,661 valid records (2 errors/nulls), progress: 100.0%, running avg: 85.42 bytes
-2025-09-25 23:17:11 - INFO - _sample_record_sizes - [Thread-6156627968] Partition 004 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
-2025-09-25 23:17:11 - INFO - _sample_record_sizes - [Thread-6156627968]     Sampling from partition 004 of 006: offsets [13919, 38808)
-2025-09-25 23:17:11 - INFO - _sample_record_sizes - [Thread-6173454336]       Batch 6: 5,000 valid records (0 errors/nulls), progress: 93.7%, running avg: 35.45 bytes
-2025-09-25 23:17:11 - INFO - _sample_record_sizes - [Thread-6173454336]       Batch 7: 1,585 valid records (1 errors/nulls), progress: 98.6%, running avg: 35.45 bytes
-2025-09-25 23:17:11 - WARNING - _sample_record_sizes - [Thread-6173454336]       Batch 8: No valid records processed (1 attempts, 0 consecutive nulls) [1/5 consecutive failures]
-2025-09-25 23:17:11 - WARNING - _sample_record_sizes - [Thread-6173454336]       Batch 9: No valid records processed (1 attempts, 0 consecutive nulls) [2/5 consecutive failures]
-2025-09-25 23:17:11 - WARNING - _sample_record_sizes - [Thread-6173454336]       Batch 10: No valid records processed (1 attempts, 0 consecutive nulls) [3/5 consecutive failures]
-2025-09-25 23:17:11 - WARNING - _sample_record_sizes - [Thread-6173454336]       Batch 11: No valid records processed (1 attempts, 0 consecutive nulls) [4/5 consecutive failures]
-2025-09-25 23:17:11 - WARNING - _sample_record_sizes - [Thread-6173454336]       Batch 12: No valid records processed (1 attempts, 0 consecutive nulls) [5/5 consecutive failures]
-2025-09-25 23:17:11 - WARNING - _sample_record_sizes - [Thread-6173454336] Giving up on partition 001 of 006 after 5 consecutive failed batches
-2025-09-25 23:17:11 - INFO - _sample_record_sizes - [Thread-6173454336] Partition 002 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
-2025-09-25 23:17:11 - INFO - _sample_record_sizes - [Thread-6173454336]     Sampling from partition 002 of 006: offsets [16832, 45949)
-2025-09-25 23:17:16 - WARNING - _sample_record_sizes - [Thread-6156627968] Failed to seek for stock_trades 004 of 006: KafkaError{code=_TIMED_OUT,val=-185,str="Failed to get watermark offsets: Local: Timed out"}
-2025-09-25 23:17:16 - INFO - _sample_record_sizes - [Thread-6156627968] Partition 005 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
-2025-09-25 23:17:16 - WARNING - _sample_record_sizes - [Thread-6173454336] Failed to seek for stock_trades_with_totals 002 of 006: KafkaError{code=_TIMED_OUT,val=-185,str="Failed to get watermark offsets: Local: Timed out"}
-2025-09-25 23:17:16 - INFO - _sample_record_sizes - [Thread-6156627968]     Sampling from partition 005 of 006: offsets [42205, 115561)
-2025-09-25 23:17:16 - INFO - _sample_record_sizes - [Thread-6173454336] Partition 003 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
-2025-09-25 23:17:16 - INFO - _sample_record_sizes - [Thread-6173454336]     Sampling from partition 003 of 006: offsets [16523, 50212)
-2025-09-25 23:17:21 - WARNING - _sample_record_sizes - [Thread-6156627968] Failed to seek for stock_trades 005 of 006: KafkaError{code=_ALL_BROKERS_DOWN,val=-187,str="Failed to get watermark offsets: Local: All broker connections are down"}
-2025-09-25 23:17:21 - INFO - _sample_record_sizes - [Thread-6156627968] Final average: 85.42 bytes from 24,661 records
-2025-09-25 23:17:21 - INFO - update_progress - Progress: 1/2 (50.0%) topics completed
-2025-09-25 23:17:21 - WARNING - _sample_record_sizes - [Thread-6173454336] Failed to seek for stock_trades_with_totals 003 of 006: KafkaError{code=_ALL_BROKERS_DOWN,val=-187,str="Failed to get watermark offsets: Local: All broker connections are down"}
-2025-09-25 23:17:21 - INFO - _sample_record_sizes - [Thread-6173454336] Partition 004 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
-2025-09-25 23:17:21 - INFO - _sample_record_sizes - [Thread-6173454336]     Sampling from partition 004 of 006: offsets [17379, 43213)
-2025-09-25 23:17:26 - WARNING - _sample_record_sizes - [Thread-6173454336] Failed to seek for stock_trades_with_totals 004 of 006: KafkaError{code=_ALL_BROKERS_DOWN,val=-187,str="Failed to get watermark offsets: Local: All broker connections are down"}
-2025-09-25 23:17:26 - INFO - _sample_record_sizes - [Thread-6173454336] Partition 005 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
-2025-09-25 23:17:26 - INFO - _sample_record_sizes - [Thread-6173454336]     Sampling from partition 005 of 006: offsets [16884, 43288)
-2025-09-25 23:17:31 - WARNING - _sample_record_sizes - [Thread-6173454336] Failed to seek for stock_trades_with_totals 005 of 006: KafkaError{code=_ALL_BROKERS_DOWN,val=-187,str="Failed to get watermark offsets: Local: All broker connections are down"}
-2025-09-25 23:17:31 - INFO - _sample_record_sizes - [Thread-6173454336] Final average: 35.45 bytes from 31,585 records
-2025-09-25 23:17:31 - INFO - update_progress - Progress: 2/2 (100.0%) topics completed
-2025-09-25 23:17:31 - INFO - __log_summary_stats - ====================================================================================================
-2025-09-25 23:17:31 - INFO - __log_summary_stats - ANALYSIS SUMMARY STATISTICS
-2025-09-25 23:17:31 - INFO - __log_summary_stats - ----------------------------------------------------------------------------------------------------
-2025-09-25 23:17:31 - INFO - __log_summary_stats - Elapsed Time: 0.03 hours
-2025-09-25 23:17:31 - INFO - __log_summary_stats - Total Topics: 2
-2025-09-25 23:17:31 - INFO - __log_summary_stats - Active Topics: 2
-2025-09-25 23:17:31 - INFO - __log_summary_stats - Active Topics %: 100.0%
-2025-09-25 23:17:31 - INFO - __log_summary_stats - Total Partitions: 12
-2025-09-25 23:17:31 - INFO - __log_summary_stats - Total Recommended Partitions: 20
-2025-09-25 23:17:31 - INFO - __log_summary_stats - Non-Empty Topics Total Partitions: 12
-2025-09-25 23:17:31 - INFO - __log_summary_stats - RECOMMENDED Increase in Partitions: 66.7%
-2025-09-25 23:17:31 - INFO - __log_summary_stats - Total Records: 544,546
-2025-09-25 23:17:31 - INFO - __log_summary_stats - Average Partitions per Topic: 6
-2025-09-25 23:17:31 - INFO - __log_summary_stats - Average Partitions per Active Topic: 6
-2025-09-25 23:17:31 - INFO - __log_summary_stats - Average Recommended Partitions per Topic: 10
-2025-09-25 23:17:31 - INFO - __log_summary_stats - ====================================================================================================
-2025-09-25 23:17:31 - INFO - analyze_kafka_cluster - KAFKA CLUSTER lkc-r9mvmp: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.
-2025-09-25 23:17:31 - INFO - main - SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.
+2025-09-27 12:52:13 - INFO - main - Retrieving the Confluent Cloud credentials from the .env file.
+2025-09-27 12:52:13 - INFO - _fetch_kafka_credentials_via_environment_variables - Retrieving the Kafka Cluster credentials from the .env file.
+2025-09-27 12:52:13 - INFO - main - ====================================================================================================
+2025-09-27 12:52:13 - INFO - main - MULTITHREADED KAFKA CLUSTER ANALYSIS STARTING
+2025-09-27 12:52:13 - INFO - main - ----------------------------------------------------------------------------------------------------
+2025-09-27 12:52:13 - INFO - main - Number of Kafka clusters to analyze: 1
+2025-09-27 12:52:13 - INFO - main - Max concurrent Kafka clusters: 4
+2025-09-27 12:52:13 - INFO - main - Max concurrent topics per cluster: 8
+2025-09-27 12:52:13 - INFO - main - Analysis method: Record sampling
+2025-09-27 12:52:13 - INFO - main - ====================================================================================================
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - ====================================================================================================
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - INITIAL ANALYSIS PARAMETERS
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - ----------------------------------------------------------------------------------------------------
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Analysis Timestamp: 2025-09-27T12:52:14.103745
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Using Confluent Cloud API Key to fetch Kafka credential: False
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Environment Filter: None
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Kafka Cluster Filter: None
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Principal ID Filter: u-vzw2nj
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Kafka Cluster ID: lkc-r9mvmp
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Max worker threads: 8
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Connecting to Kafka cluster and retrieving metadata...
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Found 2 topics to analyze
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Excluding internal topics
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Required consumption throughput factor: 10.0
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Minimum required throughput threshold: 10.0 MB/s
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Topic filter: None
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Default Partition Count: 6
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Using sample records for average record size calculation
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Sampling batch size: 10,000 records
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Sampling days: 1 days
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Sampling max consecutive nulls: 50 records
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Sampling timeout: 2.0 seconds
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - Sampling max continuous failed batches: 5 batches
+2025-09-27 12:52:14 - INFO - __log_initial_parameters - ====================================================================================================
+2025-09-27 12:52:14 - INFO - analyze_all_topics - Created the lkc-r9mvmp-recommender-1758991934-detail-report.csv file
+2025-09-27 12:52:14 - INFO - analyze_topic - [Thread-6124875776] Analyzing topic stock_trades with 1-day rolling window (from 2025-09-26T16:52:14+00:00)
+2025-09-27 12:52:14 - INFO - analyze_topic - [Thread-6141702144] Analyzing topic stock_trades_with_totals with 1-day rolling window (from 2025-09-26T16:52:14+00:00)
+2025-09-27 12:52:16 - INFO - _sample_record_sizes - [Thread-6124875776] Partition 000 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
+2025-09-27 12:52:16 - INFO - _sample_record_sizes - [Thread-6124875776]     Sampling from partition 000 of 006: offsets [105357, 154518)
+2025-09-27 12:52:17 - WARNING - _sample_record_sizes - [Thread-6124875776] Failed to seek for stock_trades 000 of 006: KafkaError{code=_STATE,val=-172,str="Failed to seek to offset 105357: Local: Erroneous state"}
+2025-09-27 12:52:17 - INFO - _sample_record_sizes - [Thread-6124875776] Partition 002 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
+2025-09-27 12:52:17 - INFO - _sample_record_sizes - [Thread-6124875776]     Sampling from partition 002 of 006: offsets [52824, 77480)
+2025-09-27 12:52:17 - WARNING - _sample_record_sizes - [Thread-6124875776] Failed to seek for stock_trades 002 of 006: KafkaError{code=_STATE,val=-172,str="Failed to seek to offset 52824: Local: Erroneous state"}
+2025-09-27 12:52:17 - INFO - _sample_record_sizes - [Thread-6124875776] Partition 004 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
+2025-09-27 12:52:17 - INFO - _sample_record_sizes - [Thread-6124875776]     Sampling from partition 004 of 006: offsets [52809, 77378)
+2025-09-27 12:52:18 - INFO - _sample_record_sizes - [Thread-6141702144] Partition 000 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
+2025-09-27 12:52:18 - INFO - _sample_record_sizes - [Thread-6141702144]     Sampling from partition 000 of 006: offsets [56571, 83999)
+2025-09-27 12:52:19 - INFO - _sample_record_sizes - [Thread-6124875776]       Batch 1: 5,000 valid records (0 errors/nulls), progress: 20.4%, running avg: 83.42 bytes
+2025-09-27 12:52:19 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 1: 5,000 valid records (0 errors/nulls), progress: 18.2%, running avg: 35.46 bytes
+2025-09-27 12:52:20 - INFO - _sample_record_sizes - [Thread-6124875776]       Batch 2: 5,000 valid records (0 errors/nulls), progress: 40.7%, running avg: 83.43 bytes
+2025-09-27 12:52:21 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 2: 5,000 valid records (0 errors/nulls), progress: 36.5%, running avg: 35.46 bytes
+2025-09-27 12:52:21 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 3: 5,000 valid records (0 errors/nulls), progress: 54.7%, running avg: 35.46 bytes
+2025-09-27 12:52:21 - INFO - _sample_record_sizes - [Thread-6124875776]       Batch 3: 5,000 valid records (0 errors/nulls), progress: 61.1%, running avg: 83.43 bytes
+2025-09-27 12:52:21 - INFO - _sample_record_sizes - [Thread-6124875776]       Batch 4: 5,000 valid records (0 errors/nulls), progress: 81.4%, running avg: 83.43 bytes
+2025-09-27 12:52:22 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 4: 5,000 valid records (0 errors/nulls), progress: 72.9%, running avg: 35.46 bytes
+2025-09-27 12:52:22 - INFO - _sample_record_sizes - [Thread-6124875776]       Batch 5: 4,569 valid records (1 errors/nulls), progress: 100.0%, running avg: 83.43 bytes
+2025-09-27 12:52:22 - INFO - _sample_record_sizes - [Thread-6124875776] Partition 005 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
+2025-09-27 12:52:22 - INFO - _sample_record_sizes - [Thread-6124875776]     Sampling from partition 005 of 006: offsets [157387, 231619)
+2025-09-27 12:52:23 - WARNING - _sample_record_sizes - [Thread-6124875776] Failed to seek for stock_trades 005 of 006: KafkaError{code=_STATE,val=-172,str="Failed to seek to offset 157387: Local: Erroneous state"}
+2025-09-27 12:52:23 - INFO - _sample_record_sizes - [Thread-6124875776] Final average: 83.43 bytes from 24,569 records
+2025-09-27 12:52:23 - INFO - update_progress - Progress: 1 of 2 (50.0%) topics completed
+2025-09-27 12:52:23 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 5: 5,000 valid records (0 errors/nulls), progress: 91.1%, running avg: 35.46 bytes
+2025-09-27 12:52:25 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 6: 2,041 valid records (1 errors/nulls), progress: 98.6%, running avg: 35.46 bytes
+2025-09-27 12:53:05 - WARNING - _sample_record_sizes - [Thread-6141702144]       Batch 7: No valid records processed (50 attempts, 50 consecutive nulls) [1/5 consecutive failures]
+2025-09-27 12:53:05 - WARNING - _sample_record_sizes - [Thread-6141702144] Too many consecutive null polls (50) - stopping partition 000 of 006
+2025-09-27 12:53:05 - INFO - _sample_record_sizes - [Thread-6141702144] Partition 001 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
+2025-09-27 12:53:05 - INFO - _sample_record_sizes - [Thread-6141702144]     Sampling from partition 001 of 006: offsets [68164, 97321)
+2025-09-27 12:53:07 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 1: 5,000 valid records (0 errors/nulls), progress: 17.1%, running avg: 35.46 bytes
+2025-09-27 12:53:08 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 2: 5,000 valid records (0 errors/nulls), progress: 34.3%, running avg: 35.46 bytes
+2025-09-27 12:53:08 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 3: 5,000 valid records (0 errors/nulls), progress: 51.4%, running avg: 35.46 bytes
+2025-09-27 12:53:09 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 4: 5,000 valid records (0 errors/nulls), progress: 68.6%, running avg: 35.46 bytes
+2025-09-27 12:53:10 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 5: 5,000 valid records (0 errors/nulls), progress: 85.7%, running avg: 35.46 bytes
+2025-09-27 12:53:12 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 6: 3,747 valid records (1 errors/nulls), progress: 98.6%, running avg: 35.46 bytes
+2025-09-27 12:53:52 - WARNING - _sample_record_sizes - [Thread-6141702144]       Batch 7: No valid records processed (50 attempts, 50 consecutive nulls) [1/5 consecutive failures]
+2025-09-27 12:53:52 - WARNING - _sample_record_sizes - [Thread-6141702144] Too many consecutive null polls (50) - stopping partition 001 of 006
+2025-09-27 12:53:52 - INFO - _sample_record_sizes - [Thread-6141702144] Partition 002 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
+2025-09-27 12:53:52 - INFO - _sample_record_sizes - [Thread-6141702144]     Sampling from partition 002 of 006: offsets [63234, 92593)
+2025-09-27 12:53:54 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 1: 5,000 valid records (0 errors/nulls), progress: 17.0%, running avg: 35.46 bytes
+2025-09-27 12:53:54 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 2: 5,000 valid records (0 errors/nulls), progress: 34.1%, running avg: 35.46 bytes
+2025-09-27 12:53:55 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 3: 5,000 valid records (0 errors/nulls), progress: 51.1%, running avg: 35.46 bytes
+2025-09-27 12:53:57 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 4: 5,000 valid records (0 errors/nulls), progress: 68.1%, running avg: 35.46 bytes
+2025-09-27 12:53:57 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 5: 5,000 valid records (0 errors/nulls), progress: 85.2%, running avg: 35.46 bytes
+2025-09-27 12:53:58 - INFO - _sample_record_sizes - [Thread-6141702144]       Batch 6: 3,957 valid records (1 errors/nulls), progress: 98.6%, running avg: 35.46 bytes
+2025-09-27 12:53:58 - WARNING - _sample_record_sizes - [Thread-6141702144]       Batch 7: No valid records processed (1 attempts, 0 consecutive nulls) [1/5 consecutive failures]
+2025-09-27 12:53:58 - WARNING - _sample_record_sizes - [Thread-6141702144]       Batch 8: No valid records processed (1 attempts, 0 consecutive nulls) [2/5 consecutive failures]
+2025-09-27 12:53:58 - WARNING - _sample_record_sizes - [Thread-6141702144]       Batch 9: No valid records processed (1 attempts, 0 consecutive nulls) [3/5 consecutive failures]
+2025-09-27 12:53:58 - WARNING - _sample_record_sizes - [Thread-6141702144]       Batch 10: No valid records processed (1 attempts, 0 consecutive nulls) [4/5 consecutive failures]
+2025-09-27 12:53:58 - WARNING - _sample_record_sizes - [Thread-6141702144]       Batch 11: No valid records processed (1 attempts, 0 consecutive nulls) [5/5 consecutive failures]
+2025-09-27 12:53:58 - WARNING - _sample_record_sizes - [Thread-6141702144] Giving up on partition 002 of 006 after 5 consecutive failed batches
+2025-09-27 12:53:58 - INFO - _sample_record_sizes - [Thread-6141702144] Partition 003 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
+2025-09-27 12:53:58 - INFO - _sample_record_sizes - [Thread-6141702144]     Sampling from partition 003 of 006: offsets [67050, 97107)
+2025-09-27 12:53:58 - WARNING - _sample_record_sizes - [Thread-6141702144] Failed to seek for stock_trades_with_totals 003 of 006: KafkaError{code=_STATE,val=-172,str="Failed to seek to offset 67050: Local: Erroneous state"}
+2025-09-27 12:53:58 - INFO - _sample_record_sizes - [Thread-6141702144] Partition 004 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
+2025-09-27 12:53:58 - INFO - _sample_record_sizes - [Thread-6141702144]     Sampling from partition 004 of 006: offsets [58207, 88746)
+2025-09-27 12:53:58 - WARNING - _sample_record_sizes - [Thread-6141702144] Failed to seek for stock_trades_with_totals 004 of 006: KafkaError{code=_STATE,val=-172,str="Failed to seek to offset 58207: Local: Erroneous state"}
+2025-09-27 12:53:58 - INFO - _sample_record_sizes - [Thread-6141702144] Partition 005 of 006: using effective batch size 5,000 (requested: 10,000, optimal: 5,000)
+2025-09-27 12:53:58 - INFO - _sample_record_sizes - [Thread-6141702144]     Sampling from partition 005 of 006: offsets [60340, 88837)
+2025-09-27 12:53:59 - WARNING - _sample_record_sizes - [Thread-6141702144] Failed to seek for stock_trades_with_totals 005 of 006: KafkaError{code=_STATE,val=-172,str="Failed to seek to offset 60340: Local: Erroneous state"}
+2025-09-27 12:53:59 - INFO - _sample_record_sizes - [Thread-6141702144] Final average: 35.46 bytes from 84,745 records
+2025-09-27 12:53:59 - INFO - update_progress - Progress: 2 of 2 (100.0%) topics completed
+2025-09-27 12:53:59 - INFO - __log_summary_stats - ====================================================================================================
+2025-09-27 12:53:59 - INFO - __log_summary_stats - ANALYSIS SUMMARY STATISTICS
+2025-09-27 12:53:59 - INFO - __log_summary_stats - ----------------------------------------------------------------------------------------------------
+2025-09-27 12:53:59 - INFO - __log_summary_stats - Elapsed Time: 0.03 hours
+2025-09-27 12:53:59 - INFO - __log_summary_stats - Total Topics: 2
+2025-09-27 12:53:59 - INFO - __log_summary_stats - Active Topics: 2
+2025-09-27 12:53:59 - INFO - __log_summary_stats - Active Topics %: 100.0%
+2025-09-27 12:53:59 - INFO - __log_summary_stats - Total Partitions: 12
+2025-09-27 12:53:59 - INFO - __log_summary_stats - Total Recommended Partitions: 20
+2025-09-27 12:53:59 - INFO - __log_summary_stats - Non-Empty Topics Total Partitions: 12
+2025-09-27 12:53:59 - INFO - __log_summary_stats - RECOMMENDED Increase in Partitions: 66.7%
+2025-09-27 12:53:59 - INFO - __log_summary_stats - Total Records: 1,089,598
+2025-09-27 12:53:59 - INFO - __log_summary_stats - Average Partitions per Topic: 6
+2025-09-27 12:53:59 - INFO - __log_summary_stats - Average Partitions per Active Topic: 6
+2025-09-27 12:53:59 - INFO - __log_summary_stats - Average Recommended Partitions per Topic: 10
+2025-09-27 12:53:59 - INFO - __log_summary_stats - ====================================================================================================
+2025-09-27 12:53:59 - INFO - _analyze_kafka_cluster - KAFKA CLUSTER lkc-r9mvmp: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.
+2025-09-27 12:53:59 - INFO - main - SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.
 ```
 
 If `USE_SAMPLE_RECORDS` is set to `False`, the application will use the Confluent Cloud Metrics API to retrieve the average and peak consumption in bytes over a rolling seven-day period.  For example, below is a screenshot of the application running successfully:
 
 ```log
-2025-09-25 23:19:39 - INFO - main - Retrieving the Confluent Cloud credentials from the .env file.
-2025-09-25 23:19:39 - INFO - main - Retrieving the Kafka Cluster credentials from the .env file.
-2025-09-25 23:19:39 - INFO - main - ====================================================================================================
-2025-09-25 23:19:39 - INFO - main - MULTITHREADED KAFKA CLUSTER ANALYSIS STARTING
-2025-09-25 23:19:39 - INFO - main - ----------------------------------------------------------------------------------------------------
-2025-09-25 23:19:39 - INFO - main - Number of Kafka clusters to analyze: 1
-2025-09-25 23:19:39 - INFO - main - Max concurrent Kafka clusters: 4
-2025-09-25 23:19:39 - INFO - main - Max concurrent topics per cluster: 8
-2025-09-25 23:19:39 - INFO - main - Analysis method: Metrics API
-2025-09-25 23:19:39 - INFO - main - ====================================================================================================
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - ====================================================================================================
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - INITIAL ANALYSIS PARAMETERS
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - ----------------------------------------------------------------------------------------------------
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Analysis Timestamp: 2025-09-25T23:19:51.973369
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Kafka Cluster ID: lkc-r9mvmp
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Max worker threads: 8
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Connecting to Kafka cluster and retrieving metadata...
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Found 2 topics to analyze
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Excluding internal topics
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Required consumption throughput factor: 10.0
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Minimum required throughput threshold: 10.0 MB/s
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Topic filter: None
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Default Partition Count: 6
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - Using Metrics API for average record size calculation
-2025-09-25 23:19:51 - INFO - __log_initial_parameters - ====================================================================================================
-2025-09-25 23:19:51 - INFO - analyze_all_topics - Created the lkc-r9mvmp-recommender-1758856791-detail-report.csv file
-2025-09-25 23:20:01 - INFO - analyze_topic_with_metrics - [Thread-6123843584] Confluent Metrics API - For topic stock_trades, the average bytes per record is 157.23 bytes/record for a total of 270,800 records.
-2025-09-25 23:20:01 - INFO - analyze_topic_with_metrics - [Thread-6140669952] Confluent Metrics API - For topic stock_trades_with_totals, the average bytes per record is 112.22 bytes/record for a total of 270,813 records.
-2025-09-25 23:20:01 - INFO - update_progress - Progress: 1/2 (50.0%) topics completed
-2025-09-25 23:20:01 - INFO - update_progress - Progress: 2/2 (100.0%) topics completed
-2025-09-25 23:20:01 - INFO - __log_summary_stats - ====================================================================================================
-2025-09-25 23:20:01 - INFO - __log_summary_stats - ANALYSIS SUMMARY STATISTICS
-2025-09-25 23:20:01 - INFO - __log_summary_stats - ----------------------------------------------------------------------------------------------------
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Elapsed Time: 0.00 hours
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Total Topics: 2
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Active Topics: 2
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Active Topics %: 100.0%
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Total Partitions: 12
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Total Recommended Partitions: 20
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Non-Empty Topics Total Partitions: 12
-2025-09-25 23:20:01 - INFO - __log_summary_stats - RECOMMENDED Increase in Partitions: 66.7%
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Total Records: 541,613.0
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Average Partitions per Topic: 6
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Average Partitions per Active Topic: 6
-2025-09-25 23:20:01 - INFO - __log_summary_stats - Average Recommended Partitions per Topic: 10
-2025-09-25 23:20:01 - INFO - __log_summary_stats - ====================================================================================================
-2025-09-25 23:20:01 - INFO - analyze_kafka_cluster - KAFKA CLUSTER lkc-r9mvmp: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.
-2025-09-25 23:20:01 - INFO - main - SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.
+2025-09-27 16:13:35 - INFO - main - Retrieving the Confluent Cloud credentials from the .env file.
+2025-09-27 16:13:38 - INFO - main - ====================================================================================================
+2025-09-27 16:13:38 - INFO - main - MULTITHREADED KAFKA CLUSTER ANALYSIS STARTING
+2025-09-27 16:13:38 - INFO - main - ----------------------------------------------------------------------------------------------------
+2025-09-27 16:13:38 - INFO - main - Number of Kafka clusters to analyze: 1
+2025-09-27 16:13:38 - INFO - main - Max concurrent Kafka clusters: 4
+2025-09-27 16:13:38 - INFO - main - Max concurrent topics per cluster: 8
+2025-09-27 16:13:38 - INFO - main - Analysis method: Metrics API
+2025-09-27 16:13:38 - INFO - main - ====================================================================================================
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - ====================================================================================================
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - INITIAL ANALYSIS PARAMETERS
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - ----------------------------------------------------------------------------------------------------
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Analysis Timestamp: 2025-09-27T16:13:44.387435
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Using Confluent Cloud API Key to fetch Kafka credential: True
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Environment Filter: None
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Kafka Cluster Filter: None
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Principal ID Filter: u-vzw2nj
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Kafka Cluster ID: lkc-r9mvmp
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Max worker threads: 8
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Connecting to Kafka cluster and retrieving metadata...
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Found 2 topics to analyze
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Excluding internal topics
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Required consumption throughput factor: 10.0
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Minimum required throughput threshold: 10.0 MB/s
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Topic filter: None
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Default Partition Count: 6
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - Using Metrics API for average record size calculation
+2025-09-27 16:13:44 - INFO - __log_initial_parameters - ====================================================================================================
+2025-09-27 16:13:44 - INFO - analyze_all_topics - Created the lkc-r9mvmp-recommender-1759004024-detail-report.csv file
+2025-09-27 16:13:49 - INFO - analyze_topic_with_metrics - [Thread-6111768576] Confluent Metrics API - For topic stock_trades, the average bytes per record is 157.33 bytes/record for a total of 565,163 records.
+2025-09-27 16:13:49 - INFO - update_progress - Progress: 1 of 2 (50.0%) topics completed
+2025-09-27 16:13:49 - INFO - analyze_topic_with_metrics - [Thread-6128594944] Confluent Metrics API - For topic stock_trades_with_totals, the average bytes per record is 112.36 bytes/record for a total of 565,161 records.
+2025-09-27 16:13:49 - INFO - update_progress - Progress: 2 of 2 (100.0%) topics completed
+2025-09-27 16:13:49 - INFO - __log_summary_stats - ====================================================================================================
+2025-09-27 16:13:49 - INFO - __log_summary_stats - ANALYSIS SUMMARY STATISTICS
+2025-09-27 16:13:49 - INFO - __log_summary_stats - ----------------------------------------------------------------------------------------------------
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Elapsed Time: 0.00 hours
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Total Topics: 2
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Active Topics: 2
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Active Topics %: 100.0%
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Total Partitions: 12
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Total Recommended Partitions: 20
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Non-Empty Topics Total Partitions: 12
+2025-09-27 16:13:49 - INFO - __log_summary_stats - RECOMMENDED Increase in Partitions: 66.7%
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Total Records: 1,130,324.0
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Average Partitions per Topic: 6
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Average Partitions per Active Topic: 6
+2025-09-27 16:13:49 - INFO - __log_summary_stats - Average Recommended Partitions per Topic: 10
+2025-09-27 16:13:49 - INFO - __log_summary_stats - ====================================================================================================
+2025-09-27 16:13:49 - INFO - _analyze_kafka_cluster - KAFKA CLUSTER lkc-r9mvmp: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.
+2025-09-27 16:13:50 - INFO - _analyze_kafka_cluster - Kafka API key PNL3OSIP6DGYDGVW for Kafka Cluster lkc-r9mvmp deleted successfully.
+2025-09-27 16:13:50 - INFO - main - SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.
 ```
 
 #### 1.3.1 Did you notice we prefix `uv run` to `python src/thread_safe_app.py`?
@@ -361,15 +400,15 @@ The application automatically generates two comprehensive CSV reports for each K
 
     ```csv
     method,topic_name,is_compacted,number_of_records,number_of_partitions,required_throughput,consumer_throughput,recommended_partitions,status
-    sampling_records,stock_trades,no,270426,6,220.29825789713522,22.02982578971352,10,active
-    sampling_records,stock_trades_with_totals,no,274120,6,92.68430746373485,9.268430746373486,10,active
+    sampling_records,stock_trades,no,540995,6,430.4537115722374,43.04537115722374,10,active
+    sampling_records,stock_trades_with_totals,no,548603,6,185.5113950547402,18.55113950547402,10,active
     ```
 
 - **Summary Report CSV.**  Once all topics have been evaluated, this report consolidates the results into a high-level overview, providing a clear, data-driven snapshot of cluster-wide throughput patterns and partitioning recommendations.  Below is a screenshot of a sample summary report:
 
     ```csv
     stat,value
-    elapsed_time_hours,0.02721131139331394
+    elapsed_time_hours,0.029160885545942518
     method,sampling_records
     required_consumption_throughput_factor,10
     minimum_required_throughput_threshold,10.0
@@ -389,7 +428,7 @@ The application automatically generates two comprehensive CSV reports for each K
     active_total_partition_count,12
     percentage_decrease,0.0
     percentage_increase,66.66666666666666
-    total_records,544546
+    total_records,1089598
     average_partitions_per_topic,6.0
     active_average_partitions_per_topic,6.0
     average_recommended_partitions_per_topic,10.0
@@ -422,77 +461,126 @@ The **50 partitions** ensure that the consumer can achieve the required throughp
 #### 2.1 End-to-End Application Workflow
 ```mermaid
 sequenceDiagram
-    participant Main as thread_safe_app.py
-    participant TP as ThreadPoolExecutor (Clusters)
-    participant Analyzer as ThreadSafeKafkaTopicsAnalyzer
-    participant TopicTP as ThreadPoolExecutor (Topics)
-    participant TopicAnalyzer as ThreadSafeTopicAnalyzer
-    participant Consumer as Kafka Consumer
-    participant Admin as Kafka AdminClient
-    participant Metrics as MetricsClient
-    participant CSV as ThreadSafeCSVWriter
+    participant Main as Main Thread
+    participant EC as EnvironmentClient
+    participant AWS as AWS Secrets Manager
+    participant KTA as KafkaTopicsAnalyzer
+    participant TPE as ThreadPoolExecutor
+    participant Worker as Worker Thread
+    participant TA as TopicAnalyzer
+    participant KC as Kafka Consumer
+    participant MC as MetricsClient
+    participant CSV as CSV Writer
 
-    Main->>Main: Load configuration and credentials
-    Main->>TP: Create cluster-level thread pool
+    Main->>Main: Load environment variables
+    Main->>Main: Read configuration settings
+
+    alt Use AWS Secrets Manager
+        Main->>AWS: get_secrets(region, secret_name)
+        AWS-->>Main: Return credentials
+    else Use environment variables
+        Main->>Main: Read from .env file
+    end
+
+    alt Use Confluent Cloud API Key
+        Main->>EC: Create EnvironmentClient
+        Main->>EC: get_environment_list()
+        EC-->>Main: Return environments
+        Main->>EC: get_kafka_cluster_list(env_id)
+        EC-->>Main: Return kafka clusters
+        loop For each cluster
+            Main->>EC: create_kafka_api_key(cluster_id, principal_id)
+            EC-->>Main: Return API key pair
+        end
+    else Use existing credentials
+        Main->>Main: Load kafka credentials from env/secrets
+    end
+
+    Main->>KTA: Create ThreadSafeKafkaTopicsAnalyzer
+    Main->>KTA: analyze_all_topics()
+
+    KTA->>KTA: __get_topics_metadata()
+    KTA->>KTA: Get cluster metadata via AdminClient
+    KTA->>KTA: Filter topics (internal, topic_filter)
+    KTA->>KTA: Get topic configurations (retention, cleanup policy)
+
+    KTA->>CSV: Create ThreadSafeCSVWriter
+    CSV->>CSV: Initialize CSV file with headers
+
+    alt Single cluster
+        KTA->>KTA: _analyze_kafka_cluster() directly
+    else Multiple clusters
+        KTA->>TPE: Create ThreadPoolExecutor(max_cluster_workers)
+        loop For each cluster
+            KTA->>TPE: Submit _analyze_kafka_cluster task
+        end
+    end
+
+    KTA->>TPE: Create ThreadPoolExecutor(max_workers_per_cluster)
     
-    loop For each Kafka cluster
-        TP->>Analyzer: analyze_kafka_cluster()
+    loop For each topic
+        KTA->>TPE: Submit analyze_topic_worker task
         
-        Analyzer->>Admin: Get topics metadata
-        Admin-->>Analyzer: Return topic list and configs
+        TPE->>Worker: Execute in worker thread
+        Worker->>TA: Create ThreadSafeTopicAnalyzer
         
-        Analyzer->>CSV: Create thread-safe CSV writer
-        CSV-->>Analyzer: CSV writer ready
-        
-        Analyzer->>TopicTP: Create topic-level thread pool
-        
-        loop For each topic (parallel)
-            TopicTP->>TopicAnalyzer: analyze_topic_worker()
-            
-            alt Sample Records Method
-                rect rgb(173, 216, 230)
-                    TopicAnalyzer->>Consumer: Get partition offsets
-                    Consumer-->>TopicAnalyzer: Return watermarks
-                    
-                    TopicAnalyzer->>Consumer: Get timestamp-based offsets
-                    Consumer-->>TopicAnalyzer: Return start offsets
-                    
-                    loop For each partition
-                        TopicAnalyzer->>Consumer: Sample record sizes
-                        Consumer-->>TopicAnalyzer: Return record data
-                    end
-                    
-                    TopicAnalyzer-->>TopicTP: Return analysis result
-                end
+        alt Use sample records
+            rect rgb(173, 216, 230)
+                Worker->>TA: analyze_topic()
+                TA->>KC: Create unique Consumer instance
+                TA->>KC: get_watermark_offsets()
+                KC-->>TA: Return low/high watermarks
+                TA->>KC: offsets_for_times() for timestamp
+                KC-->>TA: Return offset at timestamp
                 
-            else Metrics API Method
-                rect rgb(144, 238, 144)
-                    TopicAnalyzer->>Metrics: Get RECEIVED_BYTES metric
-                    Metrics-->>TopicAnalyzer: Return bytes data
-                    
-                    TopicAnalyzer->>Metrics: Get RECEIVED_RECORDS metric  
-                    Metrics-->>TopicAnalyzer: Return records data
-                    
-                    TopicAnalyzer-->>TopicTP: Return analysis result
+                loop For each partition
+                    TA->>KC: assign([TopicPartition])
+                    TA->>KC: seek(offset)
+                    loop Batch processing
+                        TA->>KC: poll(timeout)
+                        KC-->>TA: Return record or None
+                        TA->>TA: Calculate record size
+                        TA->>TA: Update running totals
+                    end
                 end
+                TA->>KC: close()
+                TA-->>Worker: Return analysis result
             end
             
-            TopicTP->>Analyzer: Process result
-            Analyzer->>CSV: Write row (thread-safe)
-            CSV-->>Analyzer: Row written
+        else Use Metrics API
+            rect rgb(255, 182, 193)
+                Worker->>TA: analyze_topic_with_metrics()
+                TA->>MC: Create MetricsClient
+                TA->>MC: get_topic_daily_aggregated_totals(RECEIVED_BYTES)
+                MC-->>TA: Return bytes metrics
+                TA->>MC: get_topic_daily_aggregated_totals(RECEIVED_RECORDS)
+                MC-->>TA: Return records metrics
+                TA->>TA: Calculate avg bytes per record
+                TA-->>Worker: Return analysis result
+            end
         end
         
-        TopicTP-->>Analyzer: All topics completed
-        
-        Analyzer->>Analyzer: Calculate summary statistics
-        Analyzer->>CSV: Write summary report
-        CSV-->>Analyzer: Summary written
-        
-        Analyzer-->>TP: Cluster analysis complete
+        Worker->>KTA: __process_and_write_result()
+        KTA->>KTA: Calculate recommendations
+        KTA->>CSV: write_row() [thread-safe]
+        Worker-->>TPE: Return success/failure
     end
-    
-    TP-->>Main: All clusters completed
-    Main->>Main: Log final summary
+
+    TPE-->>KTA: All topic analysis complete
+    KTA->>KTA: __calculate_summary_stats()
+    KTA->>KTA: __write_summary_report()
+    KTA->>KTA: __log_summary_stats()
+
+    alt Confluent Cloud API cleanup
+        loop For each created API key
+            KTA->>EC: delete_kafka_api_key(api_key)
+            EC-->>KTA: Confirm deletion
+        end
+    end
+
+    KTA-->>Main: Return analysis success/failure
+    Main->>Main: Log final results
+    Main->>Main: Exit application
 ```
 
 ### 3.0 Unlocking High-Performance Consumer Throughput

@@ -4,10 +4,25 @@ All notable changes to this project will be documented in this file.
 The format is base on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.10.00.000] - TBD
+## [0.10.00.000] - 2025-09-27
 ### Added
 - Issue [#181](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/181)
 - Issue [#182](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/182)
+- Issue [#184](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/184)
+- Issue [#185](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/185)
+- Issue [#186](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/186)
+- Issue [#187](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/187)
+- Issue [#189](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/189)
+
+### Changed
+- Issue [#158](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/158)
+- Issue [#188](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/188)
+- Issue [#190](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/190)
+- Issue [#191](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/191)
+
+### Fixed
+- Issue [#192](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/192)
+- Issue [#193](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-app/issues/193)
 
 ## [0.09.00.000] - 2025-09-26
 ### Added
