@@ -34,4 +34,9 @@ DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS: Final[int] = 6
 DEFAULT_MAX_CLUSTER_WORKERS: Final[int] = 4
 DEFAULT_MAX_WORKERS_PER_CLUSTER: Final[int] = 8
 
+# RESTful API configuration
 DEFAULT_RESTFUL_API_MAX_RETRIES: Final[int] = 3
+
+# Logging configuration
+DEFAULT_TOOL_LOG_FILE: Final[str] = "kafka-cluster-topics-partition-count-recommender-tool.log"
+DEFAULT_TOOL_LOG_FORMAT: Final[str] = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

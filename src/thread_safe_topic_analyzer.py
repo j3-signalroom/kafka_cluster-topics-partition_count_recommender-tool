@@ -23,7 +23,7 @@ __email__      = "j3@thej3.com"
 __status__     = "dev"
 
 
-# Set up logging
+# Set up module logging
 logger = setup_logging()
 
 
@@ -323,10 +323,30 @@ class ThreadSafeTopicAnalyzer:
                               sampling_timeout_seconds: float,
                               sampling_max_continuous_failed_batches: int,
                               partition_details: List[Dict]) -> float:
-        """Sample record sizes from the specified partitions to calculate average record size."""
-        
+        """Sample record sizes from the specified partitions to calculate average record size.
+
+        Args:
+            topic_name (str): The name of the topic.
+            sampling_batch_size (int): Number of records to process per batch when sampling.
+            sampling_max_consecutive_nulls (int): Maximum number of consecutive null records to encounter before stopping sampling in a partition.
+            sampling_timeout_seconds (float): Timeout in seconds for polling records.
+            sampling_max_continuous_failed_batches (int): Maximum number of continuous failed batches before stopping sampling in a partition.
+            partition_details (List[Dict]): List of partition details including partition number,
+                                            start and end offsets, and record count.
+
+        Returns:
+            float: The average bytes per record sampled.
+        """
+    
         def adaptive_poll_timeout(consecutive_nulls: int) -> float:
-            """Adjust polling timeout based on consecutive nulls encountered."""
+            """Adjust polling timeout based on consecutive nulls encountered.
+            
+            Args:
+                consecutive_nulls (int): The number of consecutive null records encountered.
+                
+            Returns:
+                float: Adjusted polling timeout in seconds.
+            """
             if consecutive_nulls < 5:
                 return sampling_timeout_seconds         # Patient at first
             elif consecutive_nulls < 20:
@@ -335,7 +355,13 @@ class ThreadSafeTopicAnalyzer:
                 return sampling_timeout_seconds / 4     # Very impatient, probably no data
             
         def calculate_optimal_batch_size(total_records: int) -> int:
-            """Calculate optimal batch size based on partition size."""
+            """Calculate optimal batch size based on partition size.
+            
+            Args:
+                total_records (int): Total number of records in the partition.
+            Returns:
+                int: Optimal batch size for sampling.
+            """
             if total_records < 10000:
                 return min(DEFAULT_SAMPLING_MINIMUM_BATCH_SIZE, total_records)
             elif total_records < 1000000:
