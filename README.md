@@ -41,7 +41,7 @@ The **Kafka Cluster Topics Partition Count Recommender [MULTITHREADED] Tool** of
    + [**4.3 Confluent Kafka Python Client**](#43-confluent-kafka-python-client)
 <!-- tocstop -->
 
-## 1.0 To get started
+## **1.0 To get started**
 
 [**_Download_**](#11-download-the-tool) ---> [**_Configure_**](#12-configure-the-tool) ---> [**_Run_**](#13-run-the-tool) ---> [**_Results_**](#14-the-results)
 
@@ -56,18 +56,18 @@ Since this project was built using [**`uv`**](https://docs.astral.sh/uv/), plea
    uv sync
    ```
 
-#### 1.1.1 Special Note on two custom dependencies
+#### **1.1.1 Special Note on two custom dependencies**
 This project has _two custom dependencies_ that we want to bring to your attention:
 
 1. **[`cc-clients-python_lib`](https://github.com/j3-signalroom/cc-clients-python_lib)**: _This library offers a simple way to interact with Confluent Cloud services, including the Metrics API. It makes it easier to send API requests and manage responses. It is used in this project to connect to the Confluent Cloud Metrics API and retrieve topic consumption metrics._
 
 2. **[`aws-clients-python_lib`](https://github.com/j3-signalroom/aws-clients-python_lib)**: _This library is used to interact with AWS services, specifically AWS Secrets Manager in this case. It enables the tool to securely retrieve secrets stored in AWS Secrets Manager._
 
-### 1.2 Configure the Tool
+### **1.2 Configure the Tool**
 
 Now, you need to set up the tool by creating a `.env` file in the root directory of your project. This file will store all the essential environment variables required for the tool to connect to your Confluent Cloud Kafka cluster and function correctly. Additionally, you can choose to use **AWS Secrets Manager** to manage your secrets.
 
-#### 1.2.1 Create an Service Account for the Tool
+#### **1.2.1 Create an Service Account for the Tool**
 The service account needs to have OrganizationAdmin, EnvironmentAdmin or ClusterAdmin role to provision Kafka cluster API keys and the [MetricsViewer](https://docs.confluent.io/cloud/current/security/access-control/rbac/predefined-rbac-roles.html#metricsviewer-role) role to access the Metrics API for all clusters it has access to.
 
 1. Create the service account:
@@ -136,7 +136,7 @@ The service account needs to have OrganizationAdmin, EnvironmentAdmin or Cluster
 
 6. Make note of the API key and secret in the output, which you will assign to the `confluent_cloud_api_key` and `confluent_cloud_api_secret` environment variables in the `.env` file.  Or, you can use AWS Secrets Manager to securely store and retrieve these credentials.
 
-#### 1.2.2 Create the `.env` file
+#### **1.2.2 Create the `.env` file**
 Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
 ```shell
 # Flag to use Confluent Cloud API key to fetch Kafka credentials; otherwise,
@@ -212,7 +212,7 @@ The environment variables are defined as follows:
 | `MAX_CLUSTER_WORKERS` | Integer | Maximum number of concurrent worker threads to analyze multiple Kafka clusters in parallel. Helps to speed up analysis when working with multiple clusters. | `2`, `4` | `3` | No |
 | `MAX_WORKERS_PER_CLUSTER` | Integer | Maximum number of concurrent worker threads to analyze multiple topics within a single Kafka cluster in parallel. Helps to speed up analysis for clusters with many topics. | `4`, `8` | `8` | No |
 
-#### 1.2.3 Using the AWS Secrets Manager (optional)
+#### **1.2.3 Using the AWS Secrets Manager (optional)**
 If you use **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and the tool will retrieve the secrets from AWS Secrets Manager using the names provided in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`.  
 
 The code expects the `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` to be stored in JSON format with these keys:
@@ -225,7 +225,7 @@ The code expects the `KAFKA_API_KEY_AWS_SECRETS` to be stored in JSON format wit
 - `sasl.username`
 - `sasl.password`
 
-### 1.3 Run the Tool
+### **1.3 Run the Tool**
 
 **Navigate to the Project Root Directory**
 
@@ -422,7 +422,7 @@ If `USE_SAMPLE_RECORDS` is set to `False`, the tool will use the Confluent Cloud
 2025-09-27 16:13:50 - INFO - main - SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.
 ```
 
-#### 1.3.1 Did you notice we prefix `uv run` to `python src/thread_safe_tool.py`?
+#### **1.3.1 Did you notice we prefix `uv run` to `python src/thread_safe_tool.py`?**
 You maybe asking yourself why.  Well, `uv` is an incredibly fast Python package installer and dependency resolver, written in [**Rust**](https://github.blog/developer-skills/programming-languages-and-frameworks/why-rust-is-the-most-admired-language-among-developers/), and designed to seamlessly replace `pip`, `pipx`, `poetry`, `pyenv`, `twine`, `virtualenv`, and more in your workflows. By prefixing `uv run` to a command, you're ensuring that the command runs in an optimal Python environment.
 
 Now, let's go a little deeper into the magic behind `uv run`:
@@ -438,7 +438,7 @@ Curious to learn more about [Astral](https://astral.sh/)'s `uv`? Check these out
 
 If you have Kafka connectivity issues, you can verify connectivity using the following command:
 
-#### 1.3.2 Troubleshoot Connectivity Issues (if any)
+#### **1.3.2 Troubleshoot Connectivity Issues (if any)**
 
 To verify connectivity to your Kafka cluster, you can use the `kafka-topics.sh` command-line tool.  First, download the Kafka binaries from the [Apache Kafka website](https://kafka.apache.org/downloads) and extract them. Navigate to the `bin` directory of the extracted Kafka folder. Second, create a `client.properties` file with your Kafka credentials:
 
@@ -461,7 +461,7 @@ Finally, run the following command to list all topics in your Kafka cluster:
 
 If the connection is successful, you should see a list of topics in your Kafka cluster. If you encounter any errors, double-check your credentials and network connectivity.
 
-### 1.4 The Results
+### **1.4 The Results**
 The tool automatically generates two comprehensive CSV reports for each Kafka Cluster that transform raw analysis into actionable insights:
 
 - **Detail Report CSV.**  For every topic analyzed, this report captures the topic’s average consumer throughput (MB/s), its required throughput (MB/s), and a calculated recommended partition count, ensuring precise alignment between workload demand and partitioning strategy.  Below is a screenshot of a sample detail report:
@@ -504,7 +504,7 @@ The tool automatically generates two comprehensive CSV reports for each Kafka Cl
 
  > The names of the CSV comprises of the `<KAFKA CLUSTER ID>-recommender-<CURRENT EPOCH TIME IN SECONDS WHEN THE TOOL STARTED>-detail-report.csv` and `<KAFKA CLUSTER ID>-recommender-<CURRENT EPOCH TIME IN SECONDS WHEN THE TOOL STARTED>-summary-report.csv`, respectively.
 
-## 2.0 How the tool calculates the recommended partition count
+## **2.0 How the tool calculates the recommended partition count**
 The tool uses the Kafka `AdminClient` to retrieve all Kafka Topics (based on the `TOPIC_FILTER` specified) stored in your Kafka Cluster, including the original partition count per topic. Then, it iterates through each Kafka Topic, calling the Confluent Cloud Metrics RESTful API to retrieve the topic’s average (i.e., the _Consumer Throughput_) and peak consumption in bytes over a rolling seven-day period. Next, it calculates the required throughput by multiplying the peak consumption by the `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` (i.e., the _Required Throughput_). Finally, it divides the required throughput by the consumer throughput and rounds the result to the nearest whole number to determine the optimal number of partitions.
 
 > **Note**: _This why the tool requires the Kafka API Key and Secret to connect to your Kafka Cluster via the AdminClient, and the Confluent Cloud API Key and Secret to connect to the Confluent Cloud Metrics API._
@@ -526,7 +526,7 @@ To determine the number of partitions needed to support a throughput of **1.22GB
 
 The **50 partitions** ensure that the consumer can achieve the required throughput of **1.22GB/s** while consuming at a rate of **25MB/s** per partition. This will allow the workload to be distributed across partitions so that multiple consumers can work in parallel to meet the throughput requirement.
 
-#### 2.1 End-to-End Tool Workflow
+#### **2.1 End-to-End Tool Workflow**
 ```mermaid
 sequenceDiagram
     participant Main as Main Thread
@@ -651,54 +651,54 @@ sequenceDiagram
     Main->>Main: Exit tool
 ```
 
-### 3.0 Unlocking High-Performance Consumer Throughput
+### **3.0 Unlocking High-Performance Consumer Throughput**
 
 The throughput of a **Kafka consumer** refers to the rate at which it can read data from Kafka topics, typically measured in terms of **megabytes per second (MB/s)** or **records per second**. Consumer throughput depends on several factors, including the configuration of Kafka, the consumer tool, and the underlying infrastructure.
 
-#### 3.1 Key Factors Affecting Consumer Throughput
+#### **3.1 Key Factors Affecting Consumer Throughput**
 
-##### 3.1.1 Partitions
+##### **3.1.1 Partitions**
 - Throughput scales with the number of partitions assigned to the consumer. A consumer can read from multiple partitions concurrently, but the total throughput is bounded by the number of partitions and their data production rates.
 - Increasing the number of partitions can improve parallelism and consumer throughput.
 
-##### 3.1.2 Consumer Parallelism
+##### **3.1.2 Consumer Parallelism**
 - A single consumer instance reads from one or more partitions, but it can be overwhelmed if the data rate exceeds its capacity.
 - Adding more consumers in a consumer group increases parallelism, as Kafka reassigns partitions to balance the load.
 
-##### 3.1.3 Fetch Configuration
+##### **3.1.3 Fetch Configuration**
 - **`fetch.min.bytes`**: Minimum amount of data (in bytes) the broker returns for a fetch request. Larger values reduce fetch requests but may introduce latency.
 - **`fetch.max.bytes`**: Maximum amount of data returned in a single fetch response. A higher value allows fetching larger batches of messages, improving throughput.
 - **`fetch.max.wait.ms`**: Maximum time the broker waits before responding to a fetch request. A higher value can increase batch sizes and throughput but may increase latency.
 
 For more details, see the [Confluent Cloud Client Optimization Guide - Consumer Fetching](https://docs.confluent.io/cloud/current/client-apps/optimizing/throughput.html#consumer-fetching).
 
-##### 3.1.4 Batch Size
+##### **3.1.4 Batch Size**
 - Consumers process messages in batches for better efficiency. Larger batches reduce processing overhead but require sufficient memory.
 - Configuration: **`max.poll.records`** controls the number of records fetched in a single poll.
 
-##### 3.1.5 Message Size
+##### **3.1.5 Message Size**
 - Larger messages can reduce throughput if the network or storage systems are bottlenecks. Use compression (e.g., `lz4`, `snappy`) to optimize data transfer.
 
-##### 3.1.6 Network Bandwidth
+##### **3.1.6 Network Bandwidth**
 - Network speed between Kafka brokers and consumers is critical. A consumer running on a limited-bandwidth network will see reduced throughput.
 
-##### 3.1.7 Deserialization Overhead
+##### **3.1.7 Deserialization Overhead**
 - The time required to deserialize records impacts throughput. Efficient deserialization methods (e.g., Avro, Protobuf with optimized schemas) can help.
 
-##### 3.1.8 Broker Load
+##### **3.1.8 Broker Load**
 - Broker performance and replication overhead impact the throughput seen by consumers. If brokers are under heavy load, consumer throughput may decrease.
 
-##### 3.1.9 Consumer Poll Frequency
+##### **3.1.9 Consumer Poll Frequency**
 - Consumers must frequently call `poll()` to fetch messages. If the consumer spends too much time processing messages between polls, throughput can drop.
 
-##### 3.1.10 System Resources
+##### **3.1.10 System Resources**
 - CPU, memory, and disk I/O on the consumer’s machine affect how fast it can process data.
 
-### 3.2 Typical Consumer Throughput
+### **3.2 Typical Consumer Throughput**
 - **Single Partition Throughput**: A single consumer reading from a single partition can typically achieve **10-50 MB/s** or higher, depending on record size, compression, and hardware.
 - **Multi-Partition Throughput**: For a consumer group reading from multiple partitions, throughput can scale linearly with the number of partitions (subject to other system limits).
 
-### 3.3 Seven Strategies to Improve Consumer Throughput
+### **3.3 Seven Strategies to Improve Consumer Throughput**
 1. **Increase Partitions**: Scale partitions to allow more parallelism.
 2. **Add Consumers**: Add more consumers in the consumer group to distribute the load.
 3. **Optimize Fetch Settings**: Tune `fetch.min.bytes`, `fetch.max.bytes`, and `fetch.max.wait.ms`.
@@ -709,16 +709,16 @@ For more details, see the [Confluent Cloud Client Optimization Guide - Consumer 
 
 By optimizing these factors, Kafka consumers can achieve higher throughput tailored to the specific use case and infrastructure.
 
-## 4.0 Resources
+## **4.0 Resources**
 
-### 4.1 Optimization Guides
+### **4.1 Optimization Guides**
 - [Optimize Confluent Cloud Clients for Throughput](https://docs.confluent.io/cloud/current/client-apps/optimizing/throughput.html#optimize-ccloud-clients-for-throughput)
 - [Choose and Change the Partition Count in Kafka](https://docs.confluent.io/kafka/operations-tools/partition-determination.html#choose-and-change-the-partition-count-in-ak)
 
-### 4.2 Confluent Cloud Metrics API
+### **4.2 Confluent Cloud Metrics API**
 - [Confluent Cloud Metrics API](https://api.telemetry.confluent.cloud/docs)
 - [Confluent Cloud Metrics API: Metrics Reference](https://api.telemetry.confluent.cloud/docs/descriptors/datasets/cloud)
 - [Confluent Cloud Metrics](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html#ccloud-metrics)
 
-### 4.3 Confluent Kafka Python Client
+### **4.3 Confluent Kafka Python Client**
 - [Confluent Kafka Python Client Documentation](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html)
