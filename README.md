@@ -15,7 +15,7 @@ The **Kafka Cluster Topics Partition Count Recommender [MULTITHREADED] Tool** of
       - [**1.2.1 Create the `.env` file**](#121-create-the-env-file)
       - [**1.2.2 Using the AWS Secrets Manager (optional)**](#122-using-the-aws-secrets-manager-optional)
    + [**1.3 Run the Tool**](#13-run-the-tool)
-      - [**1.3.1 Did you notice we prefix `uv run` to `python src/thread_safe_app.py`?**](#131-did-you-notice-we-prefix-uv-run-to-python-srcapppy)
+      - [**1.3.1 Did you notice we prefix `uv run` to `python src/thread_safe_tool.py`?**](#131-did-you-notice-we-prefix-uv-run-to-python-srcapppy)
       - [**1.3.2 Troubleshoot Connectivity Issues (if any)**](#132-troubleshoot-connectivity-issues-if-any)
    + [**1.4 The Results**](#14-the-results)
 - [**2.0 How the tool calculates the recommended partition count**](#20-how-the-tool-calculates-the-recommended-partition-count)
@@ -171,7 +171,7 @@ cd path/to/kafka_cluster-topics-partition_count_recommender-tool/
 
 Then enter the following command below to run the tool:
 ```shell
-uv run python src/thread_safe_app.py
+uv run python src/thread_safe_tool.py
 ```
 
 If `USE_SAMPLE_RECORDS` environment variable is set to `True`, the tool will sample records from each topic to calculate the average record size in bytes.  For example, below is a screenshot of the tool running successfully:
@@ -354,7 +354,7 @@ If `USE_SAMPLE_RECORDS` is set to `False`, the tool will use the Confluent Cloud
 2025-09-27 16:13:50 - INFO - main - SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.
 ```
 
-#### 1.3.1 Did you notice we prefix `uv run` to `python src/thread_safe_app.py`?
+#### 1.3.1 Did you notice we prefix `uv run` to `python src/thread_safe_tool.py`?
 You maybe asking yourself why.  Well, `uv` is an incredibly fast Python package installer and dependency resolver, written in [**Rust**](https://github.blog/developer-skills/programming-languages-and-frameworks/why-rust-is-the-most-admired-language-among-developers/), and designed to seamlessly replace `pip`, `pipx`, `poetry`, `pyenv`, `twine`, `virtualenv`, and more in your workflows. By prefixing `uv run` to a command, you're ensuring that the command runs in an optimal Python environment.
 
 Now, let's go a little deeper into the magic behind `uv run`:
@@ -362,7 +362,7 @@ Now, let's go a little deeper into the magic behind `uv run`:
 - If used in a project directory, `uv` will automatically create or update the project environment before running the command.
 - Outside of a project, if there's a virtual environment present in your current directory (or any parent directory), `uv` runs the command in that environment. If no environment is found, it uses the interpreter's environment.
 
-So what does this mean when we put `uv run` before `python src/thread_safe_app.py`? It means `uv` takes care of all the setup—fast and seamless—right in your local environment. If you think AI/ML is magic, the work the folks at [Astral](https://astral.sh/) have done with `uv` is pure wizardry!
+So what does this mean when we put `uv run` before `python src/thread_safe_tool.py`? It means `uv` takes care of all the setup—fast and seamless—right in your local environment. If you think AI/ML is magic, the work the folks at [Astral](https://astral.sh/) have done with `uv` is pure wizardry!
 
 Curious to learn more about [Astral](https://astral.sh/)'s `uv`? Check these out:
 - Documentation: Learn about [`uv`](https://docs.astral.sh/uv/).

@@ -30,7 +30,7 @@ __email__      = "j3@thej3.com"
 __status__     = "dev"
 
 
-# Set up logging
+# Set up module logging
 logger = setup_logging()
 
 

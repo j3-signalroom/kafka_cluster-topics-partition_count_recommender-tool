@@ -3,6 +3,8 @@ from pathlib import Path
 import logging
 import logging.config
 
+from constants import (DEFAULT_TOOL_LOG_FILE, DEFAULT_TOOL_LOG_FORMAT)
+
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
 __credits__    = ["Jeffrey Jonathan Jennings"]
@@ -12,13 +14,13 @@ __email__      = "j3@thej3.com"
 __status__     = "dev"
 
 
-def setup_logging(log_file: str = "kafka-cluster-topics-partition-count-recommender-tool.log") -> logging.Logger:
+def setup_logging(log_file: str = DEFAULT_TOOL_LOG_FILE) -> logging.Logger:
     """Load logging configuration from pyproject.toml.  If not found, use default logging.
     
-    Args:
+    Arg(s):
         log_file (str): The log file name to use if no configuration is found.
         
-    Returns:
+    Return(s):
         logging.Logger: Configured logger instance.
     """
     pyproject_path = Path("pyproject.toml")
@@ -36,7 +38,7 @@ def setup_logging(log_file: str = "kafka-cluster-topics-partition-count-recommen
             # Fallback to basic file logging
             logging.basicConfig(
                 level=logging.INFO,
-                format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                format=DEFAULT_TOOL_LOG_FORMAT,
                 filemode="w",  # This will reset the log file
                 handlers=[
                     logging.FileHandler(log_file),
@@ -47,7 +49,7 @@ def setup_logging(log_file: str = "kafka-cluster-topics-partition-count-recommen
         # Default logging setup if no pyproject.toml
         logging.basicConfig(
             level=logging.INFO,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            format=DEFAULT_TOOL_LOG_FORMAT,
             filemode="w",  # This will reset the log file
             handlers=[
                 logging.FileHandler(log_file),
@@ -56,5 +58,3 @@ def setup_logging(log_file: str = "kafka-cluster-topics-partition-count-recommen
         )
 
     return logging.getLogger()
-
-
