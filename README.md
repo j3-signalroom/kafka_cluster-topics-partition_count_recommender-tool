@@ -15,7 +15,7 @@ The **Kafka Cluster Topics Partition Count Recommender [MULTITHREADED] Tool** of
       - [**1.2.1 Create the `.env` file**](#121-create-the-env-file)
       - [**1.2.2 Using the AWS Secrets Manager (optional)**](#122-using-the-aws-secrets-manager-optional)
    + [**1.3 Run the Tool**](#13-run-the-tool)
-      - [**1.3.1 Did you notice we prefix `uv run` to `python src/thread_safe_tool.py`?**](#131-did-you-notice-we-prefix-uv-run-to-python-srcapppy)
+      - [**1.3.1 Did you notice we prefix `uv run` to `python src/thread_safe_tool.py`?**](#131-did-you-notice-we-prefix-uv-run-to-python-srcthread_safe_toolpy)
       - [**1.3.2 Troubleshoot Connectivity Issues (if any)**](#132-troubleshoot-connectivity-issues-if-any)
    + [**1.4 The Results**](#14-the-results)
 - [**2.0 How the tool calculates the recommended partition count**](#20-how-the-tool-calculates-the-recommended-partition-count)
