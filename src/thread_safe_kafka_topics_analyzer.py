@@ -163,7 +163,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
             ["method","topic_name","is_compacted","number_of_records","number_of_partitions","required_throughput","consumer_throughput","recommended_partitions","status"]
         )
 
-        logging.info(f"Created the {report_filename} file")
+        logging.info("Created the %s file", report_filename)
 
         def update_progress() -> None:
             """Update progress in a thread-safe manner.
@@ -174,7 +174,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
             with self.progress_lock:
                 self.completed_topics += 1
                 progress = (self.completed_topics / self.total_topics) * 100
-                logging.info(f"Progress: {self.completed_topics} of {self.total_topics} ({progress:.1f}%) topics completed")
+                logging.info("Progress: %d of %d (%.1f%%) topics completed", self.completed_topics, self.total_topics, progress)
 
         def analyze_topic_worker(topic_name: str, topic_info: Dict) -> Dict:
             """Worker function to analyze a single topic.
@@ -228,7 +228,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
                 return result
                 
             except Exception as e:
-                logging.warning(f"Failed to analyze topic {topic_name} because {e}")
+                logging.warning("Failed to analyze topic %s because %s", topic_name, e)
                 return {
                     'topic_name': topic_name,
                     'is_compacted': topic_info['is_compacted'],
@@ -272,7 +272,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
                     update_progress()
                     
                 except Exception as e:
-                    logging.error(f"Error processing topic {topic_name}: {e}")
+                    logging.error("Error processing topic %s: %s", topic_name, e)
                     update_progress()
 
         # Calculate summary statistics
@@ -452,27 +452,27 @@ class ThreadSafeKafkaTopicsAnalyzer:
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("INITIAL ANALYSIS PARAMETERS")
         logging.info("-" * DEFAULT_CHARACTER_REPEAT)
-        logging.info(f"Analysis Timestamp: {datetime.now().isoformat()}")
-        logging.info(f"Using Confluent Cloud API Key to fetch Kafka credential: {params['use_confluent_cloud_api_key_to_fetch_kafka_credentials']}")
-        logging.info(f"Environment Filter: {params['environment_filter'] if params['environment_filter'] else 'None'}")
-        logging.info(f"Kafka Cluster Filter: {params['kafka_cluster_filter'] if params['kafka_cluster_filter'] else 'None'}")
-        logging.info(f"Principal ID Filter: {params['principal_id'] if params['principal_id'] else 'None'}")
-        logging.info(f"Kafka Cluster ID: {self.kafka_cluster_id}")
-        logging.info(f"Max worker threads: {params['max_workers']}")
+        logging.info("Analysis Timestamp: %s", datetime.now().isoformat())
+        logging.info("Using Confluent Cloud API Key to fetch Kafka credential: %s", params['use_confluent_cloud_api_key_to_fetch_kafka_credentials'])
+        logging.info("Environment Filter: %s", params['environment_filter'] if params['environment_filter'] else 'None')
+        logging.info("Kafka Cluster Filter: %s", params['kafka_cluster_filter'] if params['kafka_cluster_filter'] else 'None')
+        logging.info("Principal ID Filter: %s", params['principal_id'] if params['principal_id'] else 'None')
+        logging.info("Kafka Cluster ID: %s", self.kafka_cluster_id)
+        logging.info("Max worker threads: %d", params['max_workers'])
         logging.info("Connecting to Kafka cluster and retrieving metadata...")
-        logging.info(f"Found {params['total_topics_to_analyze']} topics to analyze")
-        logging.info(f'{"Including" if params["include_internal"] else "Excluding"} internal topics')
-        logging.info(f"Required consumption throughput factor: {params['required_consumption_throughput_factor']:.1f}")
-        logging.info(f"Minimum required throughput threshold: {params['min_consumption_throughput'] / 1024 / 1024:.1f} MB/s")
-        logging.info(f"Topic filter: {params['topic_filter'] if params['topic_filter'] else 'None'}")
-        logging.info(f"Default Partition Count: {params['min_recommended_partitions']}")
-        logging.info(f'Using {"sample records" if params["use_sample_records"] else "Metrics API"} for average record size calculation')
+        logging.info("Found %d topics to analyze", params['total_topics_to_analyze'])
+        logging.info("%s internal topics", "Including" if params["include_internal"] else "Excluding")
+        logging.info("Required consumption throughput factor: %.1f", params['required_consumption_throughput_factor'])
+        logging.info("Minimum required throughput threshold: %.1f MB/s", params['min_consumption_throughput'] / 1024 / 1024)
+        logging.info("Topic filter: %s", params['topic_filter'] if params['topic_filter'] else 'None')
+        logging.info("Default Partition Count: %d", params['min_recommended_partitions'])
+        logging.info("Using %s for average record size calculation", "sample records" if params["use_sample_records"] else "Metrics API")
         if params["use_sample_records"]:
-            logging.info(f"Sampling batch size: {params['sampling_batch_size']:,} records")
-            logging.info(f"Sampling days: {params['sampling_days']} days")
-            logging.info(f"Sampling max consecutive nulls: {params['sampling_max_consecutive_nulls']:,} records")
-            logging.info(f"Sampling timeout: {params['sampling_timeout_seconds']:.1f} seconds")
-            logging.info(f"Sampling max continuous failed batches: {params['sampling_max_continuous_failed_batches']:,} batches")
+            logging.info("Sampling batch size: %d records", params['sampling_batch_size'])
+            logging.info("Sampling days: %d days", params['sampling_days'])
+            logging.info("Sampling max consecutive nulls: %d records", params['sampling_max_consecutive_nulls'])
+            logging.info("Sampling timeout: %.1f seconds", params['sampling_timeout_seconds'])
+            logging.info("Sampling max continuous failed batches: %d batches", params['sampling_max_continuous_failed_batches'])
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
 
     def __get_topics_metadata(self, sampling_days: int, include_internal: bool, topic_filter: str | None = None) -> Dict:
@@ -561,7 +561,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
 
             return topics_to_analyze
         except Exception as e:
-            logger.error(f"Error getting topics metadata: {e}")
+            logger.error("Error getting topics metadata: %s", e)
             return None
         
     def __write_summary_report(self, base_filename: str, stats: Dict) -> None:
@@ -596,21 +596,21 @@ class ThreadSafeKafkaTopicsAnalyzer:
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("ANALYSIS SUMMARY STATISTICS")
         logging.info("-" * DEFAULT_CHARACTER_REPEAT)
-        logging.info(f"Elapsed Time: {stats['elapsed_time_hours']:.2f} hours")
-        logging.info(f"Total Topics: {stats['total_topics']}")
-        logging.info(f"Active Topics: {stats['active_topic_count']}")
-        logging.info(f"Active Topics %: {stats['active_topic_percentage']:.1f}%")
-        logging.info(f"Total Partitions: {stats['total_partitions']}")
-        logging.info(f"Total Recommended Partitions: {stats['total_recommended_partitions']}")
-        logging.info(f"Non-Empty Topics Total Partitions: {stats['active_total_partition_count']}")
-        
+        logging.info("Elapsed Time: %.2f hours", stats['elapsed_time_hours'])
+        logging.info("Total Topics: %d", stats['total_topics'])
+        logging.info("Active Topics: %d", stats['active_topic_count'])
+        logging.info("Active Topics %%: %.1f%%", stats['active_topic_percentage'])
+        logging.info("Total Partitions: %d", stats['total_partitions'])
+        logging.info("Total Recommended Partitions: %d", stats['total_recommended_partitions'])
+        logging.info("Non-Empty Topics Total Partitions: %d", stats['active_total_partition_count'])
+
         if stats['percentage_decrease'] > 0:
-            logging.info(f"RECOMMENDED Decrease in Partitions: {stats['percentage_decrease']:.1f}%")
+            logging.info("RECOMMENDED Decrease in Partitions: %.1f%%", stats['percentage_decrease'])
         elif stats['percentage_increase'] > 0:
-            logging.info(f"RECOMMENDED Increase in Partitions: {stats['percentage_increase']:.1f}%")
-            
-        logging.info(f"Total Records: {stats['total_records']:,}")
-        logging.info(f"Average Partitions per Topic: {stats['average_partitions_per_topic']:.0f}")
-        logging.info(f"Average Partitions per Active Topic: {stats['active_average_partitions_per_topic']:.0f}")
-        logging.info(f"Average Recommended Partitions per Topic: {stats['average_recommended_partitions_per_topic']:.0f}")
+            logging.info("RECOMMENDED Increase in Partitions: %.1f%%", stats['percentage_increase'])
+
+        logging.info("Total Records: %d", stats['total_records'])
+        logging.info("Average Partitions per Topic: %.0f", stats['average_partitions_per_topic'])
+        logging.info("Average Partitions per Active Topic: %.0f", stats['active_average_partitions_per_topic'])
+        logging.info("Average Recommended Partitions per Topic: %.0f", stats['average_recommended_partitions_per_topic'])
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)

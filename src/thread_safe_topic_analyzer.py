@@ -69,7 +69,8 @@ class ThreadSafeTopicAnalyzer:
         topic_metadata = topic_info['metadata']
         sampling_days = topic_info['sampling_days_based_on_retention_days']
 
-        logging.info(f"[Thread-{threading.current_thread().ident}] Analyzing topic {topic_name} with {sampling_days}-day rolling window (from {iso_start_time.isoformat()})")
+        logging.info("[Thread-%d] Analyzing topic %s with %d-day rolling window (from %s)",
+                     threading.current_thread().ident, topic_name, sampling_days, iso_start_time.isoformat())
 
         partitions = list(topic_metadata.partitions.keys())
         partition_count = len(partitions)
@@ -99,7 +100,7 @@ class ThreadSafeTopicAnalyzer:
             })
 
         if total_record_count == 0:
-            logging.info(f"[Thread-{threading.current_thread().ident}] No records available in topic '{topic_name}' for sampling.")
+            logging.info("[Thread-%d] No records available in topic '%s' for sampling.", threading.current_thread().ident, topic_name)
             avg_record_size = 0.0
         else:
             avg_record_size = self.__sample_record_sizes(
@@ -160,17 +161,19 @@ class ThreadSafeTopicAnalyzer:
             if http_status_code == HttpStatus.RATE_LIMIT_EXCEEDED:
                 bytes_retry += 1
                 if bytes_retry == max_bytes_retries:
-                    logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED BYTES' metric for topic {topic_name}. Max retries reached ({max_bytes_retries}). Aborting.")
+                    logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'RECEIVED BYTES' metric for topic %s. Max retries reached (%d). Aborting.",
+                                    threading.current_thread().ident, topic_name, max_bytes_retries)
                     result['error'] = "Rate limit exceeded when retrieving 'RECEIVED BYTES' metric."
                     result['total_record_count'] = 0
                     result['avg_bytes_per_record'] = 0.0
                     break
-                logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED BYTES' metric for topic {topic_name}."
-                                f" Retrying {bytes_retry}/{max_bytes_retries} after {rate_limits['reset_in_seconds']} seconds...")
+                logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'RECEIVED BYTES' metric for topic %s. Retrying %d of %d after %d seconds...",
+                                threading.current_thread().ident, topic_name, bytes_retry, max_bytes_retries, rate_limits['reset_in_seconds'])
                 time.sleep(rate_limits['reset_in_seconds'])
                 continue
             elif http_status_code not in (HttpStatus.OK, HttpStatus.RATE_LIMIT_EXCEEDED):
-                logging.warning(f"[Thread-{threading.current_thread().ident}] Failed retrieving 'RECEIVED BYTES' metric for topic {topic_name} because: {error_message}")
+                logging.warning("[Thread-%d] Failed retrieving 'RECEIVED BYTES' metric for topic %s because: %s",
+                                threading.current_thread().ident, topic_name, error_message)
                 result['error'] = error_message
                 result['total_record_count'] = 0
                 result['avg_bytes_per_record'] = 0.0
@@ -191,17 +194,19 @@ class ThreadSafeTopicAnalyzer:
                 if http_status_code == HttpStatus.RATE_LIMIT_EXCEEDED:
                     records_retry += 1
                     if records_retry == max_records_retries:
-                        logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric for topic {topic_name}. Max retries reached ({max_records_retries}). Aborting.")
+                        logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric for topic %s. Max retries reached (%d). Aborting.",
+                                        threading.current_thread().ident, topic_name, max_records_retries)
                         result['error'] = "Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric."
                         result['total_record_count'] = 0
                         result['avg_bytes_per_record'] = 0.0
                         break
-                    logging.warning(f"[Thread-{threading.current_thread().ident}] Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric for topic {topic_name}."
-                                    f"Retrying {records_retry}/{max_records_retries} after {rate_limits['reset_in_seconds']} seconds...")
+                    logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric for topic %s. Retrying %d of %d after %d seconds...",
+                                    threading.current_thread().ident, topic_name, records_retry, max_records_retries, rate_limits['reset_in_seconds'])
                     time.sleep(rate_limits['reset_in_seconds'])
                     continue
                 elif http_status_code not in (HttpStatus.OK, HttpStatus.RATE_LIMIT_EXCEEDED):
-                    logging.warning(f"[Thread-{threading.current_thread().ident}] Failed retrieving 'RECEIVED RECORDS' metric for topic {topic_name} because: {error_message}")
+                    logging.warning("[Thread-%d] Failed retrieving 'RECEIVED RECORDS' metric for topic %s because: %s",
+                                    threading.current_thread().ident, topic_name, error_message)
                     result['error'] = error_message
                     result['total_record_count'] = 0
                     result['avg_bytes_per_record'] = 0.0
@@ -224,7 +229,8 @@ class ThreadSafeTopicAnalyzer:
                     avg_bytes_per_record = sum(avg_bytes_daily_totals)/len(avg_bytes_daily_totals) if len(avg_bytes_daily_totals) > 0 else 0
                     result['avg_bytes_per_record'] = avg_bytes_per_record
 
-                    logging.info(f"[Thread-{threading.current_thread().ident}] Confluent Metrics API - For topic {topic_name}, the average bytes per record is {avg_bytes_per_record:,.2f} bytes/record for a total of {record_count:,.0f} records.")
+                    logging.info("[Thread-%d] Confluent Metrics API - For topic %s, the average bytes per record is %.2f bytes/record for a total of %.0f records.",
+                                 threading.current_thread().ident, topic_name, avg_bytes_per_record, record_count)
 
                     break
 
@@ -258,20 +264,24 @@ class ThreadSafeTopicAnalyzer:
                     
                     # Validate watermarks
                     if low < 0 or high < 0 or high < low:
-                        logging.warning(f"[Thread-{threading.current_thread().ident}] Invalid watermarks for {topic_name}[{topic_partition.partition}]: low={low}, high={high}")
+                        logging.warning("[Thread-%d] Invalid watermarks for %s[%d]: low=%d, high=%d",
+                                        threading.current_thread().ident, topic_name, topic_partition.partition, low, high)
                         partition_offsets[topic_partition.partition] = (0, 0)
                     else:
                         partition_offsets[topic_partition.partition] = (low, high)
-                        logging.debug(f"[Thread-{threading.current_thread().ident}] Valid watermarks for {topic_name}[{topic_partition.partition}]: [{low}, {high}]")
-                        
+                        logging.debug("[Thread-%d] Valid watermarks for %s[%d]: [%d, %d]",
+                                      threading.current_thread().ident, topic_name, topic_partition.partition, low, high)
+
                 except Exception as e:
-                    logging.warning(f"[Thread-{threading.current_thread().ident}] Failed to get watermarks for {topic_name}[{topic_partition.partition}]: {e}")
+                    logging.warning("[Thread-%d] Failed to get watermarks for %s[%d]: %s",
+                                    threading.current_thread().ident, topic_name, topic_partition.partition, e)
                     partition_offsets[topic_partition.partition] = (0, 0)
             
             return partition_offsets
             
         except Exception as e:
-            logging.warning(f"[Thread-{threading.current_thread().ident}] Error getting partition offsets for topic {topic_name}: {e}")
+            logging.warning("[Thread-%d] Error getting partition offsets for topic %s: %s",
+                            threading.current_thread().ident, topic_name, e)
             return {}
         finally:
             consumer.close()
@@ -306,12 +316,14 @@ class ThreadSafeTopicAnalyzer:
                 if low <= returned_offset <= high:
                     return returned_offset
                 else:
-                    logging.warning(f"[Thread-{threading.current_thread().ident}] Timestamp-based offset {returned_offset} out of range [{low}, {high}] for {topic_name}[{partition}]")
+                    logging.warning("[Thread-%d] Timestamp-based offset %d out of range [%d, %d] for %s[%d]",
+                                    threading.current_thread().ident, returned_offset, low, high, topic_name, partition)
                     return max(low, 0)  # Use earliest available offset
             
             return None
         except Exception as e:
-            logging.warning(f"[Thread-{threading.current_thread().ident}] Error getting timestamp offset for {topic_name}[{partition}]: {e}")
+            logging.warning("[Thread-%d] Error getting timestamp offset for %s[%d]: %s",
+                            threading.current_thread().ident, topic_name, partition, e)
             return None
         finally:
             consumer.close()
@@ -395,18 +407,21 @@ class ThreadSafeTopicAnalyzer:
                 start_offset = partition_detail["offset_start"]
                 end_offset = partition_detail["offset_end"]
 
-                logging.info(f"[Thread-{threading.current_thread().ident}] Partition {partition_number:03d} of {total_partition_count:03d}: using effective batch size {effective_batch_size:,} (requested: {sampling_batch_size:,}, optimal: {optimal_batch_size:,})")
+                logging.info("[Thread-%d] Partition %03d of %03d: using effective batch size %d (requested: %d, optimal: %d)",
+                             threading.current_thread().ident, partition_number, total_partition_count, effective_batch_size, sampling_batch_size, optimal_batch_size)
 
                 # Validate offsets before proceeding
                 if start_offset is None or start_offset < 0:
-                    logging.warning(f"[Thread-{threading.current_thread().ident}] Invalid start_offset for {topic_name} {partition_number:03d} of {total_partition_count:03d}: {start_offset}")
+                    logging.warning("[Thread-%d] Invalid start_offset for %s %03d of %03d: %d",
+                                    threading.current_thread().ident, topic_name, partition_number, total_partition_count, start_offset)
                     continue
                     
                 total_offsets = end_offset - start_offset
                 if total_offsets <= 0:
                     continue
 
-                logging.info(f"[Thread-{threading.current_thread().ident}]     Sampling from partition {partition_number:03d} of {total_partition_count:03d}: offsets [{start_offset}, {end_offset})")
+                logging.info("[Thread-%d]     Sampling from partition %03d of %03d: offsets [%d, %d)",
+                             threading.current_thread().ident, partition_number, total_partition_count, start_offset, end_offset)
 
                 # Setup consumer and validate watermarks
                 topic_partition = TopicPartition(topic_name, partition_number)
@@ -420,16 +435,19 @@ class ThreadSafeTopicAnalyzer:
                     valid_end = min(high_watermark, end_offset)
                     
                     if valid_start >= valid_end:
-                        logging.warning(f"[Thread-{threading.current_thread().ident}] No valid offset range for {topic_name} - partition {partition_number:03d} of {total_partition_count:03d}: adjusted [{valid_start}, {valid_end}]")
+                        logging.warning("[Thread-%d] No valid offset range for %s - partition %03d of %03d: adjusted [%d, %d]",
+                                        threading.current_thread().ident, topic_name, partition_number, total_partition_count, valid_start, valid_end)
                         continue
                     
                     # Seek to safe start offset
                     topic_partition.offset = valid_start
                     consumer.seek(topic_partition)
-                    logging.debug(f"[Thread-{threading.current_thread().ident}] Seeking to offset {valid_start} for {topic_name} {partition_number:03d} of {total_partition_count:03d} within valid range [{low_watermark}, {high_watermark}]")
-                    
+                    logging.debug("[Thread-%d] Seeking to offset %d for %s %03d of %03d within valid range [%d, %d]",
+                                  threading.current_thread().ident, valid_start, topic_name, partition_number, total_partition_count, low_watermark, high_watermark)
+
                 except Exception as seek_error:
-                    logging.warning(f"[Thread-{threading.current_thread().ident}] Failed to seek for {topic_name} {partition_number:03d} of {total_partition_count:03d}: {seek_error}")
+                    logging.warning("[Thread-%d] Failed to seek for %s %03d of %03d: %s",
+                                    threading.current_thread().ident, topic_name, partition_number, total_partition_count, seek_error)
                     continue
                 
                 # Initialize tracking variables
@@ -446,9 +464,10 @@ class ThreadSafeTopicAnalyzer:
                     max_attempts_per_batch = effective_batch_size * 3  # Safety limit
                     max_consecutive_nulls = sampling_max_consecutive_nulls
                     consecutive_nulls = 0
-                    
-                    logging.debug(f"[Thread-{threading.current_thread().ident}] Starting batch {batch_count + 1} for partition {partition_number:03d} of {total_partition_count:03d}")
-                    
+
+                    logging.debug("[Thread-%d] Starting batch %d for partition %03d of %03d",
+                                  threading.current_thread().ident, batch_count + 1, partition_number, total_partition_count)
+
                     # Process one batch with safety limits
                     while (batch_records_processed < effective_batch_size and
                         batch_attempts < max_attempts_per_batch and
@@ -467,16 +486,19 @@ class ThreadSafeTopicAnalyzer:
                             
                             # Check if we've moved beyond our target range
                             if hasattr(record, 'offset') and record.offset() >= valid_end:
-                                logging.debug(f"[Thread-{threading.current_thread().ident}] Reached end of target range at offset {record.offset()}")
+                                logging.debug("[Thread-%d] Reached end of target range at offset %d",
+                                              threading.current_thread().ident, record.offset())
                                 break
                             
                             if record.error():
-                                logging.warning(f"[Thread-{threading.current_thread().ident}] Consumer error at offset {getattr(record, 'offset', 'unknown')}: {record.error()}")
+                                logging.warning("[Thread-%d] Consumer error at offset %s: %s",
+                                                threading.current_thread().ident, getattr(record, 'offset', 'unknown'), record.error())
                                 continue
                             
                             # Verify we're in the correct partition
                             if record.partition() != partition_number:
-                                logging.warning(f"[Thread-{threading.current_thread().ident}] Received record from wrong partition: {record.partition()} != {partition_number:03d} of {total_partition_count:03d}")
+                                logging.warning("[Thread-%d] Received record from wrong partition: %d != %03d of %03d",
+                                                threading.current_thread().ident, record.partition(), partition_number, total_partition_count)
                                 continue
                             
                             # Calculate record size
@@ -486,7 +508,8 @@ class ThreadSafeTopicAnalyzer:
                                 headers_size = sum(len(k) + len(v) for k, v in (record.headers() or []))
                                 record_size = key_size + value_size + headers_size
                             except Exception as size_error:
-                                logging.warning(f"[Thread-{threading.current_thread().ident}] Error calculating record size at offset {getattr(record, 'offset', 'unknown')}: {size_error}")
+                                logging.warning("[Thread-%d] Error calculating record size at offset %s: %s",
+                                                threading.current_thread().ident, getattr(record, 'offset', 'unknown'), size_error)
                                 record_size = 0
                             
                             # Update running totals
@@ -496,7 +519,8 @@ class ThreadSafeTopicAnalyzer:
                             partition_record_count += 1
                             
                         except Exception as poll_error:
-                            logging.warning(f"[Thread-{threading.current_thread().ident}] Error during polling: {poll_error}")
+                            logging.warning("[Thread-%d] Error during polling: %s",
+                                            threading.current_thread().ident, poll_error)
                             continue
                     
                     batch_count += 1
@@ -507,38 +531,53 @@ class ThreadSafeTopicAnalyzer:
                         current_avg = total_size / total_count if total_count > 0 else 0
                         progress_pct = (partition_record_count / max(1, total_partition_offsets)) * 100
                         error_attempts = batch_attempts - batch_records_processed
-                        
-                        logging.info(f"[Thread-{threading.current_thread().ident}]       Batch {batch_count}: {batch_records_processed:,} valid records "
-                                    f"({error_attempts} errors/nulls), progress: {progress_pct:.1f}%, "
-                                    f"running avg: {current_avg:,.2f} bytes")
+
+                        logging.info("[Thread-%d]       Batch %d: %d valid records "
+                                     "(%d errors/nulls), progress: %.1f%%, "
+                                     "running avg: %.2f bytes",
+                                     threading.current_thread().ident, batch_count,
+                                     batch_records_processed, error_attempts,
+                                     progress_pct, current_avg)
                     else:
                         failed_batches_in_a_row += 1
-                        logging.warning(f"[Thread-{threading.current_thread().ident}]       Batch {batch_count}: No valid records processed "
-                                    f"({batch_attempts} attempts, {consecutive_nulls} consecutive nulls) "
-                                    f"[{failed_batches_in_a_row}/{max_failed_batches} consecutive failures]")
+                        logging.warning("[Thread-%d]       Batch %d: No valid records processed "
+                                    "(%d attempts, %d consecutive nulls) "
+                                    "[%d of %d consecutive failures]",
+                                    threading.current_thread().ident, batch_count,
+                                    batch_attempts, consecutive_nulls,
+                                    failed_batches_in_a_row, max_failed_batches)
 
                     # Break if we hit safety limits
                     if consecutive_nulls >= max_consecutive_nulls:
-                        logging.warning(f"[Thread-{threading.current_thread().ident}] Too many consecutive null polls ({consecutive_nulls}) - stopping partition {partition_number:03d} of {total_partition_count:03d}")
+                        logging.warning("[Thread-%d] Too many consecutive null polls (%d) - stopping partition %03d of %03d",
+                                        threading.current_thread().ident, consecutive_nulls,
+                                        partition_number, total_partition_count)
                         break
                     
                     if batch_attempts >= max_attempts_per_batch and batch_records_processed == 0:
-                        logging.warning(f"[Thread-{threading.current_thread().ident}] No progress after {max_attempts_per_batch} attempts - stopping partition {partition_number:03d} of {total_partition_count:03d}")
+                        logging.warning("[Thread-%d] No progress after %d attempts - stopping partition %03d of %03d",
+                                        threading.current_thread().ident, max_attempts_per_batch,
+                                        partition_number, total_partition_count)
                         break
 
                     if failed_batches_in_a_row >= max_failed_batches:
-                        logging.warning(f"[Thread-{threading.current_thread().ident}] Giving up on partition {partition_number:03d} of {total_partition_count:03d} after {max_failed_batches} consecutive failed batches")
+                        logging.warning("[Thread-%d] Giving up on partition %03d of %03d after %d consecutive failed batches",
+                                        threading.current_thread().ident, partition_number,
+                                        total_partition_count, max_failed_batches)
                         break
             
             except Exception as e:
-                logging.warning(f"[Thread-{threading.current_thread().ident}] Error sampling partition {partition_detail.get('partition_number', 'unknown')}: {e}")
+                logging.warning("[Thread-%d] Error sampling partition %d: %s",
+                                threading.current_thread().ident, partition_detail.get('partition_number', 'unknown'), e)
             finally:
                 consumer.close()
         
         if total_count > 0:
             avg_size = total_size / total_count
-            logging.info(f"[Thread-{threading.current_thread().ident}] Final average: {avg_size:,.2f} bytes from {total_count:,} records")
+            logging.info("[Thread-%d] Final average: %.2f bytes from %d records",
+                         threading.current_thread().ident, avg_size, total_count)
             return avg_size
         else:
-            logging.warning(f"[Thread-{threading.current_thread().ident}] No records sampled from topic '{topic_name}'")
+            logging.warning("[Thread-%d] No records sampled from topic '%s'",
+                            threading.current_thread().ident, topic_name)
             return 0.0
