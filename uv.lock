@@ -370,7 +370,7 @@ wheels = [
 
 [[package]]
 name = "kafka-cluster-topics-partition-count-recommender-tool"
-version = "0.10.0.0"
+version = "0.10.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aws-clients-python-lib" },
