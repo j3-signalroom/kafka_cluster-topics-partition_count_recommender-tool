@@ -229,7 +229,7 @@ def _analyze_kafka_cluster(metrics_config: Dict,
         
     except Exception as e:
         kafka_cluster_id = kafka_credential.get("kafka_cluster_id", "unknown")
-        logging.error(f"CLUSTER {kafka_cluster_id}: ANALYSIS FAILED WITH ERROR: {e}")
+        logging.error("CLUSTER %s: ANALYSIS FAILED WITH ERROR: %s", kafka_cluster_id, e)
         return False
     
 
@@ -263,7 +263,7 @@ def main():
         max_workers_per_cluster = int(os.getenv("MAX_WORKERS_PER_CLUSTER", DEFAULT_MAX_WORKERS_PER_CLUSTER))  # Number of topics per cluster to process concurrently
 
     except Exception as e:
-        logging.error(f"THE APPLICATION FAILED TO READ CONFIGURATION SETTINGS BECAUSE OF THE FOLLOWING ERROR: {e}") 
+        logging.error("THE APPLICATION FAILED TO READ CONFIGURATION SETTINGS BECAUSE OF THE FOLLOWING ERROR: %s", e)
         return
     
     # Read Confluent Cloud credentials from environment variable or AWS Secrets Manager
@@ -273,7 +273,7 @@ def main():
             cc_api_secrets_path = json.loads(os.getenv("CONFLUENT_CLOUD_API_SECRET_PATH", "{}"))
             metrics_config, error_message = get_secrets(cc_api_secrets_path["region_name"], cc_api_secrets_path["secret_name"])
             if metrics_config == {}:
-                logging.error(f"FAILED TO RETRIEVE CONFLUENT CLOUD API KEY/SECRET FROM AWS SECRETS MANAGER BECAUSE THE FOLLOWING ERROR OCCURRED: {error_message}.")
+                logging.error("FAILED TO RETRIEVE CONFLUENT CLOUD API KEY/SECRET FROM AWS SECRETS MANAGER BECAUSE THE FOLLOWING ERROR OCCURRED: %s.", error_message)
                 return
 
             logging.info("Retrieving the Confluent Cloud credentials from the AWS Secrets Manager.")
@@ -282,7 +282,7 @@ def main():
             logging.info("Retrieving the Confluent Cloud credentials from the .env file.")
 
     except Exception as e:
-        logging.error(f"THE APPLICATION FAILED TO READ CONFLUENT CLOUD CONFIGURATION SETTINGS BECAUSE OF THE FOLLOWING ERROR: {e}") 
+        logging.error("THE APPLICATION FAILED TO READ CONFLUENT CLOUD CONFIGURATION SETTINGS BECAUSE OF THE FOLLOWING ERROR: %s", e)
         return
     
     # Fetch Kafka credentials
@@ -324,10 +324,10 @@ def main():
     logging.info("=" * DEFAULT_CHARACTER_REPEAT)
     logging.info("MULTITHREADED KAFKA CLUSTER ANALYSIS STARTING")
     logging.info("-" * DEFAULT_CHARACTER_REPEAT)
-    logging.info(f"Number of Kafka clusters to analyze: {len(kafka_credentials)}")
-    logging.info(f"Max concurrent Kafka clusters: {max_cluster_workers}")
-    logging.info(f"Max concurrent topics per cluster: {max_workers_per_cluster}")
-    logging.info(f'Analysis method: {"Record sampling" if use_sample_records else "Metrics API"}')
+    logging.info("Number of Kafka clusters to analyze: %d", len(kafka_credentials))
+    logging.info("Max concurrent Kafka clusters: %d", max_cluster_workers)
+    logging.info("Max concurrent topics per cluster: %d", max_workers_per_cluster)
+    logging.info("Analysis method: %s", "Record sampling" if use_sample_records else "Metrics API")
     logging.info("=" * DEFAULT_CHARACTER_REPEAT)
 
     # Analyze Kafka clusters concurrently if more than one cluster
@@ -360,26 +360,26 @@ def main():
                     success = future.result()
                     if success:
                         successful_clusters += 1
-                        logging.info(f"KAFKA CLUSTER {kafka_cluster_id}: ANALYSIS COMPLETED")
+                        logging.info("KAFKA CLUSTER %s: ANALYSIS COMPLETED", kafka_cluster_id)
                     else:
                         failed_clusters += 1
-                        logging.error(f"KAFKA CLUSTER {kafka_cluster_id}: ANALYSIS FAILED")
+                        logging.error("KAFKA CLUSTER %s: ANALYSIS FAILED", kafka_cluster_id)
                 except Exception as e:
                     failed_clusters += 1
-                    logging.error(f"KAFKA CLUSTER {kafka_cluster_id}: ANALYSIS FAILED WITH EXCEPTION: {e}")
+                    logging.error("KAFKA CLUSTER %s: ANALYSIS FAILED WITH EXCEPTION: %s", kafka_cluster_id, e)
 
         # Log final summary
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("MULTITHREADED ANALYSIS SUMMARY")
         logging.info("-" * DEFAULT_CHARACTER_REPEAT)
-        logging.info(f"Total Kafka clusters analyzed: {len(kafka_credentials)}")
-        logging.info(f"Successful Kafka cluster analyses: {successful_clusters}")
-        logging.info(f"Failed Kafka cluster analyses: {failed_clusters}")
+        logging.info("Total Kafka clusters analyzed: %d", len(kafka_credentials))
+        logging.info("Successful Kafka cluster analyses: %d", successful_clusters)
+        logging.info("Failed Kafka cluster analyses: %d", failed_clusters)
 
         if successful_clusters == len(kafka_credentials):
             logging.info("ALL KAFKA CLUSTER ANALYSES COMPLETED SUCCESSFULLY.")
         elif successful_clusters > 0:
-            logging.warning(f"PARTIAL SUCCESS: {successful_clusters}/{len(kafka_credentials)} KAFKA CLUSTERS ANALYZED SUCCESSFULLY.")
+            logging.warning("PARTIAL SUCCESS: %d of %d KAFKA CLUSTERS ANALYZED SUCCESSFULLY.", successful_clusters, len(kafka_credentials))
         else:
             logging.error("ALL KAFKA CLUSTER ANALYSES FAILED.")
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
