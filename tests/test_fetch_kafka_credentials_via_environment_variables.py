@@ -1,7 +1,16 @@
 import pytest
 import json
 from unittest.mock import patch
+
 from src.thread_safe_tool import _fetch_kafka_credentials_via_environment_variables
+
+
+__copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
+__credits__    = ["Jeffrey Jonathan Jennings"]
+__license__    = "MIT"
+__maintainer__ = "Jeffrey Jonathan Jennings"
+__email__      = "j3@thej3.com"
+__status__     = "dev"
 
 
 @pytest.fixture
