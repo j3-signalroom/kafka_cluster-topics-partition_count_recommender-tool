@@ -114,7 +114,7 @@ wheels = [
 
 [[package]]
 name = "cc-clients-python-lib"
-version = "0.28.7.0"
+version = "0.28.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
@@ -131,9 +131,9 @@ dependencies = [
     { name = "urllib3" },
     { name = "wheel" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/eb/17/2aaa7ad3b8d764dcf71bbe637834f62519e6ce86be41bbe46319c565de6a/cc_clients_python_lib-0.28.7.0.tar.gz", hash = "sha256:f385c26d05dbe239c5646cd42160f153b6d302e38861b8433c6e11b24a1ee77a", size = 2789386 }
+sdist = { url = "https://files.pythonhosted.org/packages/37/1f/b545987dc0b566928b4c7c0e4d033077c5fc9794da80f7e1cca2b5282c68/cc_clients_python_lib-0.28.8.0.tar.gz", hash = "sha256:49b883b15d4cb60b910ca49495c2e034d40c0b45b73e2489b082d22873e81e63", size = 2789772 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f5/3e/72bd3adc8a768386211511d719c9df8ff871719fb9e878b5ec2829668795/cc_clients_python_lib-0.28.7.0-py3-none-any.whl", hash = "sha256:1cca890a50bc469c7bfae3b34e087f05bc0f4407da940282a8045fcfd803c572", size = 382136 },
+    { url = "https://files.pythonhosted.org/packages/0b/cb/7c122431748b5cfcc159202cbe946356910b165295e5401e428e998e5ed2/cc_clients_python_lib-0.28.8.0-py3-none-any.whl", hash = "sha256:12a18cd649bc9f97e82e8580ead5acdc126fb0791a1c50dd5b37607abd864a1c", size = 382136 },
 ]
 
 [[package]]
@@ -370,7 +370,7 @@ wheels = [
 
 [[package]]
 name = "kafka-cluster-topics-partition-count-recommender-tool"
-version = "0.10.2.0"
+version = "0.10.3.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aws-clients-python-lib" },
@@ -383,7 +383,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "aws-clients-python-lib", specifier = ">=0.10.0.0" },
-    { name = "cc-clients-python-lib", specifier = "==0.28.7.0" },
+    { name = "cc-clients-python-lib", specifier = "==0.28.8.0" },
     { name = "confluent-kafka", specifier = ">=2.11.1" },
     { name = "dotenv", specifier = ">=0.9.9" },
     { name = "pytest", specifier = ">=8.4.2" },

@@ -18,6 +18,7 @@ The **Kafka Cluster Topics Partition Count Recommender [MULTITHREADED] Tool** of
    + [**1.3 Run the Tool**](#13-run-the-tool)
       - [**1.3.1 Did you notice we prefix `uv run` to `python src/thread_safe_tool.py`?**](#131-did-you-notice-we-prefix-uv-run-to-python-srcthread_safe_toolpy)
       - [**1.3.2 Troubleshoot Connectivity Issues (if any)**](#132-troubleshoot-connectivity-issues-if-any)
+      - [**1.3.3 Running the Tool's Unit Tests (i.e., PyTests)**](#133-running-the-tools-unit-tests-ie-pytests)
    + [**1.4 The Results**](#14-the-results)
 - [**2.0 How the tool calculates the recommended partition count**](#20-how-the-tool-calculates-the-recommended-partition-count)
    + [**2.1 End-to-End Tool Workflow**](#21-end-to-end-tool-workflow)
@@ -464,6 +465,28 @@ Finally, run the following command to list all topics in your Kafka cluster:
 ```
 
 If the connection is successful, you should see a list of topics in your Kafka cluster. If you encounter any errors, double-check your credentials and network connectivity.
+
+#### **1.3.3 Running the Tool's Unit Tests (i.e., PyTests)**
+To ensure the tool is functioning as expected, you can run the provided unit tests. These tests cover various aspects of the tool's functionality, such as Kafka credential fetching.
+
+**Navigate to the Project Root Directory**
+
+Open your Terminal and navigate to the root folder of the `kafka_cluster-topics-partition_count_recommender-tool/` repository that you have cloned. You can do this by executing:
+
+```shell
+cd path/to/kafka_cluster-topics-partition_count_recommender-tool/
+```
+
+> Replace `path/to/` with the actual path where your repository is located.
+
+Then enter the following commands below to run the test suites:
+```shell
+uv run pytest tests/test_fetch_kafka_credentials_via_confluent_cloud_api_key.py
+
+uv run pytest tests/test_fetch_kafka_credentials_via_environment_variables.py
+```
+
+You should see output indicating the results of the tests, including any failures or errors. If all tests pass, it confirms that the tool is working correctly.
 
 ### **1.4 The Results**
 The tool automatically generates two comprehensive CSV reports for each Kafka Cluster that transform raw analysis into actionable insights:
