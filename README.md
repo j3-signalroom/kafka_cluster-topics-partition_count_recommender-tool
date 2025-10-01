@@ -188,6 +188,11 @@ SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES=<YOUR_SAMPLING_MAX_CONTINUOUS_FAILED_BATC
 # Multithreading configuration
 MAX_CLUSTER_WORKERS=<YOUR_MAX_CLUSTER_WORKERS>
 MAX_WORKERS_PER_CLUSTER=<YOUR_MAX_WORKERS_PER_CLUSTER>
+
+# Test environment variables
+TEST_ENVIRONMENT_ID=<YOUR_TEST_ENVIRONMENT_ID>
+TEST_KAFKA_TOPIC_NAME=<YOUR_TEST_KAFKA_TOPIC_NAME>
+TEST_KAFKA_CLUSTER_ID=<YOUR_TEST_KAFKA_CLUSTER_ID>
 ```
 
 The environment variables are defined as follows:
@@ -216,6 +221,9 @@ The environment variables are defined as follows:
 | `SAMPLING_DAYS` | Integer | Time window (in days) for record sampling, creating a rolling window that looks back from the current time. Defines how far back to sample records for analysis. **Note**: Topics with retention periods shorter than this value will use their maximum available retention period instead. | `7` (last week), `30` (last month) | `7` | No |
 | `MAX_CLUSTER_WORKERS` | Integer | Maximum number of concurrent worker threads to analyze multiple Kafka clusters in parallel. Helps to speed up analysis when working with multiple clusters. | `2`, `4` | `3` | No |
 | `MAX_WORKERS_PER_CLUSTER` | Integer | Maximum number of concurrent worker threads to analyze multiple topics within a single Kafka cluster in parallel. Helps to speed up analysis for clusters with many topics. | `4`, `8` | `8` | No |
+| `TEST_ENVIRONMENT_ID` | String | Confluent Cloud environment ID used for testing connectivity. | `env-abc123` | None | No |
+| `TEST_KAFKA_TOPIC_NAME` | String | Kafka topic name used for testing connectivity. | `test-topic` | None | No |
+| `TEST_KAFKA_CLUSTER_ID` | String | Kafka cluster ID used for testing connectivity. | `lkc-abc123` | None | No |
 
 #### **1.2.3 Using the AWS Secrets Manager (optional)**
 If you use **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and the tool will retrieve the secrets from AWS Secrets Manager using the names provided in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`.  
@@ -475,9 +483,13 @@ cd path/to/kafka_cluster-topics-partition_count_recommender-tool/
 
 Then enter the following commands below to run the test suites:
 ```shell
-uv run pytest tests/test_fetch_kafka_credentials_via_confluent_cloud_api_key.py
+uv run pytest -s tests/test_fetch_kafka_credentials_via_confluent_cloud_api_key.py
 
-uv run pytest tests/test_fetch_kafka_credentials_via_environment_variables.py
+uv run pytest -s tests/test_fetch_kafka_credentials_via_environment_variables.py
+
+uv run pytest -s tests/test_metrics_client.py
+
+uv run pytest -s tests/test_environment_client.py
 ```
 
 You should see output indicating the results of the tests, including any failures or errors. If all tests pass, it confirms that the tool is working correctly.
