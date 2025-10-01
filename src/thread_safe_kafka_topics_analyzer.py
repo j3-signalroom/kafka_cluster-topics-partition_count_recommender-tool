@@ -160,7 +160,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
         # Create the CSV detail report file and write the header row
         csv_writer = ThreadSafeCSVWriter(
             report_filename,
-            ["method","topic_name","is_compacted","number_of_records","number_of_partitions","required_throughput","consumer_throughput","recommended_partitions","status"]
+            ["method","topic_name","is_compacted","number_of_records","number_of_partitions","required_throughput","consumer_throughput","recommended_partitions","hot_partition_ingress","hot_partition_egress","status"]
         )
 
         logging.info("Created the %s file", report_filename)
@@ -341,11 +341,19 @@ class ThreadSafeKafkaTopicsAnalyzer:
             status = "error" if 'error' in result else "empty"
 
         # Write to CSV
-        method = "sampling_records" if use_sample_records else "metrics_api"
+        if use_sample_records:
+            method = "sampling_records"
+            hot_partition_ingress = "N/A"
+            hot_partition_egress = "N/A"
+        else:
+            method = "metrics_api"
+            hot_partition_ingress = "yes" if result.get('hot_partition_ingress', False) else "no"
+            hot_partition_egress = "yes" if result.get('hot_partition_egress', False) else "no"
+
         csv_writer.write_row([
             method, topic_name, is_compacted_str, record_count, partition_count,
             required_throughput/1024/1024, consumer_throughput/1024/1024,
-            recommended_partition_count, status
+            recommended_partition_count, hot_partition_ingress, hot_partition_egress, status
         ])
 
     def __calculate_summary_stats(self, 
