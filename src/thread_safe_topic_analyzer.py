@@ -149,20 +149,20 @@ class ThreadSafeTopicAnalyzer:
         # Instantiate the MetricsClient class.
         metrics_client = MetricsClient(metrics_config)
 
-        bytes_retry = 0
-        max_bytes_retries = DEFAULT_RESTFUL_API_MAX_RETRIES
+        retry = 0
+        max_retries = DEFAULT_RESTFUL_API_MAX_RETRIES
         proceed = False
 
-        while bytes_retry < max_bytes_retries:
+        while retry < max_retries:
             # Use Metrics API to get the consumer byte consumption
             http_status_code, error_message, rate_limits, bytes_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_BYTES, 
                                                                                                                                 self.kafka_cluster_id, 
                                                                                                                                 topic_name)
             if http_status_code == HttpStatus.RATE_LIMIT_EXCEEDED:
-                bytes_retry += 1
-                if bytes_retry == max_bytes_retries:
+                retry += 1
+                if retry == max_retries:
                     logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'RECEIVED BYTES' metric for topic %s. Max retries reached (%d). Aborting.",
-                                    threading.current_thread().ident, topic_name, max_bytes_retries)
+                                    threading.current_thread().ident, topic_name, max_retries)
                     result['error'] = "Rate limit exceeded when retrieving 'RECEIVED BYTES' metric."
                     result['total_record_count'] = 0
                     result['avg_bytes_per_record'] = 0.0
@@ -170,7 +170,7 @@ class ThreadSafeTopicAnalyzer:
                     result['hot_partition_egress'] = False
                     break
                 logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'RECEIVED BYTES' metric for topic %s. Retrying %d of %d after %d seconds...",
-                                threading.current_thread().ident, topic_name, bytes_retry, max_bytes_retries, rate_limits['reset_in_seconds'])
+                                threading.current_thread().ident, topic_name, retry, max_retries, rate_limits['reset_in_seconds'])
                 time.sleep(rate_limits['reset_in_seconds'])
                 continue
             elif http_status_code not in (HttpStatus.OK, HttpStatus.RATE_LIMIT_EXCEEDED):
@@ -188,19 +188,19 @@ class ThreadSafeTopicAnalyzer:
 
         if proceed:
             proceed = False
-            records_retry = 0
-            max_records_retries = DEFAULT_RESTFUL_API_MAX_RETRIES
+            retry = 0
+            max_retries = DEFAULT_RESTFUL_API_MAX_RETRIES
 
-            while records_retry < max_records_retries:
+            while retry < max_retries:
                 # Use the Confluent Metrics API to get the record count
                 http_status_code, error_message, rate_limits, record_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_RECORDS, 
                                                                                                                                      self.kafka_cluster_id, 
                                                                                                                                      topic_name)
                 if http_status_code == HttpStatus.RATE_LIMIT_EXCEEDED:
-                    records_retry += 1
-                    if records_retry == max_records_retries:
+                    retry += 1
+                    if retry == max_retries:
                         logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric for topic %s. Max retries reached (%d). Aborting.",
-                                        threading.current_thread().ident, topic_name, max_records_retries)
+                                        threading.current_thread().ident, topic_name, max_retries)
                         result['error'] = "Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric."
                         result['total_record_count'] = 0
                         result['avg_bytes_per_record'] = 0.0
@@ -208,7 +208,7 @@ class ThreadSafeTopicAnalyzer:
                         result['hot_partition_egress'] = False
                         break
                     logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric for topic %s. Retrying %d of %d after %d seconds...",
-                                    threading.current_thread().ident, topic_name, records_retry, max_records_retries, rate_limits['reset_in_seconds'])
+                                    threading.current_thread().ident, topic_name, retry, max_retries, rate_limits['reset_in_seconds'])
                     time.sleep(rate_limits['reset_in_seconds'])
                     continue
                 elif http_status_code not in (HttpStatus.OK, HttpStatus.RATE_LIMIT_EXCEEDED):
@@ -244,15 +244,20 @@ class ThreadSafeTopicAnalyzer:
                     proceed = True
                     break
 
-        if proceed:
+        if proceed and record_count == 0:
+                logging.info("[Thread-%d] No records available in topic '%s' for hot partition analysis.", threading.current_thread().ident, topic_name)
+                result['hot_partition_ingress'] = False
+                result['hot_partition_egress'] = False
+                return result
+        elif proceed and record_count > 0:
             retry = 0
             max_retries = DEFAULT_RESTFUL_API_MAX_RETRIES
 
             while retry < max_retries:
                 # Calculate the ISO 8601 formatted start and end times within a rolling window for the last 1 day
                 utc_now = datetime.now(timezone.utc)
-                seven_days_ago = utc_now - timedelta(days=7)
-                iso_start_time = seven_days_ago.strftime('%Y-%m-%dT%H:%M:%S')
+                one_day_ago = utc_now - timedelta(days=1)
+                iso_start_time = one_day_ago.strftime('%Y-%m-%dT%H:%M:%S')
                 iso_end_time = utc_now.strftime('%Y-%m-%dT%H:%M:%S')
 
                 query_start_time =  datetime.fromisoformat(iso_start_time.replace('Z', '+00:00'))
@@ -260,10 +265,10 @@ class ThreadSafeTopicAnalyzer:
 
                 http_status_code, error_message, rate_limits, is_partition_hot = metrics_client.is_topic_partition_hot(self.kafka_cluster_id, topic_name, DataMovementType.INGRESS, query_start_time, query_end_time)
                 if http_status_code == HttpStatus.RATE_LIMIT_EXCEEDED:
-                    records_retry += 1
-                    if records_retry == max_records_retries:
+                    retry += 1
+                    if retry == max_retries:
                         logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'HOT_PARTITION_INGRESS' metric for topic %s. Max retries reached (%d). Aborting.",
-                                        threading.current_thread().ident, topic_name, max_records_retries)
+                                        threading.current_thread().ident, topic_name, max_retries)
                         result['error'] = "Rate limit exceeded when retrieving 'HOT_PARTITION_INGRESS' metric."
                         result['total_record_count'] = 0
                         result['avg_bytes_per_record'] = 0.0
@@ -271,7 +276,7 @@ class ThreadSafeTopicAnalyzer:
                         result['hot_partition_egress'] = False
                         break
                     logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'HOT_PARTITION_INGRESS' metric for topic %s. Retrying %d of %d after %d seconds...",
-                                    threading.current_thread().ident, topic_name, records_retry, max_records_retries, rate_limits['reset_in_seconds'])
+                                    threading.current_thread().ident, topic_name, retry, max_retries, rate_limits['reset_in_seconds'])
                     time.sleep(rate_limits['reset_in_seconds'])
                     continue
                 elif http_status_code not in (HttpStatus.OK, HttpStatus.RATE_LIMIT_EXCEEDED):
@@ -284,7 +289,7 @@ class ThreadSafeTopicAnalyzer:
                     result['hot_partition_egress'] = False
                     break
                 elif http_status_code == HttpStatus.OK:
-                    result['hot_partition_egress'] = is_partition_hot
+                    result['hot_partition_ingress'] = is_partition_hot
                     if is_partition_hot:
                         logging.info("[Thread-%d] Confluent Metrics API - Topic %s is identified as a hot topic by ingress throughput.",
                                      threading.current_thread().ident, topic_name)
@@ -294,54 +299,54 @@ class ThreadSafeTopicAnalyzer:
                     proceed = True
                     break
 
-        if proceed:
-            retry = 0
-            max_retries = DEFAULT_RESTFUL_API_MAX_RETRIES
+            if proceed:
+                retry = 0
+                max_retries = DEFAULT_RESTFUL_API_MAX_RETRIES
 
-            while retry < max_retries:
-                # Calculate the ISO 8601 formatted start and end times within a rolling window for the last 1 day
-                utc_now = datetime.now(timezone.utc)
-                seven_days_ago = utc_now - timedelta(days=7)
-                iso_start_time = seven_days_ago.strftime('%Y-%m-%dT%H:%M:%S')
-                iso_end_time = utc_now.strftime('%Y-%m-%dT%H:%M:%S')
+                while retry < max_retries:
+                    # Calculate the ISO 8601 formatted start and end times within a rolling window for the last 1 day
+                    utc_now = datetime.now(timezone.utc)
+                    one_day_ago = utc_now - timedelta(days=1)
+                    iso_start_time = one_day_ago.strftime('%Y-%m-%dT%H:%M:%S')
+                    iso_end_time = utc_now.strftime('%Y-%m-%dT%H:%M:%S')
 
-                query_start_time =  datetime.fromisoformat(iso_start_time.replace('Z', '+00:00'))
-                query_end_time = datetime.fromisoformat(iso_end_time.replace('Z', '+00:00'))
+                    query_start_time =  datetime.fromisoformat(iso_start_time.replace('Z', '+00:00'))
+                    query_end_time = datetime.fromisoformat(iso_end_time.replace('Z', '+00:00'))
 
-                http_status_code, error_message, rate_limits, is_partition_hot = metrics_client.is_topic_partition_hot(self.kafka_cluster_id, topic_name, DataMovementType.EGRESS, query_start_time, query_end_time)
-                if http_status_code == HttpStatus.RATE_LIMIT_EXCEEDED:
-                    records_retry += 1
-                    if records_retry == max_records_retries:
-                        logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'HOT_PARTITION_EGRESS' metric for topic %s. Max retries reached (%d). Aborting.",
-                                        threading.current_thread().ident, topic_name, max_records_retries)
-                        result['error'] = "Rate limit exceeded when retrieving 'HOT_PARTITION_EGRESS' metric."
+                    http_status_code, error_message, rate_limits, is_partition_hot = metrics_client.is_topic_partition_hot(self.kafka_cluster_id, topic_name, DataMovementType.EGRESS, query_start_time, query_end_time)
+                    if http_status_code == HttpStatus.RATE_LIMIT_EXCEEDED:
+                        retry += 1
+                        if retry == max_retries:
+                            logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'HOT_PARTITION_EGRESS' metric for topic %s. Max retries reached (%d). Aborting.",
+                                            threading.current_thread().ident, topic_name, max_retries)
+                            result['error'] = "Rate limit exceeded when retrieving 'HOT_PARTITION_EGRESS' metric."
+                            result['total_record_count'] = 0
+                            result['avg_bytes_per_record'] = 0.0
+                            result['hot_partition_ingress'] = False
+                            result['hot_partition_egress'] = False
+                            break
+                        logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'HOT_PARTITION_EGRESS' metric for topic %s. Retrying %d of %d after %d seconds...",
+                                        threading.current_thread().ident, topic_name, retry, max_retries, rate_limits['reset_in_seconds'])
+                        time.sleep(rate_limits['reset_in_seconds'])
+                        continue
+                    elif http_status_code not in (HttpStatus.OK, HttpStatus.RATE_LIMIT_EXCEEDED):
+                        logging.warning("[Thread-%d] Failed retrieving 'HOT_PARTITION_EGRESS' metric for topic %s because: %s",
+                                        threading.current_thread().ident, topic_name, error_message)
+                        result['error'] = error_message
                         result['total_record_count'] = 0
                         result['avg_bytes_per_record'] = 0.0
                         result['hot_partition_ingress'] = False
                         result['hot_partition_egress'] = False
                         break
-                    logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'HOT_PARTITION_EGRESS' metric for topic %s. Retrying %d of %d after %d seconds...",
-                                    threading.current_thread().ident, topic_name, records_retry, max_records_retries, rate_limits['reset_in_seconds'])
-                    time.sleep(rate_limits['reset_in_seconds'])
-                    continue
-                elif http_status_code not in (HttpStatus.OK, HttpStatus.RATE_LIMIT_EXCEEDED):
-                    logging.warning("[Thread-%d] Failed retrieving 'HOT_PARTITION_EGRESS' metric for topic %s because: %s",
-                                    threading.current_thread().ident, topic_name, error_message)
-                    result['error'] = error_message
-                    result['total_record_count'] = 0
-                    result['avg_bytes_per_record'] = 0.0
-                    result['hot_partition_ingress'] = False
-                    result['hot_partition_egress'] = False
-                    break
-                elif http_status_code == HttpStatus.OK:
-                    result['hot_partition_egress'] = is_partition_hot
-                    if is_partition_hot:
-                        logging.info("[Thread-%d] Confluent Metrics API - Topic %s is identified as a hot topic by egress throughput.",
-                                     threading.current_thread().ident, topic_name)
-                    else:
-                        logging.info("[Thread-%d] Confluent Metrics API - Topic %s is NOT identified as a hot topic by egress throughput.",
-                                     threading.current_thread().ident, topic_name)
-                    break
+                    elif http_status_code == HttpStatus.OK:
+                        result['hot_partition_egress'] = is_partition_hot
+                        if is_partition_hot:
+                            logging.info("[Thread-%d] Confluent Metrics API - Topic %s is identified as a hot topic by egress throughput.",
+                                        threading.current_thread().ident, topic_name)
+                        else:
+                            logging.info("[Thread-%d] Confluent Metrics API - Topic %s is NOT identified as a hot topic by egress throughput.",
+                                        threading.current_thread().ident, topic_name)
+                        break
 
         return result
 
