@@ -605,7 +605,7 @@ sequenceDiagram
     KTA->>KTA: Filter topics (internal, topic_filter)
     KTA->>KTA: Get topic configurations (retention, cleanup policy)
 
-    KTA->>CSV: Create ThreadSafeCSVWriter
+    KTA->>CSV: Create ThreadSafeCsvWriter
     CSV->>CSV: Initialize CSV file with headers
 
     alt Single cluster

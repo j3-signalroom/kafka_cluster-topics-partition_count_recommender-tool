@@ -8,7 +8,8 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from thread_safe_topic_analyzer import ThreadSafeTopicAnalyzer
-from thread_safe_csv_writer import ThreadSafeCSVWriter
+from thread_safe_csv_writer import ThreadSafeCsvWriter
+from thread_safe_kafka_writer import ThreadSafeKafkaWriter
 from utilities import setup_logging
 from constants import (DEFAULT_SAMPLING_DAYS, 
                        DEFAULT_SAMPLING_BATCH_SIZE,
@@ -158,12 +159,20 @@ class ThreadSafeKafkaTopicsAnalyzer:
         report_filename = f"{base_filename}-detail-report.csv"
 
         # Create the CSV detail report file and write the header row
-        csv_writer = ThreadSafeCSVWriter(
+        csv_writer = ThreadSafeCsvWriter(
             report_filename,
             ["method","topic_name","is_compacted","number_of_records","number_of_partitions","required_throughput","consumer_throughput","recommended_partitions","hot_partition_ingress","hot_partition_egress","status"]
         )
 
         logging.info("Created the %s file", report_filename)
+
+        # Initialize the thread-safe Kafka writer 
+        kafka_writer = ThreadSafeKafkaWriter(
+            bootstrap_server=self.kafka_consumer_config['bootstrap.servers'],
+            topic_name="j3.partition_recommender.results",
+            sasl_username=self.kafka_consumer_config['sasl.username'],
+            sasl_password=self.kafka_consumer_config['sasl.password']
+        )
 
         def update_progress() -> None:
             """Update progress in a thread-safe manner.
@@ -259,14 +268,15 @@ class ThreadSafeKafkaTopicsAnalyzer:
                     with results_lock:
                         results.append(result)
                     
-                    # Process result and write to CSV
+                    # Process result and write to CSV/Kafka
                     self.__process_and_write_result(
                         result, 
                         min_recommended_partitions,
                         min_consumption_throughput,
                         required_consumption_throughput_factor, 
                         use_sample_records, 
-                        csv_writer
+                        csv_writer,
+                        kafka_writer
                     )
                     
                     update_progress()
@@ -292,6 +302,9 @@ class ThreadSafeKafkaTopicsAnalyzer:
         
         # Write summary report
         self.__write_summary_report(base_filename, summary_stats)
+
+        # After all threads complete
+        kafka_writer.flush_and_close()
         
         # Log final results
         self.__log_summary_stats(use_sample_records, summary_stats)
@@ -304,7 +317,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
                                    min_consumer_throughput: float, 
                                    required_consumption_throughput_factor: float, 
                                    use_sample_records: bool, 
-                                   csv_writer: ThreadSafeCSVWriter) -> None:
+                                   csv_writer: ThreadSafeCsvWriter,
+                                   kafka_writer: ThreadSafeKafkaWriter) -> None:
         """Process analysis result and write to CSV.
 
         Args:
@@ -313,7 +327,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
             min_consumer_throughput (float): The minimum consumption throughput threshold.
             required_consumption_throughput_factor (float): The factor to adjust the required throughput.
             use_sample_records (bool): Whether to use sample records for the analysis.
-            csv_writer (ThreadSafeCSVWriter): The CSV writer instance to write the results.
+            csv_writer (ThreadSafeCsvWriter): The CSV writer instance to write the results.
+            kafka_writer (ThreadSafeKafkaWriter): The Kafka writer instance to write the results.
 
         Return(s):
             None
@@ -355,6 +370,9 @@ class ThreadSafeKafkaTopicsAnalyzer:
             required_throughput/1024/1024, consumer_throughput/1024/1024,
             recommended_partition_count, hot_partition_ingress, hot_partition_egress, status
         ])
+
+        # Write to Kafka
+        kafka_writer.write_result(result)
 
     def __calculate_summary_stats(self, 
                                  results: List[Dict], 
