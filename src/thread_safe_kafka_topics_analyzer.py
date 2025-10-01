@@ -160,7 +160,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
         # Create the CSV detail report file and write the header row
         csv_writer = ThreadSafeCSVWriter(
             report_filename,
-            ["method","topic_name","is_compacted","number_of_records","number_of_partitions","required_throughput","consumer_throughput","recommended_partitions","status"]
+            ["method","topic_name","is_compacted","number_of_records","number_of_partitions","required_throughput","consumer_throughput","recommended_partitions","hot_partition_ingress","hot_partition_egress","status"]
         )
 
         logging.info("Created the %s file", report_filename)
@@ -294,7 +294,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
         self.__write_summary_report(base_filename, summary_stats)
         
         # Log final results
-        self.__log_summary_stats(summary_stats)
+        self.__log_summary_stats(use_sample_records, summary_stats)
 
         return True if len(results) > 0 else False
 
@@ -341,11 +341,19 @@ class ThreadSafeKafkaTopicsAnalyzer:
             status = "error" if 'error' in result else "empty"
 
         # Write to CSV
-        method = "sampling_records" if use_sample_records else "metrics_api"
+        if use_sample_records:
+            method = "sampling_records"
+            hot_partition_ingress = "N/A"
+            hot_partition_egress = "N/A"
+        else:
+            method = "metrics_api"
+            hot_partition_ingress = "yes" if result.get('hot_partition_ingress', False) else "no"
+            hot_partition_egress = "yes" if result.get('hot_partition_egress', False) else "no"
+
         csv_writer.write_row([
             method, topic_name, is_compacted_str, record_count, partition_count,
             required_throughput/1024/1024, consumer_throughput/1024/1024,
-            recommended_partition_count, status
+            recommended_partition_count, hot_partition_ingress, hot_partition_egress, status
         ])
 
     def __calculate_summary_stats(self, 
@@ -382,28 +390,38 @@ class ThreadSafeKafkaTopicsAnalyzer:
         Return(s):
             Dict: Summary statistics of the analysis.
         """
+
+        # Calculate overall statistics
         overall_topic_count = len(results)
         total_partition_count = sum(result['partition_count'] for result in results)
         total_record_count = sum(result.get('total_record_count', 0) for result in results)
         active_results = [result for result in results if result.get('total_record_count', 0) > 0]
         active_topic_count = len(active_results)
         active_total_partition_count = sum(result.get('partition_count', 0) for result in active_results)
-        
-        # Calculate total recommended partitions
+        hot_partition_ingress_count = 0
+        hot_partition_egress_count = 0
         total_recommended_partitions = 0
+
+        # Calculate total recommended partitions across all active topics
         for result in active_results:
-            record_count = result.get('total_record_count', 0)
-            if record_count > 0:
-                avg_bytes_per_record = result.get('avg_bytes_per_record', 0)
-                consumer_throughput = avg_bytes_per_record * record_count
-                required_throughput = consumer_throughput * required_consumption_throughput_factor
-                
-                if required_throughput < min_consumption_throughput:
-                    recommended_partition_count = min_recommended_partitions
-                else:
-                    recommended_partition_count = round(required_throughput / consumer_throughput)
-                
-                total_recommended_partitions += recommended_partition_count
+            # Count hot partitions only if using Metrics API
+            if not use_sample_records:
+                hot_partition_ingress_count += 1 if result["hot_partition_ingress"] else 0
+                hot_partition_egress_count += 1 if result["hot_partition_egress"] else 0
+
+            # Calculate required throughput and recommended partitions
+            avg_bytes_per_record = result["avg_bytes_per_record"]
+            consumer_throughput = avg_bytes_per_record * result["total_record_count"]
+            required_throughput = consumer_throughput * required_consumption_throughput_factor
+            
+            # Calculate total recommended partitions
+            if required_throughput < min_consumption_throughput:
+                recommended_partition_count = min_recommended_partitions
+            else:
+                recommended_partition_count = round(required_throughput / consumer_throughput)
+            
+            # Accumulate total recommended partitions
+            total_recommended_partitions += recommended_partition_count
         
         # Calculate percentage change
         if active_total_partition_count > total_recommended_partitions:
@@ -413,6 +431,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
             percentage_increase = (total_recommended_partitions - active_total_partition_count) / active_total_partition_count * 100 if active_total_partition_count > 0 else 0.0
             percentage_decrease = 0.0
         
+        # Compile summary statistics
         return {
             'elapsed_time_hours': elapsed_time / 3600,
             'method': "sampling_records" if use_sample_records else "metrics_api",
@@ -437,7 +456,11 @@ class ThreadSafeKafkaTopicsAnalyzer:
             'total_records': total_record_count,
             'average_partitions_per_topic': total_partition_count/overall_topic_count if overall_topic_count > 0 else 0,
             'active_average_partitions_per_topic': total_partition_count/active_topic_count if active_topic_count > 0 else 0,
-            'average_recommended_partitions_per_topic': total_recommended_partitions/active_topic_count if active_topic_count > 0 else 0
+            'average_recommended_partitions_per_topic': total_recommended_partitions/active_topic_count if active_topic_count > 0 else 0,
+            'hot_partition_ingress_count': hot_partition_ingress_count,
+            'hot_partition_ingress_percentage': (hot_partition_ingress_count/active_topic_count*100) if active_topic_count > 0 else 0,
+            'hot_partition_egress_count': hot_partition_egress_count,
+            'hot_partition_egress_percentage': (hot_partition_egress_count/active_topic_count*100) if active_topic_count > 0 else 0
         }
     
     def __log_initial_parameters(self, params: Dict) -> None:
@@ -584,10 +607,11 @@ class ThreadSafeKafkaTopicsAnalyzer:
                 if value is not None:
                     writer.writerow([key, value])
 
-    def __log_summary_stats(self, stats: Dict) -> None:
+    def __log_summary_stats(self, use_sample_records: bool, stats: Dict) -> None:
         """Log summary statistics to console and file.
         
         Args:
+            use_sample_records (bool): Whether sample records were used for the analysis.
             stats (Dict): Summary statistics to log.
             
         Returns:
@@ -613,4 +637,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
         logging.info("Average Partitions per Topic: %.0f", stats['average_partitions_per_topic'])
         logging.info("Average Partitions per Active Topic: %.0f", stats['active_average_partitions_per_topic'])
         logging.info("Average Recommended Partitions per Topic: %.0f", stats['average_recommended_partitions_per_topic'])
+        if not use_sample_records:
+            logging.info("Topics with Hot Partition Ingress: %d (%.1f%%)", stats['hot_partition_ingress_count'], stats['hot_partition_ingress_percentage'])
+            logging.info("Topics with Hot Partition Egress: %d (%.1f%%)", stats['hot_partition_egress_count'], stats['hot_partition_egress_percentage'])        
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
