@@ -24,7 +24,11 @@ from constants import (DEFAULT_USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDEN
                        DEFAULT_MAX_WORKERS_PER_CLUSTER,
                        DEFAULT_CHARACTER_REPEAT,
                        DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS,
-                       DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD)
+                       DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD,
+                       DEFAULT_USE_KAFKA_WRITER,
+                       DEFAULT_KAFKA_WRITER_TOPIC_NAME,
+                       DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT,
+                       DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR)
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -206,8 +210,11 @@ def _analyze_kafka_cluster(metrics_config: Dict,
                                               max_workers=config.get('max_workers_per_cluster', DEFAULT_MAX_WORKERS_PER_CLUSTER),
                                               min_recommended_partitions=config.get('min_recommended_partitions', DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS),
                                               min_consumption_throughput=config.get('min_consumption_throughput', DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD),
-                                              metrics_config=metrics_config)
-        
+                                              metrics_config=metrics_config,
+                                              use_kafka_writer=config.get('use_kafka_writer', DEFAULT_USE_KAFKA_WRITER),
+                                              kafka_writer_topic_name=config.get('kafka_writer_topic_name', DEFAULT_KAFKA_WRITER_TOPIC_NAME),
+                                              kafka_writer_topic_partition_count=config.get('kafka_writer_topic_partition_count', DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT),
+                                              kafka_writer_topic_replication_factor=config.get('kafka_writer_topic_replication_factor', DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR))
         # Log the result of the analysis
         if success:
             logging.info("KAFKA CLUSTER %s: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.", kafka_credential.get('kafka_cluster_id'))
@@ -262,6 +269,11 @@ def main():
         max_cluster_workers = int(os.getenv("MAX_CLUSTER_WORKERS", DEFAULT_MAX_CLUSTER_WORKERS))  # Number of clusters to process concurrently
         max_workers_per_cluster = int(os.getenv("MAX_WORKERS_PER_CLUSTER", DEFAULT_MAX_WORKERS_PER_CLUSTER))  # Number of topics per cluster to process concurrently
 
+        # Kafka writer configuration
+        use_kafka_writer = os.getenv("USE_KAFKA_WRITER", DEFAULT_USE_KAFKA_WRITER) == "True"
+        kafka_writer_topic_name = os.getenv("KAFKA_WRITER_TOPIC_NAME", DEFAULT_KAFKA_WRITER_TOPIC_NAME)
+        kafka_writer_topic_partition_count = int(os.getenv("KAFKA_WRITER_TOPIC_PARTITION_COUNT", DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT))
+        kafka_writer_topic_replication_factor = int(os.getenv("KAFKA_WRITER_TOPIC_REPLICATION_FACTOR", DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR))
     except Exception as e:
         logging.error("THE APPLICATION FAILED TO READ CONFIGURATION SETTINGS BECAUSE OF THE FOLLOWING ERROR: %s", e)
         return
@@ -318,7 +330,11 @@ def main():
         'topic_filter': topic_filter,
         'max_workers_per_cluster': max_workers_per_cluster,
         'min_recommended_partitions': min_recommended_partitions,
-        'min_consumption_throughput': min_consumption_throughput
+        'min_consumption_throughput': min_consumption_throughput,
+        'use_kafka_writer': use_kafka_writer,
+        'kafka_writer_topic_name': kafka_writer_topic_name,
+        'kafka_writer_topic_partition_count': kafka_writer_topic_partition_count,
+        'kafka_writer_topic_replication_factor': kafka_writer_topic_replication_factor
     }
 
     logging.info("=" * DEFAULT_CHARACTER_REPEAT)
@@ -328,6 +344,10 @@ def main():
     logging.info("Max concurrent Kafka clusters: %d", max_cluster_workers)
     logging.info("Max concurrent topics per cluster: %d", max_workers_per_cluster)
     logging.info("Analysis method: %s", "Record sampling" if use_sample_records else "Metrics API")
+    logging.info("Kafka writer enabled: %s", use_kafka_writer)
+    logging.info("Kafka writer topic name: %s", kafka_writer_topic_name)
+    logging.info("Kafka writer topic partition count: %d", kafka_writer_topic_partition_count)
+    logging.info("Kafka writer topic replication factor: %d", kafka_writer_topic_replication_factor)
     logging.info("=" * DEFAULT_CHARACTER_REPEAT)
 
     # Analyze Kafka clusters concurrently if more than one cluster
