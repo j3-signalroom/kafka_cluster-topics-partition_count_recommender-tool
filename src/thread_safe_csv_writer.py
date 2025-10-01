@@ -12,7 +12,7 @@ __status__     = "dev"
 
 
 # Thread-safe CSV writer
-class ThreadSafeCSVWriter:
+class ThreadSafeCsvWriter:
     """Thread-safe CSV writer for concurrent operations."""
     
     def __init__(self, filename: str, headers: List[str]):
