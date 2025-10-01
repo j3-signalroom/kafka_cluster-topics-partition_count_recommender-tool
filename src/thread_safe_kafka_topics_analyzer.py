@@ -294,7 +294,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
         self.__write_summary_report(base_filename, summary_stats)
         
         # Log final results
-        self.__log_summary_stats(summary_stats)
+        self.__log_summary_stats(use_sample_records, summary_stats)
 
         return True if len(results) > 0 else False
 
@@ -607,10 +607,11 @@ class ThreadSafeKafkaTopicsAnalyzer:
                 if value is not None:
                     writer.writerow([key, value])
 
-    def __log_summary_stats(self, stats: Dict) -> None:
+    def __log_summary_stats(self, use_sample_records: bool, stats: Dict) -> None:
         """Log summary statistics to console and file.
         
         Args:
+            use_sample_records (bool): Whether sample records were used for the analysis.
             stats (Dict): Summary statistics to log.
             
         Returns:
@@ -636,4 +637,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
         logging.info("Average Partitions per Topic: %.0f", stats['average_partitions_per_topic'])
         logging.info("Average Partitions per Active Topic: %.0f", stats['active_average_partitions_per_topic'])
         logging.info("Average Recommended Partitions per Topic: %.0f", stats['average_recommended_partitions_per_topic'])
+        if not use_sample_records:
+            logging.info("Topics with Hot Partition Ingress: %d (%.1f%%)", stats['hot_partition_ingress_count'], stats['hot_partition_ingress_percentage'])
+            logging.info("Topics with Hot Partition Egress: %d (%.1f%%)", stats['hot_partition_egress_count'], stats['hot_partition_egress_percentage'])        
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
