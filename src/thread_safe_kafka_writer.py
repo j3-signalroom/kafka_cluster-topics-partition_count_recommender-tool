@@ -162,8 +162,8 @@ class ThreadSafeKafkaWriter:
                              replication_factor=replication_factor,
                              config={
                                 'cleanup.policy': 'delete',
-                                'retention.ms': '604800000',  # 7 days
-                                'compression.type': 'snappy'
+                                'retention.ms': '-1',  # Infinite retention
+                                'compression.type': 'lz4'
                             })
         
         futures = self.admin_client.create_topics([new_topic])

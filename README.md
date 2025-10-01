@@ -193,6 +193,12 @@ MAX_WORKERS_PER_CLUSTER=<YOUR_MAX_WORKERS_PER_CLUSTER>
 TEST_ENVIRONMENT_ID=<YOUR_TEST_ENVIRONMENT_ID>
 TEST_KAFKA_TOPIC_NAME=<YOUR_TEST_KAFKA_TOPIC_NAME>
 TEST_KAFKA_CLUSTER_ID=<YOUR_TEST_KAFKA_CLUSTER_ID>
+
+# Kafka writer configuration
+USE_KAFKA_WRITER=<True|False>
+KAFKA_WRITER_TOPIC_NAME=<YOUR_KAFKA_WRITER_TOPIC_NAME>
+KAFKA_WRITER_TOPIC_PARTITION_COUNT=<YOUR_KAFKA_WRITER_TOPIC_PARTITION_COUNT>
+KAFKA_WRITER_TOPIC_REPLICATION_FACTOR=<YOUR_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR>
 ```
 
 The environment variables are defined as follows:
@@ -224,6 +230,10 @@ The environment variables are defined as follows:
 | `TEST_ENVIRONMENT_ID` | String | Confluent Cloud environment ID used for testing connectivity. | `env-abc123` | None | No |
 | `TEST_KAFKA_TOPIC_NAME` | String | Kafka topic name used for testing connectivity. | `test-topic` | None | No |
 | `TEST_KAFKA_CLUSTER_ID` | String | Kafka cluster ID used for testing connectivity. | `lkc-abc123` | None | No |
+| `USE_KAFKA_WRITER` | Boolean | Enables the Kafka writer functionality to create a test topic and produce messages to it for connectivity testing. When `True`, the tool will attempt to create the specified test topic and produce messages to it. | `True` or `False` | `False` | No |
+| `KAFKA_WRITER_TOPIC_NAME` | String | Name of the Kafka topic to be created by the Kafka writer for connectivity testing. Only used if `USE_KAFKA_WRITER` is `True`. | `connectivity-test-topic` | None | No (required if `USE_KAFKA_WRITER` is `True`) |
+| `KAFKA_WRITER_TOPIC_PARTITION_COUNT` | Integer | Number of partitions for the Kafka writer test topic. Only used if `USE_KAFKA_WRITER` is `True`. | `3`, `6` | `3` | No (required if `USE_KAFKA_WRITER` is `True`) |
+| `KAFKA_WRITER_TOPIC_REPLICATION_FACTOR` | Integer | Replication factor for the Kafka writer test topic. Only used if `USE_KAFKA_WRITER` is `True`. | `3` | `3` | No (required if `USE_KAFKA_WRITER` is `True`) |
 
 #### **1.2.3 Using the AWS Secrets Manager (optional)**
 If you use **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and the tool will retrieve the secrets from AWS Secrets Manager using the names provided in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`.  
