@@ -34,7 +34,7 @@ def kafka_topic_name():
     return os.getenv("TEST_KAFKA_TOPIC_NAME")
  
 @pytest.fixture
-def confluent_cloud_credential():
+def metrics_client():
     """Load the Confluent Cloud credentials from the environment variables."""
     load_dotenv()
     metrics_config = json.loads(os.getenv("CONFLUENT_CLOUD_CREDENTIAL", "{}"))
@@ -42,10 +42,10 @@ def confluent_cloud_credential():
 
 
 class TestMetricsClient:
-    def test_get_topic_received_total_bytes(self, confluent_cloud_credential, kafka_cluster_id, kafka_topic_name):
-        """Test the get_topic_total() function for getting the total bytes."""
+    """Test Suite for the MetricsClient class."""
 
-        metrics_client = confluent_cloud_credential
+    def test_get_topic_received_total_bytes(self, metrics_client, kafka_cluster_id, kafka_topic_name):
+        """Test the get_topic_total() function for getting the total bytes."""
 
         # Calculate the ISO 8601 formatted start and end times within a rolling window for the last 1 day
         utc_now = datetime.now(timezone.utc)
@@ -68,11 +68,8 @@ class TestMetricsClient:
             logger.error(e)
             logger.error("HTTP Status Code: %d, Error Message: %s, rate_limits: %s, Query Result: %s", http_status_code, error_message, rate_limits, query_result)
         
-    def test_get_topic_received_total_records(self, confluent_cloud_credential, kafka_cluster_id, kafka_topic_name):
+    def test_get_topic_received_total_records(self, metrics_client, kafka_cluster_id, kafka_topic_name):
         """Test the get_topic_total() function for getting the total records."""
-
-        # Instantiate the MetricsClient class.
-        metrics_client = confluent_cloud_credential
 
         # Calculate the ISO 8601 formatted start and end times within a rolling window for the last 1 day
         utc_now = datetime.now(timezone.utc)
@@ -95,11 +92,8 @@ class TestMetricsClient:
             logger.error(e)
             logger.error("HTTP Status Code: %d, Error Message: %s, rate_limits: %s, Query Result: %s", http_status_code, error_message, rate_limits, query_result)
 
-    def test_get_topic_received_daily_aggregated_totals_bytes(self, confluent_cloud_credential, kafka_cluster_id, kafka_topic_name):
+    def test_get_topic_received_daily_aggregated_totals_bytes(self, metrics_client, kafka_cluster_id, kafka_topic_name):
         """Test the get_topic_daily_aggregated_totals() function for getting the daily aggregated totals bytes."""
-
-        # Instantiate the MetricsClient class.
-        metrics_client = confluent_cloud_credential
 
         http_status_code, error_message, rate_limits, query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_BYTES, kafka_cluster_id, kafka_topic_name)
     
@@ -113,11 +107,8 @@ class TestMetricsClient:
             logger.error(e)
             logger.error("HTTP Status Code: %d, Error Message: %s, rate_limits: %s, Query Result: %s", http_status_code, error_message, rate_limits, query_result)
 
-    def test_get_topic_received_daily_aggregated_totals_records(self, confluent_cloud_credential, kafka_cluster_id, kafka_topic_name):
+    def test_get_topic_received_daily_aggregated_totals_records(self, metrics_client, kafka_cluster_id, kafka_topic_name):
         """Test the get_topic_daily_aggregated_totals() function for getting the daily aggregated totals records."""
-
-        # Instantiate the MetricsClient class.
-        metrics_client = confluent_cloud_credential
 
         http_status_code, error_message, rate_limits, query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_RECORDS, kafka_cluster_id, kafka_topic_name)
     
@@ -132,12 +123,9 @@ class TestMetricsClient:
             logger.error(e)
             logger.error("HTTP Status Code: %d, Error Message: %s, rate_limits: %s, Query Result: %s", http_status_code, error_message, rate_limits, query_result)
 
-    def test_compute_topic_partition_count_based_on_received_bytes_record_count(self, confluent_cloud_credential, kafka_cluster_id, kafka_topic_name):
+    def test_compute_topic_partition_count_based_on_received_bytes_record_count(self, metrics_client, kafka_cluster_id, kafka_topic_name):
         """Test computing the recommended partition count based on received bytes and record count."""
                     
-        # Instantiate the MetricsClient class.
-        metrics_client = confluent_cloud_credential
-        
         http_status_code, error_message, _, bytes_query_result = metrics_client.get_topic_daily_aggregated_totals(KafkaMetric.RECEIVED_BYTES, kafka_cluster_id, kafka_topic_name)
         
         try:
@@ -182,12 +170,9 @@ class TestMetricsClient:
 
         logger.info("Confluent Metrics API - For topic %s, the recommended partition count is %d partitions to support a required consumption throughput of %.2f bytes/second.", kafka_topic_name, recommended_partition_count, required_throughput)
 
-    def test_is_topic_partition_hot_by_ingress_throughput(self, confluent_cloud_credential, kafka_cluster_id, kafka_topic_name):
+    def test_is_topic_partition_hot_by_ingress_throughput(self, metrics_client, kafka_cluster_id, kafka_topic_name):
         """Test the is_topic_partition_hot() function for checking if a topic partition is hot
         by ingress throughput."""
-
-        # Instantiate the MetricsClient class.
-        metrics_client = confluent_cloud_credential
 
         # Calculate the ISO 8601 formatted start and end times within a rolling window for the last 1 day
         utc_now = datetime.now(timezone.utc)
@@ -210,12 +195,9 @@ class TestMetricsClient:
             logger.error(e)
             logger.error("HTTP Status Code: %d, Error Message: %s, Rate Limits: %s, Is Partition Hot: %s", http_status_code, error_message, rate_limits, is_partition_hot)
 
-    def test_is_topic_partition_hot_by_egress_throughput(self, confluent_cloud_credential, kafka_cluster_id, kafka_topic_name):
+    def test_is_topic_partition_hot_by_egress_throughput(self, metrics_client, kafka_cluster_id, kafka_topic_name):
         """Test the is_topic_partition_hot() function for checking if a topic partition is hot
         by egress throughput."""
-
-        # Instantiate the MetricsClient class.
-        metrics_client = confluent_cloud_credential
 
         # Calculate the ISO 8601 formatted start and end times within a rolling window for the last 1 day
         utc_now = datetime.now(timezone.utc)
