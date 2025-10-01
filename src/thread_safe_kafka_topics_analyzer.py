@@ -20,7 +20,10 @@ from constants import (DEFAULT_SAMPLING_DAYS,
                        DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD,
                        DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS,
                        DEFAULT_CHARACTER_REPEAT,
-                       DEFAULT_MAX_WORKERS_PER_CLUSTER)
+                       DEFAULT_MAX_WORKERS_PER_CLUSTER,
+                       DEFAULT_KAFKA_WRITER_TOPIC_NAME,
+                       DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR,
+                       DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT)
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -124,7 +127,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
         if not topics_to_analyze:
             return []
         
-        app_start_time = time.time()
+        analysis_start_time_epoch = time.time()
         self.total_topics = len(topics_to_analyze)
 
         # Log initial analysis parameters
@@ -153,7 +156,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
         results_lock = threading.Lock()
 
         # Prepare CSV report file
-        base_filename = f"{self.kafka_cluster_id}-recommender-{int(app_start_time)}"
+        base_filename = f"{self.kafka_cluster_id}-recommender-{int(analysis_start_time_epoch)}"
 
         # Detail report filename
         report_filename = f"{base_filename}-detail-report.csv"
@@ -167,12 +170,15 @@ class ThreadSafeKafkaTopicsAnalyzer:
         logging.info("Created the %s file", report_filename)
 
         # Initialize the thread-safe Kafka writer 
-        kafka_writer = ThreadSafeKafkaWriter(
-            bootstrap_server=self.kafka_consumer_config['bootstrap.servers'],
-            topic_name="j3.partition_recommender.results",
-            sasl_username=self.kafka_consumer_config['sasl.username'],
-            sasl_password=self.kafka_consumer_config['sasl.password']
-        )
+        kafka_writer = ThreadSafeKafkaWriter(self.admin_client,
+                                             int(analysis_start_time_epoch),
+                                             self.kafka_cluster_id,
+                                             bootstrap_server=self.kafka_consumer_config['bootstrap.servers'],
+                                             topic_name=DEFAULT_KAFKA_WRITER_TOPIC_NAME,
+                                             partition_count=DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT,
+                                             replication_factor=DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR,
+                                             sasl_username=self.kafka_consumer_config['sasl.username'],
+                                             sasl_password=self.kafka_consumer_config['sasl.password'])
 
         def update_progress() -> None:
             """Update progress in a thread-safe manner.
@@ -287,7 +293,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
 
         # Calculate summary statistics
         summary_stats = self.__calculate_summary_stats(results, 
-                                                       time.time() - app_start_time, 
+                                                       time.time() - analysis_start_time_epoch, 
                                                        min_recommended_partitions,
                                                        min_consumption_throughput,
                                                        required_consumption_throughput_factor, 
