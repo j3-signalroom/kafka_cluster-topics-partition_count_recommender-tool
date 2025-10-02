@@ -11,21 +11,7 @@ from thread_safe_topic_analyzer import ThreadSafeTopicAnalyzer
 from thread_safe_csv_writer import ThreadSafeCsvWriter
 from thread_safe_kafka_writer import ThreadSafeKafkaWriter
 from utilities import setup_logging
-from constants import (DEFAULT_SAMPLING_DAYS, 
-                       DEFAULT_SAMPLING_BATCH_SIZE,
-                       DEFAULT_SAMPLING_TIMEOUT_SECONDS,
-                       DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS,
-                       DEFAULT_SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES,
-                       DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR,
-                       DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD,
-                       DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS,
-                       DEFAULT_CHARACTER_REPEAT,
-                       DEFAULT_MAX_WORKERS_PER_CLUSTER,
-                       DEFAULT_USE_KAFKA_WRITER,
-                       DEFAULT_KAFKA_WRITER_TOPIC_NAME,
-                       DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR,
-                       DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT,
-                       DEFAULT_KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS)
+from constants import DEFAULT_CHARACTER_REPEAT
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -75,7 +61,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
             'fetch.min.bytes': 1,
             'log_level': 3,            
             'enable.partition.eof': True,
-            'fetch.message.max.bytes': 1048576,  # 1MB max message size
+            'fetch.message.max.bytes': 10485760, # 10MB max message size
             'queued.min.messages': 1000,     
             'enable.metrics.push': False         # Disable metrics pushing for consumers to registered JMX MBeans.  However, is really being set to False to not expose unneccessary noise to the logging output
         }
@@ -86,51 +72,51 @@ class ThreadSafeKafkaTopicsAnalyzer:
         self.total_topics = 0
 
     def analyze_all_topics(self, 
-                           use_confluent_cloud_api_key_to_fetch_kafka_credentials: bool = False,
-                           environment_filter: str | None = None,
-                           kafka_cluster_filter: str | None = None,
-                           principal_id: str | None = None,
-                           include_internal: bool = False, 
-                           required_consumption_throughput_factor: float = DEFAULT_REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR,
-                           use_sample_records: bool = True, 
-                           sampling_days: int = DEFAULT_SAMPLING_DAYS, 
-                           sampling_batch_size: int = DEFAULT_SAMPLING_BATCH_SIZE,
-                           sampling_max_consecutive_nulls: int = DEFAULT_SAMPLING_MAX_CONSECUTIVE_NULLS,
-                           sampling_timeout_seconds: float = DEFAULT_SAMPLING_TIMEOUT_SECONDS,
-                           sampling_max_continuous_failed_batches: int = DEFAULT_SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES,
-                           topic_filter: str | None = None,
-                           max_workers: int = DEFAULT_MAX_WORKERS_PER_CLUSTER,
-                           min_recommended_partitions: int = DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS,
-                           min_consumption_throughput: float = DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD,
-                           metrics_config: Dict | None = None,
-                           use_kafka_writer: bool = DEFAULT_USE_KAFKA_WRITER,
-                           kafka_writer_topic_name: str = DEFAULT_KAFKA_WRITER_TOPIC_NAME,
-                           kafka_writer_topic_partition_count: int = DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT,
-                           kafka_writer_topic_replication_factor: int = DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR,
-                           kafka_writer_topic_data_retention_in_days: int = DEFAULT_KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS) -> bool:
+                           use_confluent_cloud_api_key_to_fetch_kafka_credentials: bool,
+                           environment_filter: str | None,
+                           kafka_cluster_filter: str | None,
+                           principal_id: str | None,
+                           include_internal: bool, 
+                           required_consumption_throughput_factor: float,
+                           use_sample_records: bool, 
+                           sampling_days: int, 
+                           sampling_batch_size: int,
+                           sampling_max_consecutive_nulls: int,
+                           sampling_timeout_seconds: float,
+                           sampling_max_continuous_failed_batches: int,
+                           topic_filter: str | None,
+                           max_workers_per_cluster: int,
+                           min_recommended_partitions: int,
+                           min_consumption_throughput: float,
+                           metrics_config: Dict | None,
+                           use_kafka_writer: bool,
+                           kafka_writer_topic_name: str,
+                           kafka_writer_topic_partition_count: int,
+                           kafka_writer_topic_replication_factor: int,
+                           kafka_writer_topic_data_retention_in_days: int) -> bool:
         """Analyze all topics in the Kafka cluster.
         
         Args:
-            use_confluent_cloud_api_key_to_fetch_kafka_credentials (bool, optional): Whether to use Confluent Cloud API key to fetch Kafka credentials. Defaults to False.
-            environment_filter (str | None, optional): Comma-separated list of environment IDs to filter. Defaults to None.
-            kafka_cluster_filter (str | None, optional): Comma-separated list of Kafka cluster IDs to filter. Defaults to None.
-            principal_id (str | None, optional): Comma-separated list of principal IDs to filter. Defaults to None.
-            include_internal (bool, optional): Whether to include internal topics. Defaults to False.
-            required_consumption_throughput_factor (float, optional): Factor to multiply the consumer throughput to determine required consumption throughput. Defaults to 3.0.
-            use_sample_records (bool, optional): Whether to sample records for average size. Defaults to True.
-            sampling_days (int, optional): Number of days to look back for sampling. Defaults to 7.
-            sampling_batch_size (int, optional): Number of records to process per batch when sampling. Defaults to 10,000.
-            sampling_max_consecutive_nulls (int, optional): Maximum number of consecutive null records to encounter before stopping sampling in a partition. Defaults to 50.
-            topic_filter (str | None, optional): If provided, only topics containing this string will be analyzed. Defaults to None.
-            max_workers (int, optional): Maximum number of worker threads for concurrent topic analysis. Defaults to 4.
-            min_recommended_partitions (int, optional): The minimum recommended partitions. Defaults to 6.
-            min_consumption_throughput (float, optional): The minimum consumption throughput threshold. Defaults to 10 MB/s.
-            metrics_config (Dict | None, optional): Configuration for the MetricsClient if using Metrics API. Defaults to None.
-            use_kafka_writer (bool, optional): Whether to use Kafka writer to write results. Defaults to False.
-            kafka_writer_topic_name (str, optional): The name of the Kafka writer topic. Defaults to "_j3.partition_recommender.results".
-            kafka_writer_topic_partition_count (int, optional): The number of partitions for the Kafka writer topic. Defaults to 6.
-            kafka_writer_topic_replication_factor (int, optional): The replication factor for the Kafka writer topic. Defaults to 3.
-            kafka_writer_topic_data_retention_in_days (int, optional): The data retention period for the Kafka writer topic in days. Defaults to 7 days.
+            use_confluent_cloud_api_key_to_fetch_kafka_credentials (bool): Whether to use Confluent Cloud API key to fetch Kafka credentials.
+            environment_filter (str | None): Comma-separated list of environment IDs to filter.
+            kafka_cluster_filter (str | None): Comma-separated list of Kafka cluster IDs to filter.
+            principal_id (str | None): Comma-separated list of principal IDs to filter.
+            include_internal (bool): Whether to include internal topics.
+            required_consumption_throughput_factor (float): Factor to multiply the consumer throughput to determine required consumption throughput.
+            use_sample_records (bool): Whether to sample records for average size.
+            sampling_days (int): Number of days to look back for sampling.
+            sampling_batch_size (int): Number of records to process per batch when sampling.
+            sampling_max_consecutive_nulls (int): Maximum number of consecutive null records to encounter before stopping sampling in a partition.
+            topic_filter (str | None): If provided, only topics containing this string will be analyzed.
+            max_workers_per_cluster (int): Maximum number of worker threads for concurrent topic analysis.
+            min_recommended_partitions (int): The minimum recommended partitions.
+            min_consumption_throughput (float): The minimum consumption throughput threshold.
+            metrics_config (Dict | None): Configuration for the MetricsClient if using Metrics API.
+            use_kafka_writer (bool): Whether to use Kafka writer to write results.
+            kafka_writer_topic_name (str): The name of the Kafka writer topic.
+            kafka_writer_topic_partition_count (int): The number of partitions for the Kafka writer topic.
+            kafka_writer_topic_replication_factor (int): The replication factor for the Kafka writer topic.
+            kafka_writer_topic_data_retention_in_days (int): The data retention period for the Kafka writer topic in days.
 
         Returns:
             bool: True if analysis was successful, False otherwise.
@@ -150,7 +136,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
             "environment_filter": environment_filter,
             "kafka_cluster_filter": kafka_cluster_filter,
             "principal_id": principal_id,
-            "max_workers": max_workers,
+            "max_workers_per_cluster": max_workers_per_cluster,
             "total_topics_to_analyze": len(topics_to_analyze),
             "include_internal": include_internal,
             "required_consumption_throughput_factor": required_consumption_throughput_factor,
@@ -278,7 +264,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
                 }
             
         # Execute topic analysis in parallel using ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=max_workers_per_cluster) as executor:
             # Submit all tasks
             future_to_topic = {
                 executor.submit(analyze_topic_worker, topic_name, topic_info): topic_name
@@ -526,7 +512,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
         logging.info("Kafka Cluster Filter: %s", params['kafka_cluster_filter'] if params['kafka_cluster_filter'] else 'None')
         logging.info("Principal ID Filter: %s", params['principal_id'] if params['principal_id'] else 'None')
         logging.info("Kafka Cluster ID: %s", self.kafka_cluster_id)
-        logging.info("Max worker threads: %d", params['max_workers'])
+        logging.info("Max worker threads: %d", params['max_workers_per_cluster'])
         logging.info("Connecting to Kafka cluster and retrieving metadata...")
         logging.info("Found %d topics to analyze", params['total_topics_to_analyze'])
         logging.info("%s internal topics", "Including" if params["include_internal"] else "Excluding")
