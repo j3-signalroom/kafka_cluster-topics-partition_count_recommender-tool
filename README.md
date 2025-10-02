@@ -20,6 +20,8 @@ The **Kafka Cluster Topics Partition Count Recommender [MULTITHREADED] Tool** of
       - [**1.3.2 Troubleshoot Connectivity Issues (if any)**](#132-troubleshoot-connectivity-issues-if-any)
       - [**1.3.3 Running the Tool's Unit Tests (i.e., PyTests)**](#133-running-the-tools-unit-tests-ie-pytests)
    + [**1.4 The Results**](#14-the-results)
+      - [**1.4.1 Detail and Summary Report written to CSV files**](#141-detail-and-summary-report-written-to-csv-files)
+      - [**1.4.2 Detail Results Produced to Kafka**](#142-detail-results-produced-to-kafka)
 - [**2.0 How the tool calculates the recommended partition count**](#20-how-the-tool-calculates-the-recommended-partition-count)
    + [**2.1 End-to-End Tool Workflow**](#21-end-to-end-tool-workflow)
 - [**3.0 Unlocking High-Performance Consumer Throughput**](#30-unlocking-high-performance-consumer-throughput)
@@ -199,6 +201,7 @@ USE_KAFKA_WRITER=<True|False>
 KAFKA_WRITER_TOPIC_NAME=<YOUR_KAFKA_WRITER_TOPIC_NAME>
 KAFKA_WRITER_TOPIC_PARTITION_COUNT=<YOUR_KAFKA_WRITER_TOPIC_PARTITION_COUNT>
 KAFKA_WRITER_TOPIC_REPLICATION_FACTOR=<YOUR_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR>
+KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS=<YOUR_KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS>
 ```
 
 The environment variables are defined as follows:
@@ -234,6 +237,7 @@ The environment variables are defined as follows:
 | `KAFKA_WRITER_TOPIC_NAME` | String | Name of the Kafka topic to be created by the Kafka writer for connectivity testing. Only used if `USE_KAFKA_WRITER` is `True`. | `connectivity-test-topic` | None | No (required if `USE_KAFKA_WRITER` is `True`) |
 | `KAFKA_WRITER_TOPIC_PARTITION_COUNT` | Integer | Number of partitions for the Kafka writer test topic. Only used if `USE_KAFKA_WRITER` is `True`. | `3`, `6` | `3` | No (required if `USE_KAFKA_WRITER` is `True`) |
 | `KAFKA_WRITER_TOPIC_REPLICATION_FACTOR` | Integer | Replication factor for the Kafka writer test topic. Only used if `USE_KAFKA_WRITER` is `True`. | `3` | `3` | No (required if `USE_KAFKA_WRITER` is `True`) |
+| `KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS` | Integer | Data retention period (in days) for the Kafka writer test topic. Only used if `USE_KAFKA_WRITER` is `True`. | `0` (Infinite), `7` | `0` | No (required if `USE_KAFKA_WRITER` is `True`) |
 
 #### **1.2.3 Using the AWS Secrets Manager (optional)**
 If you use **AWS Secrets Manager** to manage your secrets, set the `USE_AWS_SECRETS_MANAGER` variable to `True` and the tool will retrieve the secrets from AWS Secrets Manager using the names provided in `CONFLUENT_CLOUD_API_KEY_AWS_SECRETS` and `KAFKA_API_KEY_AWS_SECRETS`.  
@@ -505,6 +509,8 @@ uv run pytest -s tests/test_environment_client.py
 You should see output indicating the results of the tests, including any failures or errors. If all tests pass, it confirms that the tool is working correctly.
 
 ### **1.4 The Results**
+
+#### **1.4.1 Detail and Summary Report written to CSV files**
 The tool automatically generates two comprehensive CSV reports for each Kafka Cluster that transform raw analysis into actionable insights:
 
 - **Detail Report CSV.**  For every topic analyzed, this report captures the topic’s average consumer throughput (MB/s), its required throughput (MB/s), and a calculated recommended partition count, ensuring precise alignment between workload demand and partitioning strategy.  Below is a screenshot of a sample detail report:
@@ -546,6 +552,10 @@ The tool automatically generates two comprehensive CSV reports for each Kafka Cl
     ```
 
  > The names of the CSV comprises of the `<KAFKA CLUSTER ID>-recommender-<CURRENT EPOCH TIME IN SECONDS WHEN THE TOOL STARTED>-detail-report.csv` and `<KAFKA CLUSTER ID>-recommender-<CURRENT EPOCH TIME IN SECONDS WHEN THE TOOL STARTED>-summary-report.csv`, respectively.
+
+#### **1.4.2 Detail Results Produced to Kafka**
+
+<TO BE ADDED IN FUTURE RELEASE>
 
 ## **2.0 How the tool calculates the recommended partition count**
 The tool uses the Kafka `AdminClient` to retrieve all Kafka Topics (based on the `TOPIC_FILTER` specified) stored in your Kafka Cluster, including the original partition count per topic. Then, it iterates through each Kafka Topic, calling the Confluent Cloud Metrics RESTful API to retrieve the topic’s average (i.e., the _Consumer Throughput_) and peak consumption in bytes over a rolling seven-day period. Next, it calculates the required throughput by multiplying the peak consumption by the `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` (i.e., the _Required Throughput_). Finally, it divides the required throughput by the consumer throughput and rounds the result to the nearest whole number to determine the optimal number of partitions.
@@ -618,6 +628,9 @@ sequenceDiagram
     KTA->>CSV: Create ThreadSafeCsvWriter
     CSV->>CSV: Initialize CSV file with headers
 
+    KTA->>KWRITER: Create ThreadSafeKafkaWriter
+    KWRITER->>KWRITER: Initialize Kafka producer for logging results
+
     alt Single cluster
         KTA->>KTA: _analyze_kafka_cluster() directly
     else Multiple clusters
@@ -674,6 +687,7 @@ sequenceDiagram
         Worker->>KTA: __process_and_write_result()
         KTA->>KTA: Calculate recommendations
         KTA->>CSV: write_row() [thread-safe]
+        KTA->>KWRITER: write_result() [thread-safe]
         Worker-->>TPE: Return success/failure
     end
 

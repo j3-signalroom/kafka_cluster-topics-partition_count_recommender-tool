@@ -28,7 +28,8 @@ from constants import (DEFAULT_USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDEN
                        DEFAULT_USE_KAFKA_WRITER,
                        DEFAULT_KAFKA_WRITER_TOPIC_NAME,
                        DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT,
-                       DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR)
+                       DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR,
+                       DEFAULT_KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS)
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -214,7 +215,8 @@ def _analyze_kafka_cluster(metrics_config: Dict,
                                               use_kafka_writer=config.get('use_kafka_writer', DEFAULT_USE_KAFKA_WRITER),
                                               kafka_writer_topic_name=config.get('kafka_writer_topic_name', DEFAULT_KAFKA_WRITER_TOPIC_NAME),
                                               kafka_writer_topic_partition_count=config.get('kafka_writer_topic_partition_count', DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT),
-                                              kafka_writer_topic_replication_factor=config.get('kafka_writer_topic_replication_factor', DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR))
+                                              kafka_writer_topic_replication_factor=config.get('kafka_writer_topic_replication_factor', DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR),
+                                              kafka_writer_topic_data_retention_in_days=config.get('kafka_writer_topic_data_retention_in_days', DEFAULT_KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS))
         # Log the result of the analysis
         if success:
             logging.info("KAFKA CLUSTER %s: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.", kafka_credential.get('kafka_cluster_id'))
@@ -274,6 +276,7 @@ def main():
         kafka_writer_topic_name = os.getenv("KAFKA_WRITER_TOPIC_NAME", DEFAULT_KAFKA_WRITER_TOPIC_NAME)
         kafka_writer_topic_partition_count = int(os.getenv("KAFKA_WRITER_TOPIC_PARTITION_COUNT", DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT))
         kafka_writer_topic_replication_factor = int(os.getenv("KAFKA_WRITER_TOPIC_REPLICATION_FACTOR", DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR))
+        kafka_writer_topic_data_retention_in_days = int(os.getenv("KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS", DEFAULT_KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS))
     except Exception as e:
         logging.error("THE APPLICATION FAILED TO READ CONFIGURATION SETTINGS BECAUSE OF THE FOLLOWING ERROR: %s", e)
         return
@@ -334,7 +337,8 @@ def main():
         'use_kafka_writer': use_kafka_writer,
         'kafka_writer_topic_name': kafka_writer_topic_name,
         'kafka_writer_topic_partition_count': kafka_writer_topic_partition_count,
-        'kafka_writer_topic_replication_factor': kafka_writer_topic_replication_factor
+        'kafka_writer_topic_replication_factor': kafka_writer_topic_replication_factor,
+        'kafka_writer_topic_data_retention_in_days': kafka_writer_topic_data_retention_in_days
     }
 
     logging.info("=" * DEFAULT_CHARACTER_REPEAT)
@@ -348,6 +352,7 @@ def main():
     logging.info("Kafka writer topic name: %s", kafka_writer_topic_name)
     logging.info("Kafka writer topic partition count: %d", kafka_writer_topic_partition_count)
     logging.info("Kafka writer topic replication factor: %d", kafka_writer_topic_replication_factor)
+    logging.info("Kafka writer topic data retention (in days): %d", kafka_writer_topic_data_retention_in_days)
     logging.info("=" * DEFAULT_CHARACTER_REPEAT)
 
     # Analyze Kafka clusters concurrently if more than one cluster

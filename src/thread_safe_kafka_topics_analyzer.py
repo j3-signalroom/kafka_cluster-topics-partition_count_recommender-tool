@@ -24,7 +24,8 @@ from constants import (DEFAULT_SAMPLING_DAYS,
                        DEFAULT_USE_KAFKA_WRITER,
                        DEFAULT_KAFKA_WRITER_TOPIC_NAME,
                        DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR,
-                       DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT)
+                       DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT,
+                       DEFAULT_KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS)
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -105,7 +106,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
                            use_kafka_writer: bool = DEFAULT_USE_KAFKA_WRITER,
                            kafka_writer_topic_name: str = DEFAULT_KAFKA_WRITER_TOPIC_NAME,
                            kafka_writer_topic_partition_count: int = DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT,
-                           kafka_writer_topic_replication_factor: int = DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR) -> bool:
+                           kafka_writer_topic_replication_factor: int = DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR,
+                           kafka_writer_topic_data_retention_in_days: int = DEFAULT_KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS) -> bool:
         """Analyze all topics in the Kafka cluster.
         
         Args:
@@ -123,7 +125,13 @@ class ThreadSafeKafkaTopicsAnalyzer:
             max_workers (int, optional): Maximum number of worker threads for concurrent topic analysis. Defaults to 4.
             min_recommended_partitions (int, optional): The minimum recommended partitions. Defaults to 6.
             min_consumption_throughput (float, optional): The minimum consumption throughput threshold. Defaults to 10 MB/s.
-        
+            metrics_config (Dict | None, optional): Configuration for the MetricsClient if using Metrics API. Defaults to None.
+            use_kafka_writer (bool, optional): Whether to use Kafka writer to write results. Defaults to False.
+            kafka_writer_topic_name (str, optional): The name of the Kafka writer topic. Defaults to "_j3.partition_recommender.results".
+            kafka_writer_topic_partition_count (int, optional): The number of partitions for the Kafka writer topic. Defaults to 6.
+            kafka_writer_topic_replication_factor (int, optional): The replication factor for the Kafka writer topic. Defaults to 3.
+            kafka_writer_topic_data_retention_in_days (int, optional): The data retention period for the Kafka writer topic in days. Defaults to 7 days.
+
         Returns:
             bool: True if analysis was successful, False otherwise.
         """
@@ -153,7 +161,12 @@ class ThreadSafeKafkaTopicsAnalyzer:
             "sampling_timeout_seconds": sampling_timeout_seconds,
             "sampling_max_continuous_failed_batches": sampling_max_continuous_failed_batches,
             "min_recommended_partitions": min_recommended_partitions,
-            "min_consumption_throughput": min_consumption_throughput
+            "min_consumption_throughput": min_consumption_throughput,
+            "use_kafka_writer": use_kafka_writer,
+            "kafka_writer_topic_name": kafka_writer_topic_name,
+            "kafka_writer_topic_partition_count": kafka_writer_topic_partition_count,
+            "kafka_writer_topic_replication_factor": kafka_writer_topic_replication_factor,
+            "kafka_writer_topic_data_retention_in_days": kafka_writer_topic_data_retention_in_days
         })
 
         # Initialize results list and total recommended partitions counter
@@ -183,6 +196,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
                                                 topic_name=kafka_writer_topic_name,
                                                 partition_count=kafka_writer_topic_partition_count,
                                                 replication_factor=kafka_writer_topic_replication_factor,
+                                                data_retention_in_days=kafka_writer_topic_data_retention_in_days,
                                                 sasl_username=self.kafka_consumer_config['sasl.username'],
                                                 sasl_password=self.kafka_consumer_config['sasl.password'])
 
