@@ -195,35 +195,15 @@ def _analyze_kafka_cluster(metrics_config: Dict,
                                                  metrics_config=config['metrics_config'])
 
         # Analyze all topics in the Kafka cluster with multithreading
-        success = analyzer.analyze_all_topics(use_confluent_cloud_api_key_to_fetch_kafka_credentials=config['use_confluent_cloud_api_key_to_fetch_kafka_credentials'],
-                                              environment_filter=config['environment_filter'],
-                                              kafka_cluster_filter=config['kafka_cluster_filter'],
-                                              principal_id=config['principal_id'],
-                                              include_internal=config['include_internal'],
-                                              required_consumption_throughput_factor=config['required_consumption_throughput_factor'],
-                                              use_sample_records=config['use_sample_records'],
-                                              sampling_days=config['sampling_days'],
-                                              sampling_batch_size=config['sampling_batch_size'],
-                                              sampling_max_consecutive_nulls=config['sampling_max_consecutive_nulls'],
-                                              sampling_timeout_seconds=config['sampling_timeout_seconds'],
-                                              sampling_max_continuous_failed_batches=config['sampling_max_continuous_failed_batches'],
-                                              topic_filter=config['topic_filter'],
-                                              max_workers=config.get('max_workers_per_cluster', DEFAULT_MAX_WORKERS_PER_CLUSTER),
-                                              min_recommended_partitions=config.get('min_recommended_partitions', DEFAULT_MINIMUM_RECOMMENDED_PARTITIONS),
-                                              min_consumption_throughput=config.get('min_consumption_throughput', DEFAULT_CONSUMER_THROUGHPUT_THRESHOLD),
-                                              metrics_config=metrics_config,
-                                              use_kafka_writer=config.get('use_kafka_writer', DEFAULT_USE_KAFKA_WRITER),
-                                              kafka_writer_topic_name=config.get('kafka_writer_topic_name', DEFAULT_KAFKA_WRITER_TOPIC_NAME),
-                                              kafka_writer_topic_partition_count=config.get('kafka_writer_topic_partition_count', DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT),
-                                              kafka_writer_topic_replication_factor=config.get('kafka_writer_topic_replication_factor', DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR),
-                                              kafka_writer_topic_data_retention_in_days=config.get('kafka_writer_topic_data_retention_in_days', DEFAULT_KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS))
+        success = analyzer.analyze_all_topics(**config)
+
         # Log the result of the analysis
         if success:
             logging.info("KAFKA CLUSTER %s: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.", kafka_credential.get('kafka_cluster_id'))
         else:
             logging.error("KAFKA CLUSTER %s: TOPIC ANALYSIS FAILED.", kafka_credential.get('kafka_cluster_id'))
 
-        # Clean up the created Kafka API key if it was created using Confluent Cloud API key
+        # Clean up the created Kafka API key(s) if it was created using Confluent Cloud API key
         if use_confluent_cloud_api_key_to_fetch_kafka_credentials:
             # Instantiate the EnvironmentClient class.
             environment_client = EnvironmentClient(environment_config=metrics_config)
