@@ -1,5 +1,5 @@
 from confluent_kafka import Producer
-from confluent_kafka.admin import NewTopic
+from confluent_kafka.admin import NewTopic, ConfigResource
 
 import threading
 import json
@@ -7,8 +7,6 @@ import logging
 from typing import Dict
 
 from utilities import setup_logging
-from constants import (DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT,
-                       DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR)
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -26,7 +24,17 @@ logger = setup_logging()
 class ThreadSafeKafkaWriter:
     """Thread-safe Kafka producer for writing analysis results."""
 
-    def __init__(self, admin_client, analysis_start_time: int, kafka_cluster_id: str, bootstrap_server: str, topic_name: str, partition_count: int, replication_factor: int, sasl_username: str, sasl_password: str):
+    def __init__(self, 
+                 admin_client, 
+                 analysis_start_time: int, 
+                 kafka_cluster_id: str, 
+                 bootstrap_server: str, 
+                 topic_name: str, 
+                 partition_count: int, 
+                 replication_factor: int, 
+                 data_retention_in_days: int,
+                 sasl_username: str, 
+                 sasl_password: str):
         """Initialize the Kafka producer with connection details.
 
         Args:
@@ -40,6 +48,8 @@ class ThreadSafeKafkaWriter:
             sasl_username (str): The SASL username for authentication.
             sasl_password (str): The SASL password for authentication.
         """
+
+        # Initialize instance variables
         self.admin_client = admin_client
         self.analysis_start_time = analysis_start_time
         self.kafka_cluster_id = kafka_cluster_id
@@ -48,7 +58,8 @@ class ThreadSafeKafkaWriter:
         self.delivered_count = 0
         self.failed_count = 0
 
-        self.__create_topic_if_not_exists(partition_count=DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT, replication_factor=DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR)
+        # Ensure the topic exists or create it
+        self.__create_topic_if_not_exists(partition_count=partition_count, replication_factor=replication_factor, data_retention_in_days=data_retention_in_days)
 
         # Kafka Producer is thread-safe, can be shared across threads
         self.producer = Producer({
@@ -137,45 +148,52 @@ class ThreadSafeKafkaWriter:
         
         logging.info(f"Total delivered: {self.delivered_count}, Failed: {self.failed_count}")
 
-    def __create_topic_if_not_exists(self, partition_count: int, replication_factor: int) -> None:
+    def __create_topic_if_not_exists(self, partition_count: int, replication_factor: int, data_retention_in_days: int) -> None:
         """Create the results topic if it doesn't exist.
 
         Args:
             partition_count (int): Number of partitions for the topic.
             replication_factor (int): Replication factor for the topic.
+            data_retention_in_days (int): Data retention period in days.
         
         Return(s):
             None
         """
         # Check if topic exists
-        metadata = self.admin_client.list_topics(timeout=10)
+        topic_list = self.admin_client.list_topics(timeout=10)
         
-        if self.topic_name in metadata.topics:
-            logging.info(f"Topic '{self.topic_name}' already exists")
-            return
-        
-        # Create new topic
-        logging.info(f"Creating topic '{self.topic_name}' with {partition_count} partitions")
-        
-        new_topic = NewTopic(topic=self.topic_name,
-                             num_partitions=partition_count,
-                             replication_factor=replication_factor,
-                             config={
-                                'cleanup.policy': 'delete',
-                                'retention.ms': '-1',  # Infinite retention
-                                'compression.type': 'lz4'
-                            })
-        
-        futures = self.admin_client.create_topics([new_topic])
-        
-        # Wait for topic creation
-        for topic, future in futures.items():
-            try:
-                future.result()  # Block until topic is created
-                logging.info(f"Topic '{topic}' created successfully")
-            except Exception as e:
-                logging.error(f"Failed to create topic '{topic}': {e}")
-                raise
+        # If topic exists, verify retention policy
+        retention_policy = '-1' if data_retention_in_days == 0 else str(data_retention_in_days * 24 * 60 * 60 * 1000)  # Convert days to milliseconds
+        if self.topic_name in topic_list.topics:
+            logging.info(f"Kafka topic '{self.topic_name}' already exists but will verify retention policy")
+
+            # Update existing topic retention policy
+            resource = ConfigResource(ConfigResource.Type.TOPIC, self.topic_name)
+            resource.set_config('retention.ms', retention_policy)
+            self.admin_client.alter_configs([resource])
+        else:        
+            # Otherwise, create new topic
+            logging.info(f"Creating Kafka topic '{self.topic_name}' with {partition_count} partitions")
+
+            new_topic = NewTopic(topic=self.topic_name,
+                                num_partitions=partition_count,
+                                replication_factor=replication_factor,
+                                config={
+                                    'cleanup.policy': 'delete',
+                                    'retention.ms': retention_policy,
+                                    'compression.type': 'lz4'
+                                })
+            
+            futures = self.admin_client.create_topics([new_topic])
+            
+            # Wait for topic creation
+            for topic, future in futures.items():
+                try:
+                    future.result()  # Block until topic is created
+                    logging.info(f"Topic '{topic}' created successfully")
+                except Exception as e:
+                    logging.error(f"Failed to create topic '{topic}': {e}")
+                    raise
 
     def __make_json_serializable(self, obj):
         """Recursively convert non-serializable objects in a dict/list to strings.

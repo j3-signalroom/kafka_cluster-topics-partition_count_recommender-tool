@@ -46,3 +46,4 @@ DEFAULT_USE_KAFKA_WRITER: Final[str] = "False"
 DEFAULT_KAFKA_WRITER_TOPIC_NAME: Final[str] = "_j3.partition_recommender.results"
 DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT: Final[int] = 6
 DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR: Final[int] = 3
+DEFAULT_KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS: Final[int] = 0  # 0 means infinite retention
