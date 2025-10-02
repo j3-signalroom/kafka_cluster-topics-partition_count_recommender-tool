@@ -139,7 +139,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
         topics_to_analyze = self.__get_topics_metadata(sampling_days=sampling_days, include_internal=include_internal, topic_filter=topic_filter)
         if not topics_to_analyze:
             return []
-        
+
+        # Start analysis
         analysis_start_time_epoch = time.time()
         self.total_topics = len(topics_to_analyze)
 
@@ -187,7 +188,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
 
         logging.info("Created the %s file", report_filename)
 
-        # Initialize the thread-safe Kafka writer 
+        # Initialize the thread-safe Kafka writer (if enabled)
         if use_kafka_writer:
             kafka_writer = ThreadSafeKafkaWriter(self.admin_client,
                                                 int(analysis_start_time_epoch),
