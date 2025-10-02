@@ -194,14 +194,14 @@ def _analyze_kafka_cluster(metrics_config: Dict,
                                                  kafka_api_secret=kafka_credential.get("sasl.password"),
                                                  metrics_config=config['metrics_config'])
 
-        # Analyze all topics in the Kafka cluster with multithreading
+        # Multithread the analysis of all topics in the Kafka cluster
         success = analyzer.analyze_all_topics(**config)
 
         # Log the result of the analysis
         if success:
-            logging.info("KAFKA CLUSTER %s: TOPIC ANALYSIS COMPLETED SUCCESSFULLY.", kafka_credential.get('kafka_cluster_id'))
+            logging.info("KAFKA CLUSTER %s TOPIC ANALYSIS COMPLETED SUCCESSFULLY.", kafka_credential.get('kafka_cluster_id'))
         else:
-            logging.error("KAFKA CLUSTER %s: TOPIC ANALYSIS FAILED.", kafka_credential.get('kafka_cluster_id'))
+            logging.error("KAFKA CLUSTER %s TOPIC ANALYSIS FAILED.", kafka_credential.get('kafka_cluster_id'))
 
         # Clean up the created Kafka API key(s) if it was created using Confluent Cloud API key
         if use_confluent_cloud_api_key_to_fetch_kafka_credentials:
@@ -301,7 +301,6 @@ def main():
         'environment_filter': environment_filter,
         'kafka_cluster_filter': kafka_cluster_filter,
         'principal_id': principal_id,
-        'kafka_credentials': kafka_credentials,
         'include_internal': include_internal,
         'required_consumption_throughput_factor': required_consumption_throughput_factor,
         'use_sample_records': use_sample_records,
