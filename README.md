@@ -498,6 +498,7 @@ cd path/to/kafka_cluster-topics-partition_count_recommender-tool/
 Then enter the following commands below to run the test suites:
 ```shell
 uv run pytest -s tests/test_fetch_kafka_credentials_via_confluent_cloud_api_key.py
+```
 
 ```shell
 uv run pytest -s tests/test_fetch_kafka_credentials_via_environment_variables.py
