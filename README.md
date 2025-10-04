@@ -499,14 +499,23 @@ Then enter the following commands below to run the test suites:
 ```shell
 uv run pytest -s tests/test_fetch_kafka_credentials_via_confluent_cloud_api_key.py
 
+```shell
 uv run pytest -s tests/test_fetch_kafka_credentials_via_environment_variables.py
+```
 
+```shell
 uv run pytest -s tests/test_metrics_client.py
+```
 
+```shell
 uv run pytest -s tests/test_environment_client.py
+```
 
+```shell
 uv run pytest -s tests/test_schema_registry_client.py
+```
 
+```shell
 uv run pytest -s tests/test_iam_client.py
 ```
 
