@@ -610,7 +610,7 @@ sequenceDiagram
         Main->>EC: get_kafka_cluster_list(env_id)
         EC-->>Main: Return kafka clusters
         loop For each cluster
-            Main->>EC: create_kafka_api_key(cluster_id, principal_id)
+            Main->>EC: create_api_key(kafka_cluster_id, principal_id)
             EC-->>Main: Return API key pair
         end
     else Use existing credentials
@@ -698,7 +698,7 @@ sequenceDiagram
 
     alt Confluent Cloud API cleanup
         loop For each created API key
-            KTA->>EC: delete_kafka_api_key(api_key)
+            KTA->>EC: delete_api_key(api_key)
             EC-->>KTA: Confirm deletion
         end
     end
