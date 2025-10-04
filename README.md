@@ -504,6 +504,10 @@ uv run pytest -s tests/test_fetch_kafka_credentials_via_environment_variables.py
 uv run pytest -s tests/test_metrics_client.py
 
 uv run pytest -s tests/test_environment_client.py
+
+uv run pytest -s tests/test_schema_registry_client.py
+
+uv run pytest -s tests/test_iam_client.py
 ```
 
 You should see output indicating the results of the tests, including any failures or errors. If all tests pass, it confirms that the tool is working correctly.

@@ -23,12 +23,6 @@ logger.setLevel(logging.INFO)
 
 
 @pytest.fixture
-def kafka_cluster_id():
-    """Load the Test Kafka cluster ID from the IAM variables."""
-    load_dotenv()
-    return os.getenv("TEST_KAFKA_CLUSTER_ID")
-
-@pytest.fixture
 def principal_id():
     """Load the Test Principal ID from the IAM variables."""
     load_dotenv()
@@ -49,40 +43,8 @@ def environment_client():
     yield EnvironmentClient(environment_config)
 
 
-
 class TestIamClient:
     """Test Suite for the IamClient class."""
-
-    def test_create_and_delete_api_key(self, iam_client, kafka_cluster_id, principal_id):
-        """Test the create_api_key() and delete_api_key() functions."""
-
-        http_status_code, error_message, api_key_pair = iam_client.create_api_key(resource_id=kafka_cluster_id,
-                                                                                  principal_id=principal_id,
-                                                                                  display_name="Test Kafka API Key",
-                                                                                  description="This is a test Kafka API key created by the automated test suite.")
-
-        try:
-            assert http_status_code == HttpStatus.ACCEPTED, f"HTTP Status Code: {http_status_code}"
-
-            beautified = json.dumps(api_key_pair, indent=4, sort_keys=True)
-            logger.info("Kafka API Key Pair: %s", beautified)
-        except AssertionError as e:
-            logger.error(e)
-            logger.error("HTTP Status Code: %d, Error Message: %s, Kafka API Key Pair: %s", http_status_code, error_message, api_key_pair)
-            return
-
-        time.sleep(2)  # Wait for 2 seconds before deleting the API key.
-
-        http_status_code, error_message = iam_client.delete_api_key(api_key=api_key_pair["key"])
-    
-        try:
-            assert http_status_code == HttpStatus.NO_CONTENT, f"HTTP Status Code: {http_status_code}"
-
-            logger.info("Successfully deleted Kafka API Key: %s", api_key_pair['key'])
-        except AssertionError as e:
-            logger.error(e)
-            logger.error("HTTP Status Code: %d, Error Message: %s", http_status_code, error_message)
-            return  
 
     def test_creating_and_deleting_kafka_api_keys(self, iam_client, environment_client, principal_id):
         """Test the create_api_key() and delete_api_key() functions."""
