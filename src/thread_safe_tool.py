@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from thread_safe_kafka_topics_analyzer import ThreadSafeKafkaTopicsAnalyzer
 from utilities import setup_logging
 from cc_clients_python_lib.environment_client import EnvironmentClient
+from cc_clients_python_lib.iam_client import IamClient
 from cc_clients_python_lib.http_status import HttpStatus
 from aws_clients_python_lib.secrets_manager import get_secrets
 from constants import (DEFAULT_USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS,
@@ -61,8 +62,9 @@ def _fetch_kafka_credentials_via_confluent_cloud_api_key(principal_id: str,
     """
     kafka_credentials = []
 
-    # Instantiate the EnvironmentClient class.
+    # Instantiate the EnvironmentClient and IamClient classes.
     environment_client = EnvironmentClient(environment_config=environment_config)
+    iam_client = IamClient(iam_config=environment_config)
 
     http_status_code, error_message, environments = environment_client.get_environment_list()
  
@@ -91,7 +93,10 @@ def _fetch_kafka_credentials_via_confluent_cloud_api_key(principal_id: str,
 
                 # Retrieve API key pair for each Kafka cluster
                 for kafka_cluster in kafka_clusters:
-                    http_status_code, error_message, api_key_pair = environment_client.create_kafka_api_key(kafka_cluster_id=kafka_cluster.get("id"), principal_id=principal_id)
+                    http_status_code, error_message, api_key_pair = iam_client.create_api_key(resource_id=kafka_cluster.get("id"), 
+                                                                                              principal_id=principal_id,
+                                                                                              display_name=f"Temporary API Key for Kafka Cluster {kafka_cluster.get('display_name')} ({kafka_cluster.get('id')}) in Environment {environment.get('display_name')} for Principal {principal_id}",
+                                                                                              description="This API key was created temporarily by the Kafka Cluster Topics Partition Count Recommender Tool to retrieve Kafka Cluster credentials.  It will be deleted automatically after use.")
                     
                     # If unable to retrieve the API key pair, log the error and attempt to clean up any previously created API keys
                     if http_status_code == HttpStatus.FORBIDDEN:
@@ -102,7 +107,7 @@ def _fetch_kafka_credentials_via_confluent_cloud_api_key(principal_id: str,
 
                         for kafka_credential in kafka_credentials:
                             if kafka_credential.get("kafka_cluster_id") == kafka_cluster.get("id"):
-                                http_status_code, error_message = environment_client.delete_kafka_api_key(api_key=kafka_credential["sasl.username"])
+                                http_status_code, error_message = iam_client.delete_api_key(api_key=kafka_credential["sasl.username"])
                                 if http_status_code != HttpStatus.ACCEPTED:
                                     logger.warning("FAILED TO DELETE KAFKA API KEY %s FOR KAFKA CLUSTER %s BECAUSE THE FOLLOWING ERROR OCCURRED: %s.", kafka_credential['sasl.username'], kafka_credential['kafka_cluster_id'], error_message)
                                 else:
@@ -205,10 +210,10 @@ def _analyze_kafka_cluster(metrics_config: Dict,
 
         # Clean up the created Kafka API key(s) if it was created using Confluent Cloud API key
         if use_confluent_cloud_api_key_to_fetch_kafka_credentials:
-            # Instantiate the EnvironmentClient class.
-            environment_client = EnvironmentClient(environment_config=metrics_config)
+            # Instantiate the IamClient class.
+            iam_client = IamClient(iam_config=metrics_config)
 
-            http_status_code, error_message = environment_client.delete_kafka_api_key(api_key=kafka_credential["sasl.username"])
+            http_status_code, error_message = iam_client.delete_api_key(api_key=kafka_credential["sasl.username"])
             if http_status_code != HttpStatus.NO_CONTENT:
                 logging.warning("FAILED TO DELETE KAFKA API KEY %s FOR KAFKA CLUSTER %s BECAUSE THE FOLLOWING ERROR OCCURRED: %s.", kafka_credential['sasl.username'], kafka_credential['kafka_cluster_id'], error_message)
             else:
