@@ -29,8 +29,16 @@ def principal_id():
 def environment_config():
     """Fixture for environment configuration."""
     return {
-        "api_key": "test_key",
-        "api_secret": "test_secret"
+        "confluent_cloud_api_key": "test_key",
+        "confluent_cloud_api_secret": "test_secret"
+    }
+
+@pytest.fixture
+def iam_config():
+    """Fixture for IAM configuration."""
+    return {
+        "confluent_cloud_api_key": "test_key",
+        "confluent_cloud_api_secret": "test_secret"
     }
 
 
@@ -77,6 +85,12 @@ def mock_environment_client():
     with patch('src.thread_safe_tool.EnvironmentClient') as mock_client:
         yield mock_client
 
+@pytest.fixture
+def mock_iam_client():
+    """Fixture for mock IamClient."""
+    with patch('src.thread_safe_tool.IamClient') as mock_client:
+        yield mock_client
+
 
 class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
     """Test suite for _fetch_kafka_credentials_via_confluent_cloud_api_key function."""
@@ -88,20 +102,25 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         mock_environments, 
         mock_kafka_clusters,
         mock_api_key_pair,
-        mock_environment_client
+        mock_environment_client,
+        mock_iam_client
     ):
         """Test successful retrieval of Kafka credentials from all environments."""
         # Setup mock client
         mock_client_instance = Mock()
         mock_environment_client.return_value = mock_client_instance
-        
+
+        mock_iam_client_instance = Mock()
+        mock_iam_client.return_value = mock_iam_client_instance
+
+
         mock_client_instance.get_environment_list.return_value = (
             HttpStatus.OK, None, mock_environments
         )
         mock_client_instance.get_kafka_cluster_list.return_value = (
             HttpStatus.OK, None, [mock_kafka_clusters[0]]
         )
-        mock_client_instance.create_kafka_api_key.return_value = (
+        mock_iam_client_instance.create_api_key.return_value = (
             HttpStatus.ACCEPTED, None, mock_api_key_pair
         )
         
@@ -175,11 +194,15 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         mock_environments,
         mock_kafka_clusters,
         mock_api_key_pair,
-        mock_environment_client
+        mock_environment_client,
+        mock_iam_client
     ):
         """Test filtering by specific environment IDs."""
         mock_client_instance = Mock()
         mock_environment_client.return_value = mock_client_instance
+
+        mock_iam_client_instance = Mock()
+        mock_iam_client.return_value = mock_iam_client_instance
         
         mock_client_instance.get_environment_list.return_value = (
             HttpStatus.OK, None, mock_environments
@@ -187,7 +210,7 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         mock_client_instance.get_kafka_cluster_list.return_value = (
             HttpStatus.OK, None, [mock_kafka_clusters[0]]
         )
-        mock_client_instance.create_kafka_api_key.return_value = (
+        mock_iam_client_instance.create_api_key.return_value = (
             HttpStatus.ACCEPTED, None, mock_api_key_pair
         )
         
@@ -211,11 +234,15 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         mock_environments,
         mock_kafka_clusters,
         mock_api_key_pair,
-        mock_environment_client
+        mock_environment_client,
+        mock_iam_client
     ):
         """Test filtering by specific Kafka cluster IDs."""
         mock_client_instance = Mock()
         mock_environment_client.return_value = mock_client_instance
+
+        mock_iam_client_instance = Mock()
+        mock_iam_client.return_value = mock_iam_client_instance
         
         mock_client_instance.get_environment_list.return_value = (
             HttpStatus.OK, None, [mock_environments[0]]
@@ -223,7 +250,7 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         mock_client_instance.get_kafka_cluster_list.return_value = (
             HttpStatus.OK, None, mock_kafka_clusters
         )
-        mock_client_instance.create_kafka_api_key.return_value = (
+        mock_iam_client_instance.create_api_key.return_value = (
             HttpStatus.ACCEPTED, None, mock_api_key_pair
         )
         
@@ -244,11 +271,15 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         environment_config,
         mock_environments,
         mock_kafka_clusters,
-        mock_environment_client
+        mock_environment_client,
+        mock_iam_client
     ):
         """Test handling of forbidden access (403) error."""
         mock_client_instance = Mock()
         mock_environment_client.return_value = mock_client_instance
+
+        mock_iam_client_instance = Mock()
+        mock_iam_client.return_value = mock_iam_client_instance
         
         mock_client_instance.get_environment_list.return_value = (
             HttpStatus.OK, None, [mock_environments[0]]
@@ -256,7 +287,7 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         mock_client_instance.get_kafka_cluster_list.return_value = (
             HttpStatus.OK, None, [mock_kafka_clusters[0]]
         )
-        mock_client_instance.create_kafka_api_key.return_value = (
+        mock_iam_client_instance.create_api_key.return_value = (
             HttpStatus.FORBIDDEN, "Access denied", None
         )
         
@@ -274,11 +305,15 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         environment_config,
         mock_environments,
         mock_kafka_clusters,
-        mock_environment_client
+        mock_environment_client,
+        mock_iam_client
     ):
         """Test API key creation failure returns empty list and exits early."""
         mock_client_instance = Mock()
         mock_environment_client.return_value = mock_client_instance
+
+        mock_iam_client_instance = Mock()
+        mock_iam_client.return_value = mock_iam_client_instance
         
         mock_client_instance.get_environment_list.return_value = (
             HttpStatus.OK, None, [mock_environments[0]]
@@ -288,11 +323,11 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         )
         
         # First cluster succeeds, second cluster fails
-        mock_client_instance.create_kafka_api_key.side_effect = [
+        mock_iam_client_instance.create_api_key.side_effect = [
             (HttpStatus.ACCEPTED, None, {"key": "key1", "secret": "secret1"}),
             (HttpStatus.INTERNAL_SERVER_ERROR, "API Error", None)
         ]
-        mock_client_instance.delete_kafka_api_key.return_value = (
+        mock_iam_client_instance.delete_kafka_api_key.return_value = (
             HttpStatus.ACCEPTED, None
         )
         
@@ -315,11 +350,15 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         mock_environments,
         mock_kafka_clusters,
         mock_api_key_pair,
-        mock_environment_client
+        mock_environment_client,
+        mock_iam_client
     ):
         """Test handling when cleanup deletion fails."""
         mock_client_instance = Mock()
         mock_environment_client.return_value = mock_client_instance
+
+        mock_iam_client_instance = Mock()
+        mock_iam_client.return_value = mock_iam_client_instance
         
         mock_client_instance.get_environment_list.return_value = (
             HttpStatus.OK, None, [mock_environments[0]]
@@ -329,12 +368,12 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         )
         
         # First cluster succeeds, second fails
-        mock_client_instance.create_kafka_api_key.side_effect = [
+        mock_iam_client_instance.create_api_key.side_effect = [
             (HttpStatus.ACCEPTED, None, mock_api_key_pair),
             (HttpStatus.INTERNAL_SERVER_ERROR, "API Error", None)
         ]
         # Deletion fails
-        mock_client_instance.delete_kafka_api_key.return_value = (
+        mock_iam_client_instance.delete_kafka_api_key.return_value = (
             HttpStatus.INTERNAL_SERVER_ERROR, "Delete failed"
         )
         
@@ -353,11 +392,15 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         mock_environments,
         mock_kafka_clusters,
         mock_api_key_pair,
-        mock_environment_client
+        mock_environment_client,
+        mock_iam_client
     ):
         """Test filtering with multiple comma-separated environment IDs."""
         mock_client_instance = Mock()
         mock_environment_client.return_value = mock_client_instance
+
+        mock_iam_client_instance = Mock()
+        mock_iam_client.return_value = mock_iam_client_instance
         
         mock_client_instance.get_environment_list.return_value = (
             HttpStatus.OK, None, mock_environments
@@ -365,7 +408,7 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         mock_client_instance.get_kafka_cluster_list.return_value = (
             HttpStatus.OK, None, [mock_kafka_clusters[0]]
         )
-        mock_client_instance.create_kafka_api_key.return_value = (
+        mock_iam_client_instance.create_api_key.return_value = (
             HttpStatus.ACCEPTED, None, mock_api_key_pair
         )
         
