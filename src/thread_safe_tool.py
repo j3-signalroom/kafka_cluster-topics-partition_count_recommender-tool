@@ -9,9 +9,11 @@ from utilities import setup_logging
 from cc_clients_python_lib.iam_client import IamClient
 from cc_clients_python_lib.http_status import HttpStatus
 from confluent_credentials import (fetch_kafka_credentials_via_confluent_cloud_api_key,
-                                  fetch_kafka_credentials_via_env_file,
-                                  fetch_confluent_cloud_credential)
-from constants import (DEFAULT_USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS,
+                                   fetch_kafka_credentials_via_env_file,
+                                   fetch_confluent_cloud_credential_via_env_file,
+                                   fetch_schema_registry_via_confluent_cloud_api_key,
+                                   fetch_schema_registry_credentials_via_env_file)
+from constants import (DEFAULT_USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_RESOURCE_CREDENTIALS,
                        DEFAULT_SAMPLING_DAYS,
                        DEFAULT_SAMPLING_BATCH_SIZE,
                        DEFAULT_SAMPLING_MAX_CONTINUOUS_FAILED_BATCHES,
@@ -45,16 +47,12 @@ __status__     = "dev"
 logger = setup_logging()
 
 
-def _analyze_kafka_cluster(metrics_config: Dict, 
-                           use_confluent_cloud_api_key_to_fetch_kafka_credentials: bool, 
-                           kafka_credential: Dict, 
-                           config: Dict) -> bool:
+def _analyze_kafka_cluster(kafka_credential: Dict, sr_credential: Dict, config: Dict) -> bool:
     """Analyze a single Kafka cluster.
     
     Args:
-        metrics_config (Dict): Confluent Cloud API credentials
-        use_confluent_cloud_api_key_to_fetch_kafka_credentials (bool): Whether the Kafka credentials were fetched using Confluent Cloud API key
         kafka_credential (Dict): Kafka cluster credentials
+        sr_credential (Dict): Schema Registry credentials
         config (Dict): Configuration parameters
         
     Return(s):
@@ -66,7 +64,8 @@ def _analyze_kafka_cluster(metrics_config: Dict,
                                                  bootstrap_server_uri=kafka_credential.get("bootstrap.servers"),
                                                  kafka_api_key=kafka_credential.get("sasl.username"),
                                                  kafka_api_secret=kafka_credential.get("sasl.password"),
-                                                 metrics_config=config['metrics_config'])
+                                                 sr_url=sr_credential["url"],
+                                                 sr_api_key_secret=sr_credential["basic.auth.user.info"])
 
         # Multithread the analysis of all topics in the Kafka cluster
         success = analyzer.analyze_all_topics(**config)
@@ -78,16 +77,23 @@ def _analyze_kafka_cluster(metrics_config: Dict,
             logging.error("KAFKA CLUSTER %s TOPIC ANALYSIS FAILED.", kafka_credential.get('kafka_cluster_id'))
 
         # Clean up the created Kafka API key(s) if it was created using Confluent Cloud API key
-        if use_confluent_cloud_api_key_to_fetch_kafka_credentials:
+        if config["use_confluent_cloud_api_key_to_fetch_resource_credentials"]:
             # Instantiate the IamClient class.
-            iam_client = IamClient(iam_config=metrics_config)
+            iam_client = IamClient(iam_config=config['metrics_config'])
 
+            # Delete the Kafka API key created for this Kafka cluster
             http_status_code, error_message = iam_client.delete_api_key(api_key=kafka_credential["sasl.username"])
             if http_status_code != HttpStatus.NO_CONTENT:
                 logging.warning("FAILED TO DELETE KAFKA API KEY %s FOR KAFKA CLUSTER %s BECAUSE THE FOLLOWING ERROR OCCURRED: %s.", kafka_credential['sasl.username'], kafka_credential['kafka_cluster_id'], error_message)
             else:
                 logging.info("Kafka API key %s for Kafka Cluster %s deleted successfully.", kafka_credential['sasl.username'], kafka_credential['kafka_cluster_id'])
 
+            # Delete the Schema Registry API key created for this Schema Registry instance
+            http_status_code, error_message = iam_client.delete_api_key(api_key=sr_credential["basic.auth.user.info"].split(":")[0])
+            if http_status_code != HttpStatus.NO_CONTENT:
+                logging.warning("FAILED TO DELETE SCHEMA REGISTRY API KEY %s FOR SCHEMA REGISTRY %s BECAUSE THE FOLLOWING ERROR OCCURRED: %s.", sr_credential["basic.auth.user.info"].split(":")[0], sr_credential['schema_registry_id'], error_message)
+            else:
+                logging.info("Schema Registry API key %s for Schema Registry %s deleted successfully.", sr_credential["basic.auth.user.info"].split(":")[0], sr_credential['schema_registry_id'])
         return success
         
     except Exception as e:
@@ -104,7 +110,7 @@ def main():
  
     # Fetch environment variables non-credential configuration settings
     try:
-        use_confluent_cloud_api_key_to_fetch_kafka_credentials = os.getenv("USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS", DEFAULT_USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS) == "True"
+        use_confluent_cloud_api_key_to_fetch_resource_credentials = os.getenv("USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_RESOURCE_CREDENTIALS", DEFAULT_USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_RESOURCE_CREDENTIALS) == "True"
         environment_filter = os.getenv("ENVIRONMENT_FILTER")
         kafka_cluster_filter = os.getenv("KAFKA_CLUSTER_FILTER")
         principal_id = os.getenv("PRINCIPAL_ID")
@@ -131,17 +137,20 @@ def main():
         kafka_writer_topic_partition_count = int(os.getenv("KAFKA_WRITER_TOPIC_PARTITION_COUNT", DEFAULT_KAFKA_WRITER_TOPIC_PARTITION_COUNT))
         kafka_writer_topic_replication_factor = int(os.getenv("KAFKA_WRITER_TOPIC_REPLICATION_FACTOR", DEFAULT_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR))
         kafka_writer_topic_data_retention_in_days = int(os.getenv("KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS", DEFAULT_KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS))
+
+        # Indicate whether to use Private Schema Registry
+        use_private_schema_registry = os.getenv("USE_PRIVATE_SCHEMA_REGISTRY", "False") == "True"
     except Exception as e:
         logging.error("THE APPLICATION FAILED TO READ CONFIGURATION SETTINGS BECAUSE OF THE FOLLOWING ERROR: %s", e)
         return
     
     # Fetch Confluent Cloud credentials from environment variable or AWS Secrets Manager
-    metrics_config = fetch_confluent_cloud_credential(use_aws_secrets_manager)
+    metrics_config = fetch_confluent_cloud_credential_via_env_file(use_aws_secrets_manager)
     if not metrics_config:
         return
     
     # Fetch Kafka credentials
-    if use_confluent_cloud_api_key_to_fetch_kafka_credentials:
+    if use_confluent_cloud_api_key_to_fetch_resource_credentials:
         # Read the Kafka Cluster credentials using Confluent Cloud API key
         kafka_credentials = fetch_kafka_credentials_via_confluent_cloud_api_key(principal_id, 
                                                                                 metrics_config, 
@@ -153,11 +162,24 @@ def main():
 
     if not kafka_credentials:
         return
+    
+    # Fetch Schema Registry credentials
+    if use_confluent_cloud_api_key_to_fetch_resource_credentials:
+        # Read the Schema Registry credentials using Confluent Cloud API key
+        sr_credentials = fetch_schema_registry_via_confluent_cloud_api_key(principal_id, 
+                                                                           metrics_config, 
+                                                                           use_private_schema_registry, 
+                                                                           environment_filter)
+    else:
+        # Read the Schema Registry credentials from the environment variable or AWS Secrets Manager
+        sr_credentials = fetch_schema_registry_credentials_via_env_file(use_aws_secrets_manager)
+    if not sr_credentials:
+        return
 
     # Prepare configuration object
     config = {
         'metrics_config': metrics_config,
-        'use_confluent_cloud_api_key_to_fetch_kafka_credentials': use_confluent_cloud_api_key_to_fetch_kafka_credentials,
+        'use_confluent_cloud_api_key_to_fetch_resource_credentials': use_confluent_cloud_api_key_to_fetch_resource_credentials,
         'environment_filter': environment_filter,
         'kafka_cluster_filter': kafka_cluster_filter,
         'principal_id': principal_id,
@@ -197,10 +219,7 @@ def main():
     # Analyze Kafka clusters concurrently if more than one cluster
     if len(kafka_credentials) == 1:
         # Single Kafka cluster.  No need for cluster-level threading
-        success = _analyze_kafka_cluster(metrics_config, 
-                                         use_confluent_cloud_api_key_to_fetch_kafka_credentials, 
-                                         kafka_credentials[0], 
-                                         config)
+        success = _analyze_kafka_cluster(kafka_credentials[0], sr_credentials[0], config)
         if success:
             logging.info("SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.")
         else:
@@ -213,8 +232,8 @@ def main():
         with ThreadPoolExecutor(max_workers=max_cluster_workers) as executor:
             # Submit Kafka cluster analysis tasks
             future_to_cluster = {
-                executor.submit(_analyze_kafka_cluster, metrics_config, use_confluent_cloud_api_key_to_fetch_kafka_credentials, credential, config): credential.get("kafka_cluster_id", "unknown")
-                for credential in kafka_credentials
+                executor.submit(_analyze_kafka_cluster, kafka_credential, sr_credentials[kafka_credential["environment_id"]], config): kafka_credential.get("kafka_cluster_id", "unknown")
+                for kafka_credential in kafka_credentials
             }
             
             # Process completed Kafka cluster analyses
