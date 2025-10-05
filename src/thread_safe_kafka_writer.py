@@ -1,5 +1,8 @@
+from typing import Final
 from confluent_kafka import Producer
 from confluent_kafka.admin import NewTopic, ConfigResource
+from confluent_kafka.schema_registry import SchemaRegistryClient
+from confluent_kafka.schema_registry.json_schema import JSONSerializer
 import threading
 import json
 import logging
@@ -19,6 +22,122 @@ __status__     = "dev"
 logger = setup_logging()
 
 
+KAFKA_TOPIC_KEY_SCHEMA: Final[str] = """
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalroom.ai/kafka-metrics-key.schema.json",
+  "title": "Kafka Metrics API Key",
+  "description": "Schema for Kafka topic metrics key",
+  "type": "object",
+  "properties": {
+    "analysis_start_time_epoch": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unique epoch milliseconds for this analysis run",
+      "examples": [1700000000000]
+    },
+    "kafka_cluster_id": {
+      "type": "string",
+      "description": "ID of the Kafka cluster",
+      "examples": ["lkc-abc123"]
+    },
+    "topic_name": {
+      "type": "string",
+      "description": "Name of the Kafka topic",
+      "examples": ["example-kafka-topic"]
+    }
+  },
+  "required": [
+    "analysis_start_time_epoch",
+    "kafka_cluster_id",
+    "topic_name"
+  ],
+  "additionalProperties": false
+}
+"""
+
+KAFKA_TOPIC_VALUE_SCHEMA: Final[str] = """
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://signalroom.ai/kafka-metrics-value.schema.json",
+  "title": "Kafka Metrics API Response",
+  "description": "Schema for Kafka topic metrics and partition recommendations",
+  "type": "object",
+  "properties": {
+    "method": {
+      "type": "string",
+      "enum": ["sampling_records", "metrics_api"]
+      "description": "The API method used to retrieve metrics",
+    },
+    "topic_name": {
+      "type": "string",
+      "description": "Name of the Kafka topic",
+      "examples": ["example-kafka-topic"]
+    },
+    "is_compacted": {
+      "type": "string",
+      "enum": ["yes", "no"],
+      "description": "Indicates whether the topic uses log compaction"
+    },
+    "number_of_records": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "description": "Total number of records in the topic"
+    },
+    "number_of_partitions": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Current number of partitions for the topic"
+    },
+    "required_throughput": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Required throughput in bytes per second or messages per second"
+    },
+    "consumer_throughput": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Consumer throughput in bytes per second or messages per second"
+    },
+    "recommended_partitions": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Recommended number of partitions based on throughput analysis"
+    },
+    "hot_partition_ingress": {
+      "type": "string",
+      "enum": ["yes", "no", "n/a"],
+      "description": "Indicates whether hot partitions are detected on ingress"
+    },
+    "hot_partition_egress": {
+      "type": "string",
+      "enum": ["yes", "no", "n/a"],
+      "description": "Indicates whether hot partitions are detected on egress"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "empty", "error"],
+      "description": "Current status of the topic"
+    }
+  },
+  "required": [
+    "method",
+    "topic_name",
+    "is_compacted",
+    "number_of_records",
+    "number_of_partitions",
+    "required_throughput",
+    "consumer_throughput",
+    "recommended_partitions",
+    "hot_partition_ingress",
+    "hot_partition_egress",
+    "status"
+  ],
+  "additionalProperties": false
+}
+"""
+
+
 class ThreadSafeKafkaWriter:
     """Thread-safe Kafka producer for writing analysis results."""
 
@@ -32,7 +151,9 @@ class ThreadSafeKafkaWriter:
                  replication_factor: int, 
                  data_retention_in_days: int,
                  sasl_username: str, 
-                 sasl_password: str):
+                 sasl_password: str,
+                 sr_url: str,
+                 sr_api_key_secret: str) -> None:
         """Initialize the Kafka producer with connection details.
 
         Args:
@@ -45,6 +166,8 @@ class ThreadSafeKafkaWriter:
             replication_factor (int): Replication factor for the topic.
             sasl_username (str): The SASL username for authentication.
             sasl_password (str): The SASL password for authentication.
+            sr_url (str): The Schema Registry URL.
+            sr_api_key_secret (str): The Schema Registry API key and secret in the format "key:secret".
         """
 
         # Initialize instance variables
@@ -59,17 +182,25 @@ class ThreadSafeKafkaWriter:
         # Ensure the topic exists or create it
         self.__create_topic_if_not_exists(partition_count=partition_count, replication_factor=replication_factor, data_retention_in_days=data_retention_in_days)
 
+        # Initialize Schema Registry client
+        sr_client = SchemaRegistryClient({
+           "url": sr_url,
+           "basic.auth.user.info": sr_api_key_secret
+        })
+
         # Kafka Producer is thread-safe, can be shared across threads
         self.producer = Producer({
-            'bootstrap.servers': bootstrap_server,
-            'security.protocol': 'SASL_SSL',
-            'sasl.mechanism': 'PLAIN',
-            'sasl.username': sasl_username,
-            'sasl.password': sasl_password,
-            'linger.ms': 100,           # Batch messages for efficiency
-            'compression.type': 'lz4',
-            'acks': 'all',              # Wait for all replicas
-            'retries': 3
+            "bootstrap.servers": bootstrap_server,
+            "security.protocol": "SASL_SSL",
+            "sasl.mechanism": "PLAIN",
+            "sasl.username": sasl_username,
+            "sasl.password": sasl_password,
+            "linger.ms": 100,           # Batch messages for efficiency
+            "compression.type": "lz4",
+            "acks": "all",              # Wait for all replicas
+            "retries": 3,
+            "key.serializer": JSONSerializer(KAFKA_TOPIC_KEY_SCHEMA, sr_client),
+            "value.serializer": JSONSerializer(KAFKA_TOPIC_VALUE_SCHEMA, sr_client)
         })
     
     def delivery_callback(self, error_message: str, record) -> None:

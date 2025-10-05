@@ -352,10 +352,12 @@ class ThreadSafeKafkaTopicsAnalyzer:
         record_count = result.get('total_record_count', 0)
         
         if record_count > 0:
-            avg_bytes_per_record = result.get('avg_bytes_per_record', 0)
+            # Calculate consumer and required throughput
+            avg_bytes_per_record = result.get('avg_bytes_per_record', 0.0)
             consumer_throughput = avg_bytes_per_record * record_count
             required_throughput = consumer_throughput * required_consumption_throughput_factor
             
+            # Calculate recommended partitions
             if required_throughput < min_consumer_throughput:
                 recommended_partition_count = min_recommended_partitions
             else:
@@ -363,28 +365,30 @@ class ThreadSafeKafkaTopicsAnalyzer:
             
             status = "active"
         else:
-            consumer_throughput = 0
-            required_throughput = 0
+            # No records found or error occurred
+            consumer_throughput = 0.0
+            required_throughput = 0.0
             recommended_partition_count = 0
             status = "error" if 'error' in result else "empty"
 
-        # Write to CSV
+        # Determine method and hot partition status
         if use_sample_records:
             method = "sampling_records"
-            hot_partition_ingress = "N/A"
-            hot_partition_egress = "N/A"
+            hot_partition_ingress = "n/a"
+            hot_partition_egress = "n/a"
         else:
             method = "metrics_api"
             hot_partition_ingress = "yes" if result.get('hot_partition_ingress', False) else "no"
             hot_partition_egress = "yes" if result.get('hot_partition_egress', False) else "no"
 
+        # Write to CSV
         csv_writer.write_row([
             method, topic_name, is_compacted_str, record_count, partition_count,
             required_throughput/1024/1024, consumer_throughput/1024/1024,
             recommended_partition_count, hot_partition_ingress, hot_partition_egress, status
         ])
 
-        # Write to Kafka
+        # Write to Kafka (if enabled)
         if kafka_writer:
             kafka_writer.write_result((json.dumps({"method": method, 
                                                    "topic_name": topic_name, 

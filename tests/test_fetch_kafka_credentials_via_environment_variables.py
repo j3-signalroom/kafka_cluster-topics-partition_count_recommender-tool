@@ -2,7 +2,7 @@ import pytest
 import json
 from unittest.mock import patch
 
-from src.thread_safe_tool import _fetch_kafka_credentials_via_environment_variables
+from src.confluent_credentials import fetch_kafka_credentials_via_environment_variables
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -48,14 +48,14 @@ def mock_secrets_paths():
 
 
 class TestFetchKafkaCredentialsViaEnvironmentVariables:
-    """Test suite for _fetch_kafka_credentials_via_environment_variables function."""
+    """Test suite for fetch_kafka_credentials_via_environment_variables function."""
 
-    @patch('src.thread_safe_tool.os.getenv')
+    @patch('src.confluent_credentials.os.getenv')
     def test_fetch_from_env_variable_success(self, mock_getenv, mock_kafka_credentials):
         """Test successful retrieval from environment variable."""
         mock_getenv.return_value = json.dumps(mock_kafka_credentials)
         
-        result = _fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_environment_variables(
             use_aws_secrets_manager=False
         )
         
@@ -64,19 +64,19 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         assert result[1]["kafka_cluster_id"] == "lkc-2"
         mock_getenv.assert_called_once_with("KAFKA_CREDENTIALS", "[]")
 
-    @patch('src.thread_safe_tool.os.getenv')
+    @patch('src.confluent_credentials.os.getenv')
     def test_fetch_from_env_variable_empty(self, mock_getenv):
         """Test when environment variable is empty."""
         mock_getenv.return_value = "[]"
         
-        result = _fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_environment_variables(
             use_aws_secrets_manager=False
         )
         
         assert result == []
 
-    @patch('src.thread_safe_tool.get_secrets')
-    @patch('src.thread_safe_tool.os.getenv')
+    @patch('src.confluent_credentials.get_secrets')
+    @patch('src.confluent_credentials.os.getenv')
     def test_fetch_from_aws_secrets_manager_success(
         self, 
         mock_getenv, 
@@ -91,7 +91,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
             (mock_kafka_credentials[1], None)
         ]
         
-        result = _fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_environment_variables(
             use_aws_secrets_manager=True
         )
         
@@ -104,8 +104,8 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         mock_get_secrets.assert_any_call("us-east-1", "kafka/cluster1")
         mock_get_secrets.assert_any_call("us-west-2", "kafka/cluster2")
 
-    @patch('src.thread_safe_tool.get_secrets')
-    @patch('src.thread_safe_tool.os.getenv')
+    @patch('src.confluent_credentials.get_secrets')
+    @patch('src.confluent_credentials.os.getenv')
     def test_fetch_from_aws_secrets_manager_failure(
         self, 
         mock_getenv, 
@@ -116,14 +116,14 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         mock_getenv.return_value = json.dumps(mock_secrets_paths)
         mock_get_secrets.return_value = ({}, "Access denied")
         
-        result = _fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_environment_variables(
             use_aws_secrets_manager=True
         )
         
         assert result == []
 
-    @patch('src.thread_safe_tool.get_secrets')
-    @patch('src.thread_safe_tool.os.getenv')
+    @patch('src.confluent_credentials.get_secrets')
+    @patch('src.confluent_credentials.os.getenv')
     def test_fetch_from_aws_secrets_manager_partial_failure(
         self, 
         mock_getenv, 
@@ -138,19 +138,19 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
             ({}, "Secret not found")
         ]
         
-        result = _fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_environment_variables(
             use_aws_secrets_manager=True
         )
         
         # Should return empty list on any failure
         assert result == []
 
-    @patch('src.thread_safe_tool.os.getenv')
+    @patch('src.confluent_credentials.os.getenv')
     def test_filter_single_cluster_from_env(self, mock_getenv, mock_kafka_credentials):
         """Test filtering a single Kafka cluster from environment variable."""
         mock_getenv.return_value = json.dumps(mock_kafka_credentials)
         
-        result = _fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_environment_variables(
             use_aws_secrets_manager=False,
             kafka_cluster_filter="lkc-1"
         )
@@ -158,12 +158,12 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         assert len(result) == 1
         assert result[0]["kafka_cluster_id"] == "lkc-1"
 
-    @patch('src.thread_safe_tool.os.getenv')
+    @patch('src.confluent_credentials.os.getenv')
     def test_filter_multiple_clusters_from_env(self, mock_getenv, mock_kafka_credentials):
         """Test filtering multiple Kafka clusters with comma-separated values."""
         mock_getenv.return_value = json.dumps(mock_kafka_credentials)
         
-        result = _fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_environment_variables(
             use_aws_secrets_manager=False,
             kafka_cluster_filter="lkc-1, lkc-2"
         )
@@ -173,20 +173,20 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         assert "lkc-1" in cluster_ids
         assert "lkc-2" in cluster_ids
 
-    @patch('src.thread_safe_tool.os.getenv')
+    @patch('src.confluent_credentials.os.getenv')
     def test_filter_non_existent_cluster(self, mock_getenv, mock_kafka_credentials):
         """Test filtering with non-existent cluster ID."""
         mock_getenv.return_value = json.dumps(mock_kafka_credentials)
         
-        result = _fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_environment_variables(
             use_aws_secrets_manager=False,
             kafka_cluster_filter="lkc-999"
         )
         
         assert result == []
 
-    @patch('src.thread_safe_tool.get_secrets')
-    @patch('src.thread_safe_tool.os.getenv')
+    @patch('src.confluent_credentials.get_secrets')
+    @patch('src.confluent_credentials.os.getenv')
     def test_filter_clusters_from_aws_secrets_manager(
         self, 
         mock_getenv, 
@@ -201,7 +201,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
             (mock_kafka_credentials[1], None)
         ]
         
-        result = _fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_environment_variables(
             use_aws_secrets_manager=True,
             kafka_cluster_filter="lkc-2"
         )
@@ -209,19 +209,19 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         assert len(result) == 1
         assert result[0]["kafka_cluster_id"] == "lkc-2"
 
-    @patch('src.thread_safe_tool.os.getenv')
+    @patch('src.confluent_credentials.os.getenv')
     def test_exception_handling_invalid_json(self, mock_getenv):
         """Test exception handling when environment variable contains invalid JSON."""
         mock_getenv.return_value = "invalid json"
         
-        result = _fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_environment_variables(
             use_aws_secrets_manager=False
         )
         
         assert result == []
 
-    @patch('src.thread_safe_tool.get_secrets')
-    @patch('src.thread_safe_tool.os.getenv')
+    @patch('src.confluent_credentials.get_secrets')
+    @patch('src.confluent_credentials.os.getenv')
     def test_exception_handling_get_secrets_raises(
         self, 
         mock_getenv, 
@@ -232,49 +232,49 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         mock_getenv.return_value = json.dumps(mock_secrets_paths)
         mock_get_secrets.side_effect = Exception("Connection error")
         
-        result = _fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_environment_variables(
             use_aws_secrets_manager=True
         )
         
         assert result == []
 
-    @patch('src.thread_safe_tool.os.getenv')
+    @patch('src.confluent_credentials.os.getenv')
     def test_empty_secrets_paths(self, mock_getenv):
         """Test when KAFKA_API_SECRET_PATHS is empty."""
         mock_getenv.return_value = "[]"
         
-        result = _fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_environment_variables(
             use_aws_secrets_manager=True
         )
         
         assert result == []
 
-    @patch('src.thread_safe_tool.os.getenv')
+    @patch('src.confluent_credentials.os.getenv')
     def test_missing_env_variable_uses_default(self, mock_getenv):
         """Test that missing environment variable uses default empty list."""
         mock_getenv.return_value = "[]"  # Default value
         
-        result = _fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_environment_variables(
             use_aws_secrets_manager=False
         )
         
         assert result == []
         mock_getenv.assert_called_once_with("KAFKA_CREDENTIALS", "[]")
 
-    @patch('src.thread_safe_tool.os.getenv')
+    @patch('src.confluent_credentials.os.getenv')
     def test_filter_with_whitespace(self, mock_getenv, mock_kafka_credentials):
         """Test that filter handles whitespace correctly."""
         mock_getenv.return_value = json.dumps(mock_kafka_credentials)
         
-        result = _fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_environment_variables(
             use_aws_secrets_manager=False,
             kafka_cluster_filter="  lkc-1  ,  lkc-2  "
         )
         
         assert len(result) == 2
 
-    @patch('src.thread_safe_tool.get_secrets')
-    @patch('src.thread_safe_tool.os.getenv')
+    @patch('src.confluent_credentials.get_secrets')
+    @patch('src.confluent_credentials.os.getenv')
     def test_aws_secrets_manager_with_no_cluster_id(
         self, 
         mock_getenv, 
@@ -293,7 +293,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
             None
         )
         
-        result = _fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_environment_variables(
             use_aws_secrets_manager=True
         )
         
