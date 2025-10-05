@@ -1,5 +1,6 @@
 import csv
 from datetime import datetime, timedelta, timezone
+import json
 import time
 from typing import Dict, List
 from confluent_kafka.admin import AdminClient, ConfigResource
@@ -385,7 +386,17 @@ class ThreadSafeKafkaTopicsAnalyzer:
 
         # Write to Kafka
         if kafka_writer:
-            kafka_writer.write_result(result)
+            kafka_writer.write_result((json.dumps({"method": method, 
+                                                   "topic_name": topic_name, 
+                                                   "is_compacted": is_compacted_str, 
+                                                   "number_of_records": record_count, 
+                                                   "number_of_partitions": partition_count, 
+                                                   "required_throughput": required_throughput, 
+                                                   "consumer_throughput": consumer_throughput, 
+                                                   "recommended_partitions": recommended_partition_count, 
+                                                   "hot_partition_ingress": hot_partition_ingress, 
+                                                   "hot_partition_egress": hot_partition_egress, 
+                                                   "status": status}).encode('utf-8')))
 
     def __calculate_summary_stats(self, 
                                  results: List[Dict], 
