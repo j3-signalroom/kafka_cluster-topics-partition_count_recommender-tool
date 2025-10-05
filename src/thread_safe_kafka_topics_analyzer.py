@@ -1,6 +1,5 @@
 import csv
 from datetime import datetime, timedelta, timezone
-import json
 import time
 from typing import Dict, List
 from confluent_kafka.admin import AdminClient, ConfigResource
@@ -30,7 +29,13 @@ logger = setup_logging()
 class ThreadSafeKafkaTopicsAnalyzer:
     """Class to analyze Kafka cluster topics."""
 
-    def __init__(self, kafka_cluster_id: str, bootstrap_server_uri: str, kafka_api_key: str, kafka_api_secret: str, metrics_config: Dict):
+    def __init__(self, 
+                 kafka_cluster_id: str, 
+                 bootstrap_server_uri: str, 
+                 kafka_api_key: str, 
+                 kafka_api_secret: str,
+                 sr_url: str,
+                 sr_api_key_secret: str) -> None:
         """Connect to the Kafka Cluster with the AdminClient.
 
         Args:
@@ -38,7 +43,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
             bootstrap_server_uri (string): Kafka Cluster URI
             kafka_api_key (string): Your Confluent Cloud Kafka API key
             kafka_api_secret (string): Your Confluent Cloud Kafka API secret
-            metrics_config (Dict): Configuration for the MetricsClient
+            sr_url (string): Your Confluent Cloud Schema Registry URL
+            sr_api_key_secret (string): Your Confluent Cloud Schema Registry API secret
         """
         self.kafka_cluster_id = kafka_cluster_id
 
@@ -72,8 +78,12 @@ class ThreadSafeKafkaTopicsAnalyzer:
         self.completed_topics = 0
         self.total_topics = 0
 
+        # Schema Registry info
+        self.sr_url = sr_url
+        self.sr_api_key_secret = sr_api_key_secret
+
     def analyze_all_topics(self, 
-                           use_confluent_cloud_api_key_to_fetch_kafka_credentials: bool,
+                           use_confluent_cloud_api_key_to_fetch_resource_credentials: bool,
                            environment_filter: str | None,
                            kafka_cluster_filter: str | None,
                            principal_id: str | None,
@@ -98,7 +108,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
         """Analyze all topics in the Kafka cluster.
         
         Args:
-            use_confluent_cloud_api_key_to_fetch_kafka_credentials (bool): Whether to use Confluent Cloud API key to fetch Kafka credentials.
+            use_confluent_cloud_api_key_to_fetch_resource_credentials (bool): Whether to use Confluent Cloud API key to fetch Kafka credentials.
             environment_filter (str | None): Comma-separated list of environment IDs to filter.
             kafka_cluster_filter (str | None): Comma-separated list of Kafka cluster IDs to filter.
             principal_id (str | None): Comma-separated list of principal IDs to filter.
@@ -133,7 +143,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
 
         # Log initial analysis parameters
         self.__log_initial_parameters({
-            "use_confluent_cloud_api_key_to_fetch_kafka_credentials": use_confluent_cloud_api_key_to_fetch_kafka_credentials,
+            "use_confluent_cloud_api_key_to_fetch_resource_credentials": use_confluent_cloud_api_key_to_fetch_resource_credentials,
             "environment_filter": environment_filter,
             "kafka_cluster_filter": kafka_cluster_filter,
             "principal_id": principal_id,
@@ -186,7 +196,9 @@ class ThreadSafeKafkaTopicsAnalyzer:
                                                 replication_factor=kafka_writer_topic_replication_factor,
                                                 data_retention_in_days=kafka_writer_topic_data_retention_in_days,
                                                 sasl_username=self.kafka_consumer_config['sasl.username'],
-                                                sasl_password=self.kafka_consumer_config['sasl.password'])
+                                                sasl_password=self.kafka_consumer_config['sasl.password'],
+                                                sr_url=self.sr_url,
+                                                sr_api_key_secret=self.sr_api_key_secret)
 
         def update_progress() -> None:
             """Update progress in a thread-safe manner.
@@ -352,10 +364,12 @@ class ThreadSafeKafkaTopicsAnalyzer:
         record_count = result.get('total_record_count', 0)
         
         if record_count > 0:
-            avg_bytes_per_record = result.get('avg_bytes_per_record', 0)
+            # Calculate consumer and required throughput
+            avg_bytes_per_record = result.get('avg_bytes_per_record', 0.0)
             consumer_throughput = avg_bytes_per_record * record_count
             required_throughput = consumer_throughput * required_consumption_throughput_factor
             
+            # Calculate recommended partitions
             if required_throughput < min_consumer_throughput:
                 recommended_partition_count = min_recommended_partitions
             else:
@@ -363,40 +377,42 @@ class ThreadSafeKafkaTopicsAnalyzer:
             
             status = "active"
         else:
-            consumer_throughput = 0
-            required_throughput = 0
+            # No records found or error occurred
+            consumer_throughput = 0.0
+            required_throughput = 0.0
             recommended_partition_count = 0
             status = "error" if 'error' in result else "empty"
 
-        # Write to CSV
+        # Determine method and hot partition status
         if use_sample_records:
             method = "sampling_records"
-            hot_partition_ingress = "N/A"
-            hot_partition_egress = "N/A"
+            hot_partition_ingress = "n/a"
+            hot_partition_egress = "n/a"
         else:
             method = "metrics_api"
             hot_partition_ingress = "yes" if result.get('hot_partition_ingress', False) else "no"
             hot_partition_egress = "yes" if result.get('hot_partition_egress', False) else "no"
 
+        # Write to CSV
         csv_writer.write_row([
             method, topic_name, is_compacted_str, record_count, partition_count,
             required_throughput/1024/1024, consumer_throughput/1024/1024,
             recommended_partition_count, hot_partition_ingress, hot_partition_egress, status
         ])
 
-        # Write to Kafka
+        # Write to Kafka (if enabled)
         if kafka_writer:
-            kafka_writer.write_result((json.dumps({"method": method, 
-                                                   "topic_name": topic_name, 
-                                                   "is_compacted": is_compacted_str, 
-                                                   "number_of_records": record_count, 
-                                                   "number_of_partitions": partition_count, 
-                                                   "required_throughput": required_throughput, 
-                                                   "consumer_throughput": consumer_throughput, 
-                                                   "recommended_partitions": recommended_partition_count, 
-                                                   "hot_partition_ingress": hot_partition_ingress, 
-                                                   "hot_partition_egress": hot_partition_egress, 
-                                                   "status": status}).encode('utf-8')))
+            kafka_writer.write_result({"method": method, 
+                                       "topic_name": topic_name, 
+                                       "is_compacted": is_compacted_str, 
+                                       "number_of_records": record_count, 
+                                       "number_of_partitions": partition_count, 
+                                       "required_throughput": required_throughput, 
+                                       "consumer_throughput": consumer_throughput, 
+                                       "recommended_partitions": recommended_partition_count, 
+                                       "hot_partition_ingress": hot_partition_ingress, 
+                                       "hot_partition_egress": hot_partition_egress, 
+                                       "status": status})
 
     def __calculate_summary_stats(self, 
                                  results: List[Dict], 
@@ -518,7 +534,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
         logging.info("INITIAL ANALYSIS PARAMETERS")
         logging.info("-" * DEFAULT_CHARACTER_REPEAT)
         logging.info("Analysis Timestamp: %s", datetime.now().isoformat())
-        logging.info("Using Confluent Cloud API Key to fetch Kafka credential: %s", params['use_confluent_cloud_api_key_to_fetch_kafka_credentials'])
+        logging.info("Using Confluent Cloud API Key to fetch Kafka credential: %s", params['use_confluent_cloud_api_key_to_fetch_resource_credentials'])
         logging.info("Environment Filter: %s", params['environment_filter'] if params['environment_filter'] else 'None')
         logging.info("Kafka Cluster Filter: %s", params['kafka_cluster_filter'] if params['kafka_cluster_filter'] else 'None')
         logging.info("Principal ID Filter: %s", params['principal_id'] if params['principal_id'] else 'None')

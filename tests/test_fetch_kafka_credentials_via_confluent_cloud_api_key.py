@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import Mock, patch
 import logging
 
-from src.thread_safe_tool import _fetch_kafka_credentials_via_confluent_cloud_api_key, HttpStatus
+from src.confluent_credentials import fetch_kafka_credentials_via_confluent_cloud_api_key, HttpStatus
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -82,18 +82,18 @@ def mock_api_key_pair():
 @pytest.fixture
 def mock_environment_client():
     """Fixture for mock EnvironmentClient."""
-    with patch('src.thread_safe_tool.EnvironmentClient') as mock_client:
+    with patch('src.confluent_credentials.EnvironmentClient') as mock_client:
         yield mock_client
 
 @pytest.fixture
 def mock_iam_client():
     """Fixture for mock IamClient."""
-    with patch('src.thread_safe_tool.IamClient') as mock_client:
+    with patch('src.confluent_credentials.IamClient') as mock_client:
         yield mock_client
 
 
 class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
-    """Test suite for _fetch_kafka_credentials_via_confluent_cloud_api_key function."""
+    """Test suite for fetch_kafka_credentials_via_confluent_cloud_api_key function."""
 
     def test_successful_fetch_all_environments(
         self, 
@@ -125,7 +125,7 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         )
         
         # Execute
-        result = _fetch_kafka_credentials_via_confluent_cloud_api_key(
+        result = fetch_kafka_credentials_via_confluent_cloud_api_key(
             principal_id, environment_config
         )
         
@@ -154,7 +154,7 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         )
         
         # Execute
-        result = _fetch_kafka_credentials_via_confluent_cloud_api_key(
+        result = fetch_kafka_credentials_via_confluent_cloud_api_key(
             principal_id, environment_config
         )
         
@@ -180,7 +180,7 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         )
         
         # Execute
-        result = _fetch_kafka_credentials_via_confluent_cloud_api_key(
+        result = fetch_kafka_credentials_via_confluent_cloud_api_key(
             principal_id, environment_config
         )
         
@@ -215,7 +215,7 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         )
         
         # Execute with environment filter
-        result = _fetch_kafka_credentials_via_confluent_cloud_api_key(
+        result = fetch_kafka_credentials_via_confluent_cloud_api_key(
             principal_id, 
             environment_config,
             environment_filter="env-1"
@@ -255,7 +255,7 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         )
         
         # Execute with Kafka cluster filter
-        result = _fetch_kafka_credentials_via_confluent_cloud_api_key(
+        result = fetch_kafka_credentials_via_confluent_cloud_api_key(
             principal_id, 
             environment_config,
             kafka_cluster_filter="lkc-1"
@@ -292,7 +292,7 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         )
         
         # Execute
-        result = _fetch_kafka_credentials_via_confluent_cloud_api_key(
+        result = fetch_kafka_credentials_via_confluent_cloud_api_key(
             principal_id, environment_config
         )
         
@@ -332,7 +332,7 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         )
         
         # Execute
-        result = _fetch_kafka_credentials_via_confluent_cloud_api_key(
+        result = fetch_kafka_credentials_via_confluent_cloud_api_key(
             principal_id, environment_config
         )
         
@@ -378,7 +378,7 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         )
         
         # Execute - should not raise exception despite cleanup failure
-        result = _fetch_kafka_credentials_via_confluent_cloud_api_key(
+        result = fetch_kafka_credentials_via_confluent_cloud_api_key(
             principal_id, environment_config
         )
         
@@ -413,7 +413,7 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         )
         
         # Execute with multiple environment filters
-        result = _fetch_kafka_credentials_via_confluent_cloud_api_key(
+        result = fetch_kafka_credentials_via_confluent_cloud_api_key(
             principal_id, 
             environment_config,
             environment_filter="env-1, env-2"
@@ -442,7 +442,7 @@ class TestFetchKafkaCredentialsViaConfluentCloudApiKey:
         )
         
         # Execute
-        result = _fetch_kafka_credentials_via_confluent_cloud_api_key(
+        result = fetch_kafka_credentials_via_confluent_cloud_api_key(
             principal_id, environment_config
         )
         

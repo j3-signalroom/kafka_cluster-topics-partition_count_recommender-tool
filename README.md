@@ -148,7 +148,11 @@ Create the `.env` file and add the following environment variables, filling them
 # Set the flag to `True` to use the Confluent Cloud API key for fetching Kafka
 # credentials; otherwise, set it to `False` to reference `KAFKA_CREDENTIALS` or
 # `KAFKA_API_SECRET_PATHS` to obtain the Kafka Cluster credentials
-USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS=<True|False>
+USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_RESOURCE_CREDENTIALS=<True|False>
+
+# Set the flag to `True` to use the Private Schema Registry (if 
+# USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_RESOURCE_CREDENTIALS is True)
+USE_PRIVATE_SCHEMA_REGISTRY=<True|False>
 
 # Environment and Kafka cluster filters (comma-separated IDs)
 # Example: ENVIRONMENT_FILTER="env-123,env-456"
@@ -157,8 +161,9 @@ ENVIRONMENT_FILTER=<YOUR_ENVIRONMENT_FILTER, IF ANY>
 KAFKA_CLUSTER_FILTER=<YOUR_KAFKA_CLUSTER_FILTER, IF ANY>
 
 # Environment variables credentials for Confluent Cloud and Kafka clusters
-CONFLUENT_CLOUD_CREDENTIAL={"confluent_cloud_api_key":"<YOUR_CONFLUENT_CLOUD_API_KEY>", "confluent_cloud_api_secret": "<YOUR_CONFLUENT_CLOUD_API_SECRETS>"}
-KAFKA_CREDENTIALS=[{"kafka_cluster_id": "<YOUR_KAFKA_CLUSTER_ID>", "bootstrap.servers": "<YOUR_BOOTSTRAP_SERVER_URI>", "sasl.username": "<YOUR_KAFKA_API_KEY>", "sasl.password": "<YOUR_KAFKA_API_SECRET>"}]
+CONFLUENT_CLOUD_CREDENTIAL={"confluent_cloud_api_key":"<YOUR_CONFLUENT_CLOUD_API_KEY>", "confluent_cloud_api_secret": "<YOUR_CONFLUENT_CLOUD_API_SECRET>"}
+KAFKA_CREDENTIALS=[{"environment_id": "<YOUR_ENVIRONMENT_ID>", "kafka_cluster_id": "<YOUR_KAFKA_CLUSTER_ID>", "bootstrap.servers": "<YOUR_BOOTSTRAP_SERVER_URI>", "sasl.username": "<YOUR_KAFKA_API_KEY>", "sasl.password": "<YOUR_KAFKA_API_SECRET>"}]
+SCHEMA_REGISTRY_CREDENTIAL={"<YOUR_ENVIRONMENT_ID>": {"url": "<YOUR_SCHEMA_REGISTRY_URL>", "api_key": "<YOUR_SCHEMA_REGISTRY_API_KEY>", "api_secret": "<YOUR_SCHEMA_REGISTRY_API_SECRET>", "confluent_cloud_api_key": "<YOUR_CONFLUENT_CLOUD_API_KEY>", "confluent_cloud_api_secret": "<YOUR_CONFLUENT_CLOUD_API_SECRET>"}}
 
 # Confluent Cloud principal ID (user or service account) for API key creation
 # Example: PRINCIPAL_ID=u-abc123 or PRINCIPAL_ID=sa-xyz789
@@ -168,6 +173,7 @@ PRINCIPAL_ID=<YOUR_PRINCIPAL_ID>
 USE_AWS_SECRETS_MANAGER=<True|False>
 CONFLUENT_CLOUD_API_SECRET_PATH={"region_name": "<YOUR_SECRET_AWS_REGION_NAME>", "secret_name": "<YOUR_CONFLUENT_CLOUD_API_KEY_AWS_SECRETS>"}
 KAFKA_API_SECRET_PATHS=[{"region_name": "<YOUR_SECRET_AWS_REGION_NAME>", "secret_name": "<YOUR_KAFKA_API_KEY_AWS_SECRETS>"}]
+SCHEMA_REGISTRY_API_SECRET_PATH={"region_name": "us-east-1", "secret_name": "/confluent_cloud_resource/schema_registry"}
 
 # Topic analysis configuration
 INCLUDE_INTERNAL_TOPICS=<True|False>
@@ -208,15 +214,17 @@ The environment variables are defined as follows:
 
 | Environment Variable Name | Type | Description | Example | Default | Required |
 |---------------|------|-------------|---------|---------|----------|
-| `USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS` | Boolean | Set the flag to `True` to use the Confluent Cloud API key for fetching Kafka credentials; otherwise, set it to `False` to reference `KAFKA_CREDENTIALS` or `KAFKA_API_SECRET_PATHS` to obtain the Kafka Cluster credentials. | `True` or `False` | `False` | No |
+| `USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_RESOURCE_CREDENTIALS` | Boolean | Set the flag to `True` to use the Confluent Cloud API key for fetching Kafka credentials; otherwise, set it to `False` to reference `KAFKA_CREDENTIALS` or `KAFKA_API_SECRET_PATHS` to obtain the Kafka Cluster credentials. | `True` or `False` | `False` | No |
 | `ENVIRONMENT_FILTER` | Comma-separated String | A list of specific Confluent Cloud environment IDs to filter. When provided, only these environments will be used to fetch Kafka cluster credentials. Use commas to separate multiple environment IDs. Leave blank or unset to use all available environments. | `env-123,env-456` | Empty (all environments) | No |
 | `PRINCIPAL_ID` | String | Confluent Cloud principal ID (user or service account) for API key creation. | `u-abc123` or `sa-xyz789` | None | Yes |
 | `KAFKA_CLUSTER_FILTER` | Comma-separated String | A list of specific Kafka cluster IDs to filter. When provided, only these Kafka clusters will be analyzed. Use commas to separate multiple cluster IDs. Leave blank or unset to analyze all available clusters. | `lkc-123,lkc-456` | Empty (all clusters) | No |
 | `CONFLUENT_CLOUD_CREDENTIAL` | JSON Object | Contains authentication credentials for Confluent Cloud API access. Must include `confluent_cloud_api_key` and `confluent_cloud_api_secret` fields for authenticating with Confluent Cloud services. | `{"confluent_cloud_api_key": "CKABCD123456", "confluent_cloud_api_secret": "xyz789secretkey"}` | None | Yes (if not using AWS Secrets Manager) |
-| `KAFKA_CREDENTIALS` | JSON Array | Array of Kafka cluster connection objects. Each object must contain `sasl.username`, `sasl.password`, `kafka_cluster_id`, and `bootstrap.servers` for connecting to specific Kafka clusters. | `[{"sasl.username": "ABC123", "sasl.password": "secret123", "kafka_cluster_id": "lkc-abc123", "bootstrap.servers": "pkc-123.us-east-1.aws.confluent.cloud:9092"}]` | None | Yes (if not using AWS Secrets Manager) |
+| `KAFKA_CREDENTIALS` | JSON Array | Array of Kafka cluster connection objects. Each object must contain `sasl.username`, `sasl.password`, `kafka_cluster_id`, and `bootstrap.servers` for connecting to specific Kafka clusters. | `[{"environment_id": "env-abc123", "sasl.username": "ABC123", "sasl.password": "secret123", "kafka_cluster_id": "lkc-abc123", "bootstrap.servers": "pkc-123.us-east-1.aws.confluent.cloud:9092"}]` | None | Yes (if not using AWS Secrets Manager) |
+| `SCHEMA_REGISTRY_CREDENTIAL` | JSON Object | Contains authentication credentials for Confluent Cloud Schema Registry access. Must include `url` and `basic.auth.user.info` fields for authenticating with the Schema Registry. | `{"env_abc1234": {"url": "https://psrc-4zq2x.us-east-2.aws.confluent.cloud", "basic.auth.user.info": "K6Y5J3X5YQ3ZVYQH:cflt8mX6v1eE0b+1y7gk9v0b0e3r7mX6v1eE0b+1y7gk9v0b0e3r7"}}` | None | Yes (if not using AWS Secrets Manager) |
 | `USE_AWS_SECRETS_MANAGER` | Boolean | Controls whether to retrieve credentials from AWS Secrets Manager instead of using direct environment variables. When `True`, credentials are fetched from AWS Secrets Manager using the paths specified in other variables. | `True` or `False` | `False` | No |
 | `CONFLUENT_CLOUD_API_SECRET_PATH` | JSON Object | AWS Secrets Manager configuration for Confluent Cloud credentials. Contains `region_name` (AWS region) and `secret_name` (name of the secret in AWS Secrets Manager). Only used when `USE_AWS_SECRETS_MANAGER` is `True`. | `{"region_name": "us-east-1", "secret_name": "confluent-cloud-api-credentials"}` | None | Yes (if `USE_AWS_SECRETS_MANAGER` is `True`) |
 | `KAFKA_API_SECRET_PATHS` | JSON Array | Array of AWS Secrets Manager configurations for Kafka cluster credentials. Each object contains `region_name` and `secret_name` for retrieving cluster-specific credentials from AWS Secrets Manager. | `[{"region_name": "us-east-1", "secret_name": "kafka-cluster-1-creds"}, {"region_name": "us-east-1", "secret_name": "kafka-cluster-2-creds"}]` | None | Yes (if `USE_AWS_SECRETS_MANAGER` is `True`) |
+| `SCHEMA_REGISTRY_API_SECRET_PATH` | JSON Object | AWS Secrets Manager configuration for Schema Registry credentials. Contains `region_name` (AWS region) and `secret_name` (name of the secret in AWS Secrets Manager). Only used when `USE_AWS_SECRETS_MANAGER` is `True`. | `{"region_name": "us-east-1", "secret_name": "schema-registry-credentials"}` | None | Yes (if `USE_AWS_SECRETS_MANAGER` is `True`) |
 | `INCLUDE_INTERNAL_TOPICS` | Boolean | Determines whether Kafka internal topics (system topics like `__consumer_offsets`, `_schemas`) are included in the analysis and reporting. Set to `False` to exclude internal topics and focus only on user-created topics. | `True` or `False` | `False` | No |
 | `TOPIC_FILTER` | Comma-separated String | A list of specific topic names or part of topic names to analyze. When provided, only these topics will be included in the analysis. Use commas to separate multiple topic names. Leave blank or unset to analyze all available topics. | `user-events,order-processing,payment-notifications` | Empty (all topics) | No |
 | `MIN_RECOMMENDED_PARTITIONS` | Integer | The minimum number of partitions to recommend for any topic, regardless of calculated needs. This ensures that topics have a baseline level of parallelism and fault tolerance. | `6`, `12` | `6` | No |
@@ -501,7 +509,7 @@ uv run pytest -s tests/test_fetch_kafka_credentials_via_confluent_cloud_api_key.
 ```
 
 ```shell
-uv run pytest -s tests/test_fetch_kafka_credentials_via_environment_variables.py
+uv run pytest -s tests/test_fetch_kafka_credentials_via_env_file.py
 ```
 
 ```shell
