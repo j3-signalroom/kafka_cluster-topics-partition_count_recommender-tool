@@ -87,13 +87,6 @@ def _analyze_kafka_cluster(kafka_credential: Dict, sr_credential: Dict, config: 
                 logging.warning("FAILED TO DELETE KAFKA API KEY %s FOR KAFKA CLUSTER %s BECAUSE THE FOLLOWING ERROR OCCURRED: %s.", kafka_credential['sasl.username'], kafka_credential['kafka_cluster_id'], error_message)
             else:
                 logging.info("Kafka API key %s for Kafka Cluster %s deleted successfully.", kafka_credential['sasl.username'], kafka_credential['kafka_cluster_id'])
-
-            # Delete the Schema Registry API key created for this Schema Registry instance
-            http_status_code, error_message = iam_client.delete_api_key(api_key=sr_credential["basic.auth.user.info"].split(":")[0])
-            if http_status_code != HttpStatus.NO_CONTENT:
-                logging.warning("FAILED TO DELETE SCHEMA REGISTRY API KEY %s FOR SCHEMA REGISTRY %s BECAUSE THE FOLLOWING ERROR OCCURRED: %s.", sr_credential["basic.auth.user.info"].split(":")[0], sr_credential['schema_registry_id'], error_message)
-            else:
-                logging.info("Schema Registry API key %s for Schema Registry %s deleted successfully.", sr_credential["basic.auth.user.info"].split(":")[0], sr_credential['schema_registry_id'])
         return success
         
     except Exception as e:
@@ -250,6 +243,17 @@ def main():
                 except Exception as e:
                     failed_clusters += 1
                     logging.error("KAFKA CLUSTER %s: ANALYSIS FAILED WITH EXCEPTION: %s", kafka_cluster_id, e)
+
+        # Instantiate the IamClient class.
+        iam_client = IamClient(iam_config=config['metrics_config'])
+
+        # Delete all the Schema Registry API keys created for each Schema Registry instance
+        for sr_credential in sr_credentials.values():
+            http_status_code, error_message = iam_client.delete_api_key(api_key=sr_credential["basic.auth.user.info"].split(":")[0])
+            if http_status_code != HttpStatus.NO_CONTENT:
+                logging.warning("FAILED TO DELETE SCHEMA REGISTRY API KEY %s FOR SCHEMA REGISTRY %s BECAUSE THE FOLLOWING ERROR OCCURRED: %s.", sr_credential["basic.auth.user.info"].split(":")[0], sr_credential['id'], error_message)
+            else:
+                logging.info("Schema Registry API key %s for Schema Registry %s deleted successfully.", sr_credential["basic.auth.user.info"].split(":")[0], sr_credential['id'])
 
         # Log final summary
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)

@@ -245,14 +245,11 @@ class ThreadSafeKafkaWriter:
       return key
 
     def value_to_dict(self, value, ctx):
-        """
-        Returns a dict representation of a value instance for serialization.
-
+        """Returns a dict representation of a value instance for serialization.
         Args:
             value: Entity instance.
             ctx (SerializationContext): Metadata pertaining to the serialization
                 operation.
-
         Returns:
             dict: Dict populated with entity attributes to be serialized.
         """
