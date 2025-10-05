@@ -2,7 +2,7 @@ import pytest
 import json
 from unittest.mock import patch
 
-from src.confluent_credentials import fetch_kafka_credentials_via_environment_variables
+from src.confluent_credentials import fetch_kafka_credentials_via_env_file
 
 
 __copyright__  = "Copyright (c) 2025 Jeffrey Jonathan Jennings"
@@ -48,14 +48,14 @@ def mock_secrets_paths():
 
 
 class TestFetchKafkaCredentialsViaEnvironmentVariables:
-    """Test suite for fetch_kafka_credentials_via_environment_variables function."""
+    """Test suite for fetch_kafka_credentials_via_env_file function."""
 
     @patch('src.confluent_credentials.os.getenv')
     def test_fetch_from_env_variable_success(self, mock_getenv, mock_kafka_credentials):
         """Test successful retrieval from environment variable."""
         mock_getenv.return_value = json.dumps(mock_kafka_credentials)
         
-        result = fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_env_file(
             use_aws_secrets_manager=False
         )
         
@@ -69,7 +69,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         """Test when environment variable is empty."""
         mock_getenv.return_value = "[]"
         
-        result = fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_env_file(
             use_aws_secrets_manager=False
         )
         
@@ -91,7 +91,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
             (mock_kafka_credentials[1], None)
         ]
         
-        result = fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_env_file(
             use_aws_secrets_manager=True
         )
         
@@ -116,7 +116,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         mock_getenv.return_value = json.dumps(mock_secrets_paths)
         mock_get_secrets.return_value = ({}, "Access denied")
         
-        result = fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_env_file(
             use_aws_secrets_manager=True
         )
         
@@ -138,7 +138,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
             ({}, "Secret not found")
         ]
         
-        result = fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_env_file(
             use_aws_secrets_manager=True
         )
         
@@ -150,7 +150,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         """Test filtering a single Kafka cluster from environment variable."""
         mock_getenv.return_value = json.dumps(mock_kafka_credentials)
         
-        result = fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_env_file(
             use_aws_secrets_manager=False,
             kafka_cluster_filter="lkc-1"
         )
@@ -163,7 +163,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         """Test filtering multiple Kafka clusters with comma-separated values."""
         mock_getenv.return_value = json.dumps(mock_kafka_credentials)
         
-        result = fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_env_file(
             use_aws_secrets_manager=False,
             kafka_cluster_filter="lkc-1, lkc-2"
         )
@@ -178,7 +178,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         """Test filtering with non-existent cluster ID."""
         mock_getenv.return_value = json.dumps(mock_kafka_credentials)
         
-        result = fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_env_file(
             use_aws_secrets_manager=False,
             kafka_cluster_filter="lkc-999"
         )
@@ -201,7 +201,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
             (mock_kafka_credentials[1], None)
         ]
         
-        result = fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_env_file(
             use_aws_secrets_manager=True,
             kafka_cluster_filter="lkc-2"
         )
@@ -214,7 +214,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         """Test exception handling when environment variable contains invalid JSON."""
         mock_getenv.return_value = "invalid json"
         
-        result = fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_env_file(
             use_aws_secrets_manager=False
         )
         
@@ -232,7 +232,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         mock_getenv.return_value = json.dumps(mock_secrets_paths)
         mock_get_secrets.side_effect = Exception("Connection error")
         
-        result = fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_env_file(
             use_aws_secrets_manager=True
         )
         
@@ -243,7 +243,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         """Test when KAFKA_API_SECRET_PATHS is empty."""
         mock_getenv.return_value = "[]"
         
-        result = fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_env_file(
             use_aws_secrets_manager=True
         )
         
@@ -254,7 +254,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         """Test that missing environment variable uses default empty list."""
         mock_getenv.return_value = "[]"  # Default value
         
-        result = fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_env_file(
             use_aws_secrets_manager=False
         )
         
@@ -266,7 +266,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
         """Test that filter handles whitespace correctly."""
         mock_getenv.return_value = json.dumps(mock_kafka_credentials)
         
-        result = fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_env_file(
             use_aws_secrets_manager=False,
             kafka_cluster_filter="  lkc-1  ,  lkc-2  "
         )
@@ -293,7 +293,7 @@ class TestFetchKafkaCredentialsViaEnvironmentVariables:
             None
         )
         
-        result = fetch_kafka_credentials_via_environment_variables(
+        result = fetch_kafka_credentials_via_env_file(
             use_aws_secrets_manager=True
         )
         

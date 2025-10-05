@@ -505,7 +505,7 @@ uv run pytest -s tests/test_fetch_kafka_credentials_via_confluent_cloud_api_key.
 ```
 
 ```shell
-uv run pytest -s tests/test_fetch_kafka_credentials_via_environment_variables.py
+uv run pytest -s tests/test_fetch_kafka_credentials_via_env_file.py
 ```
 
 ```shell

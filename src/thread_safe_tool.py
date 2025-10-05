@@ -9,7 +9,7 @@ from utilities import setup_logging
 from cc_clients_python_lib.iam_client import IamClient
 from cc_clients_python_lib.http_status import HttpStatus
 from confluent_credentials import (fetch_kafka_credentials_via_confluent_cloud_api_key,
-                                  fetch_kafka_credentials_via_environment_variables,
+                                  fetch_kafka_credentials_via_env_file,
                                   fetch_confluent_cloud_credential)
 from constants import (DEFAULT_USE_CONFLUENT_CLOUD_API_KEY_TO_FETCH_KAFKA_CREDENTIALS,
                        DEFAULT_SAMPLING_DAYS,
@@ -149,7 +149,7 @@ def main():
                                                                                 kafka_cluster_filter)
     else:
         # Read the Kafka Cluster credentials from the environment variable or AWS Secrets Manager
-        kafka_credentials = fetch_kafka_credentials_via_environment_variables(use_aws_secrets_manager)
+        kafka_credentials = fetch_kafka_credentials_via_env_file(use_aws_secrets_manager)
 
     if not kafka_credentials:
         return

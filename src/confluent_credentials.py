@@ -131,7 +131,7 @@ def fetch_kafka_credentials_via_confluent_cloud_api_key(principal_id: str,
         return kafka_credentials
 
 
-def fetch_kafka_credentials_via_environment_variables(use_aws_secrets_manager: bool, kafka_cluster_filter: str | None = None) -> list[Dict]:
+def fetch_kafka_credentials_via_env_file(use_aws_secrets_manager: bool, kafka_cluster_filter: str | None = None) -> list[Dict]:
     """Fetch Kafka credentials from environment variable or AWS Secrets Manager.
 
     Args:
