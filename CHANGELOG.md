@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is base on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [0.12.00.000] - 2025-10-04
+## [0.12.00.000] - TBD
 ### Added
 - Issue [#241](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-tool/issues/241)
 - Issue [#246](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-tool/issues/246)
@@ -13,6 +13,7 @@ The format is base on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), 
 ### Changed
 - Issue [#247](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-tool/issues/247)
 - Issue [#253](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-tool/issues/253)
+- Issue [#256](https://github.com/j3-signalroom/kafka_cluster-topics-partition_count_recommender-tool/issues/256)
 
 ## [0.11.01.000] - 2025-10-02
 ### Changed

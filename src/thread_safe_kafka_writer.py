@@ -1,10 +1,8 @@
 from confluent_kafka import Producer
 from confluent_kafka.admin import NewTopic, ConfigResource
-
 import threading
 import json
 import logging
-from typing import Dict
 
 from utilities import setup_logging
 
@@ -92,7 +90,7 @@ class ThreadSafeKafkaWriter:
                 self.delivered_count += 1
                 logging.debug(f"Message delivered to {record.topic()}[{record.partition()}]")
     
-    def write_result(self, result: Dict) -> None:
+    def write_result(self, record_value: bytes) -> None:
         """Write analysis result to Kafka topic.
 
         Args:
@@ -102,12 +100,10 @@ class ThreadSafeKafkaWriter:
             None
         """
         try:
-            # Convert result to JSON, making it serializable
-            serializable_result = self.__make_json_serializable(result)
             key = json.dumps({"analysis_start_time_epoch": self.analysis_start_time, 
                               "kafka_cluster_id": self.kafka_cluster_id, 
-                              "topic_name": result.get('topic_name', 'unknown')}).encode('utf-8')
-            value = json.dumps(serializable_result).encode('utf-8')
+                              "topic_name": self.topic_name}).encode('utf-8')
+            value = record_value
 
             # Producer.produce() is thread-safe, no lock needed here
             self.producer.produce(topic=self.topic_name,
@@ -194,22 +190,3 @@ class ThreadSafeKafkaWriter:
                 except Exception as e:
                     logging.error(f"Failed to create topic '{topic}': {e}")
                     raise
-
-    def __make_json_serializable(self, obj):
-        """Recursively convert non-serializable objects in a dict/list to strings.
-
-        Args:
-            obj: The object to convert (dict, list, or other).
-
-        Return(s):
-            The JSON-serializable version of the object.
-        """
-        if isinstance(obj, dict):
-            return {k: self.__make_json_serializable(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [self.__make_json_serializable(v) for v in obj]
-        try:
-            json.dumps(obj)
-            return obj
-        except (TypeError, OverflowError):
-            return str(obj)
