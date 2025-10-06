@@ -274,7 +274,7 @@ class ThreadSafeTopicAnalyzer:
                 elif http_status_code == HttpStatus.OK:
                     result['hot_partition_ingress'] = 'yes' if is_partition_hot["is_partition_hot"] else 'no'
                     if is_partition_hot["is_partition_hot"]:
-                        logging.info("[Thread-%d] Confluent Metrics API - Topic %s is identified as a hot topic by ingress throughput in the last %d days.", threading.current_thread().ident, topic_name, topic_info['sampling_days_based_on_retention_days'])
+                        logging.info("[Thread-%d] Confluent Metrics API - Topic %s is IDENTIFIED as a hot topic by ingress throughput in the last %d days.", threading.current_thread().ident, topic_name, topic_info['sampling_days_based_on_retention_days'])
                     else:
                         logging.info("[Thread-%d] Confluent Metrics API - Topic %s is NOT identified as a hot topic by ingress throughput in the last %d days.", threading.current_thread().ident, topic_name, topic_info['sampling_days_based_on_retention_days'])
                     proceed = True
@@ -309,7 +309,7 @@ class ThreadSafeTopicAnalyzer:
                     elif http_status_code == HttpStatus.OK:
                         result['hot_partition_egress'] = 'yes' if is_partition_hot["is_partition_hot"] else 'no'
                         if is_partition_hot["is_partition_hot"]:
-                            logging.info("[Thread-%d] Confluent Metrics API - Topic %s is identified as a hot topic by egress throughput in the last %d days.", threading.current_thread().ident, topic_name, topic_info['sampling_days_based_on_retention_days'])
+                            logging.info("[Thread-%d] Confluent Metrics API - Topic %s is IDENTIFIED as a hot topic by egress throughput in the last %d days.", threading.current_thread().ident, topic_name, topic_info['sampling_days_based_on_retention_days'])
                         else:
                             logging.info("[Thread-%d] Confluent Metrics API - Topic %s is NOT identified as a hot topic by egress throughput in the last %d days.", threading.current_thread().ident, topic_name, topic_info['sampling_days_based_on_retention_days'])
                         break
