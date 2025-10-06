@@ -464,8 +464,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
         for result in active_results:
             # Count hot partitions only if using Metrics API
             if not use_sample_records:
-                hot_partition_ingress_count += 1 if result["hot_partition_ingress"] else 0
-                hot_partition_egress_count += 1 if result["hot_partition_egress"] else 0
+                hot_partition_ingress_count += 1 if result["hot_partition_ingress"] == 'yes' else 0
+                hot_partition_egress_count += 1 if result["hot_partition_egress"] == 'yes' else 0
 
             # Calculate required throughput and recommended partitions
             avg_bytes_per_record = result["avg_bytes_per_record"]
@@ -516,9 +516,9 @@ class ThreadSafeKafkaTopicsAnalyzer:
             'active_average_partitions_per_topic': total_partition_count/active_topic_count if active_topic_count > 0 else 0,
             'average_recommended_partitions_per_topic': total_recommended_partitions/active_topic_count if active_topic_count > 0 else 0,
             'hot_partition_ingress_count': hot_partition_ingress_count,
-            'hot_partition_ingress_percentage': (hot_partition_ingress_count/active_topic_count*100) if active_topic_count > 0 else 0,
+            'hot_partition_ingress_percentage': (hot_partition_ingress_count/active_topic_count)*100 if active_topic_count > 0 else 0,
             'hot_partition_egress_count': hot_partition_egress_count,
-            'hot_partition_egress_percentage': (hot_partition_egress_count/active_topic_count*100) if active_topic_count > 0 else 0
+            'hot_partition_egress_percentage': (hot_partition_egress_count/active_topic_count)*100 if active_topic_count > 0 else 0
         }
     
     def __log_initial_parameters(self, params: Dict) -> None:
