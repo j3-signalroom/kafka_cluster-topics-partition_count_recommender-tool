@@ -390,8 +390,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
             hot_partition_egress = "n/a"
         else:
             method = "metrics_api"
-            hot_partition_ingress = "yes" if result.get('hot_partition_ingress', False) else "no"
-            hot_partition_egress = "yes" if result.get('hot_partition_egress', False) else "no"
+            hot_partition_ingress = result["hot_partition_ingress"]
+            hot_partition_egress = result["hot_partition_egress"]
 
         # Write to CSV
         csv_writer.write_row([
