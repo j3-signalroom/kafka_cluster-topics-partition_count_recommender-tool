@@ -204,10 +204,13 @@ class ThreadSafeKafkaWriter:
                 "sasl.mechanism": "PLAIN",
                 "sasl.username": sasl_username,
                 "sasl.password": sasl_password,
-                "linger.ms": 100,           # Batch messages for efficiency
+                "linger.ms": 100,               # Batch messages for efficiency
                 "compression.type": "lz4",
-                "acks": "all",              # Wait for all replicas
-                "retries": 3
+                "acks": "all",                  # Wait for all replicas
+                "retries": 10,
+                'retry.backoff.ms': 100,
+                'delivery.timeout.ms': 300000,  # Delivery timeout 5 minutes
+                'enable.idempotence': True,     # Prevents duplicate messages on retry
             })
         except Exception as e:
             logging.error(f"Failed to create Kafka producer: {e}")
