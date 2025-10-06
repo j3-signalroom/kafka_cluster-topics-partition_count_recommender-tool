@@ -34,8 +34,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
                  bootstrap_server_uri: str, 
                  kafka_api_key: str, 
                  kafka_api_secret: str,
-                 sr_url: str,
-                 sr_api_key_secret: str) -> None:
+                 sr_url: str | None = None,
+                 sr_api_key_secret: str | None = None) -> None:
         """Connect to the Kafka Cluster with the AdminClient.
 
         Args:
@@ -43,8 +43,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
             bootstrap_server_uri (string): Kafka Cluster URI
             kafka_api_key (string): Your Confluent Cloud Kafka API key
             kafka_api_secret (string): Your Confluent Cloud Kafka API secret
-            sr_url (string): Your Confluent Cloud Schema Registry URL
-            sr_api_key_secret (string): Your Confluent Cloud Schema Registry API secret
+            sr_url (string | None): Your Confluent Cloud Schema Registry URL
+            sr_api_key_secret (string | None): Your Confluent Cloud Schema Registry API secret
         """
         self.kafka_cluster_id = kafka_cluster_id
 
@@ -79,8 +79,9 @@ class ThreadSafeKafkaTopicsAnalyzer:
         self.total_topics = 0
 
         # Schema Registry info
-        self.sr_url = sr_url
-        self.sr_api_key_secret = sr_api_key_secret
+        if sr_url is not None and sr_api_key_secret is not None:
+            self.sr_url = sr_url
+            self.sr_api_key_secret = sr_api_key_secret
 
     def analyze_all_topics(self, 
                            use_confluent_cloud_api_key_to_fetch_resource_credentials: bool,

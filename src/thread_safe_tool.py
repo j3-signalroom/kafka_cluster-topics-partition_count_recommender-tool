@@ -47,12 +47,12 @@ __status__     = "dev"
 logger = setup_logging()
 
 
-def _analyze_kafka_cluster(kafka_credential: Dict, sr_credential: Dict, config: Dict) -> bool:
+def _analyze_kafka_cluster(kafka_credential: Dict, config: Dict, sr_credential: Dict | None = None) -> bool:
     """Analyze a single Kafka cluster.
     
     Args:
         kafka_credential (Dict): Kafka cluster credentials
-        sr_credential (Dict): Schema Registry credentials
+        sr_credential (Dict | None): Schema Registry credentials
         config (Dict): Configuration parameters
         
     Return(s):
@@ -60,12 +60,18 @@ def _analyze_kafka_cluster(kafka_credential: Dict, sr_credential: Dict, config: 
     """
     try:
         # Instantiate the Kafka Topics Analyzer
-        analyzer = ThreadSafeKafkaTopicsAnalyzer(kafka_cluster_id=kafka_credential.get("kafka_cluster_id"),
-                                                 bootstrap_server_uri=kafka_credential.get("bootstrap.servers"),
-                                                 kafka_api_key=kafka_credential.get("sasl.username"),
-                                                 kafka_api_secret=kafka_credential.get("sasl.password"),
-                                                 sr_url=sr_credential["url"],
-                                                 sr_api_key_secret=sr_credential["basic.auth.user.info"])
+        if sr_credential is not None:
+            analyzer = ThreadSafeKafkaTopicsAnalyzer(kafka_cluster_id=kafka_credential.get("kafka_cluster_id"),
+                                                     bootstrap_server_uri=kafka_credential.get("bootstrap.servers"),
+                                                     kafka_api_key=kafka_credential.get("sasl.username"),
+                                                     kafka_api_secret=kafka_credential.get("sasl.password"),
+                                                     sr_url=sr_credential["url"],
+                                                     sr_api_key_secret=sr_credential["basic.auth.user.info"])
+        else:
+            analyzer = ThreadSafeKafkaTopicsAnalyzer(kafka_cluster_id=kafka_credential.get("kafka_cluster_id"),
+                                                     bootstrap_server_uri=kafka_credential.get("bootstrap.servers"),
+                                                     kafka_api_key=kafka_credential.get("sasl.username"),
+                                                     kafka_api_secret=kafka_credential.get("sasl.password"))    
 
         # Multithread the analysis of all topics in the Kafka cluster
         success = analyzer.analyze_all_topics(**config)
@@ -157,17 +163,18 @@ def main():
         return
     
     # Fetch Schema Registry credentials
-    if use_confluent_cloud_api_key_to_fetch_resource_credentials:
-        # Read the Schema Registry credentials using Confluent Cloud API key
-        sr_credentials = fetch_schema_registry_via_confluent_cloud_api_key(principal_id, 
-                                                                           metrics_config, 
-                                                                           use_private_schema_registry, 
-                                                                           environment_filter)
-    else:
-        # Read the Schema Registry credentials from the environment variable or AWS Secrets Manager
-        sr_credentials = fetch_schema_registry_credentials_via_env_file(use_aws_secrets_manager)
-    if not sr_credentials:
-        return
+    if use_kafka_writer:
+        if use_confluent_cloud_api_key_to_fetch_resource_credentials:
+            # Read the Schema Registry credentials using Confluent Cloud API key
+            sr_credentials = fetch_schema_registry_via_confluent_cloud_api_key(principal_id, 
+                                                                            metrics_config, 
+                                                                            use_private_schema_registry, 
+                                                                            environment_filter)
+        else:
+            # Read the Schema Registry credentials from the environment variable or AWS Secrets Manager
+            sr_credentials = fetch_schema_registry_credentials_via_env_file(use_aws_secrets_manager)
+        if not sr_credentials:
+            return
 
     # Prepare configuration object
     config = {
@@ -212,7 +219,11 @@ def main():
     # Analyze Kafka clusters concurrently if more than one cluster
     if len(kafka_credentials) == 1:
         # Single Kafka cluster.  No need for cluster-level threading
-        success = _analyze_kafka_cluster(kafka_credentials[0], sr_credentials[0], config)
+        if use_kafka_writer:
+            success = _analyze_kafka_cluster(kafka_credentials[0], config, sr_credential=sr_credentials[0])
+        else:
+            success = _analyze_kafka_cluster(kafka_credentials[0], config)
+    
         if success:
             logging.info("SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.")
         else:
@@ -224,10 +235,16 @@ def main():
         
         with ThreadPoolExecutor(max_workers=max_cluster_workers) as executor:
             # Submit Kafka cluster analysis tasks
-            future_to_cluster = {
-                executor.submit(_analyze_kafka_cluster, kafka_credential, sr_credentials[kafka_credential["environment_id"]], config): kafka_credential.get("kafka_cluster_id", "unknown")
-                for kafka_credential in kafka_credentials
-            }
+            if use_kafka_writer:
+                future_to_cluster = {
+                    executor.submit(_analyze_kafka_cluster, kafka_credential, config, sr_credential=sr_credentials[kafka_credential["environment_id"]]): kafka_credential.get("kafka_cluster_id", "unknown")
+                    for kafka_credential in kafka_credentials
+                }
+            else:
+                future_to_cluster = {
+                    executor.submit(_analyze_kafka_cluster, kafka_credential, config): kafka_credential.get("kafka_cluster_id", "unknown")
+                    for kafka_credential in kafka_credentials
+                }
             
             # Process completed Kafka cluster analyses
             for future in as_completed(future_to_cluster):
@@ -244,16 +261,18 @@ def main():
                     failed_clusters += 1
                     logging.error("KAFKA CLUSTER %s: ANALYSIS FAILED WITH EXCEPTION: %s", kafka_cluster_id, e)
 
-        # Instantiate the IamClient class.
-        iam_client = IamClient(iam_config=config['metrics_config'])
+        # Clean up the created Schema Registry API key(s) if they were created using Confluent Cloud API key
+        if use_kafka_writer:
+            # Instantiate the IamClient class.
+            iam_client = IamClient(iam_config=config['metrics_config'])
 
-        # Delete all the Schema Registry API keys created for each Schema Registry instance
-        for sr_credential in sr_credentials.values():
-            http_status_code, error_message = iam_client.delete_api_key(api_key=sr_credential["basic.auth.user.info"].split(":")[0])
-            if http_status_code != HttpStatus.NO_CONTENT:
-                logging.warning("FAILED TO DELETE SCHEMA REGISTRY API KEY %s FOR SCHEMA REGISTRY %s BECAUSE THE FOLLOWING ERROR OCCURRED: %s.", sr_credential["basic.auth.user.info"].split(":")[0], sr_credential['schema_registry_cluster_id'], error_message)
-            else:
-                logging.info("Schema Registry API key %s for Schema Registry %s deleted successfully.", sr_credential["basic.auth.user.info"].split(":")[0], sr_credential['schema_registry_cluster_id'])
+            # Delete all the Schema Registry API keys created for each Schema Registry instance
+            for sr_credential in sr_credentials.values():
+                http_status_code, error_message = iam_client.delete_api_key(api_key=sr_credential["basic.auth.user.info"].split(":")[0])
+                if http_status_code != HttpStatus.NO_CONTENT:
+                    logging.warning("FAILED TO DELETE SCHEMA REGISTRY API KEY %s FOR SCHEMA REGISTRY %s BECAUSE THE FOLLOWING ERROR OCCURRED: %s.", sr_credential["basic.auth.user.info"].split(":")[0], sr_credential['schema_registry_cluster_id'], error_message)
+                else:
+                    logging.info("Schema Registry API key %s for Schema Registry %s deleted successfully.", sr_credential["basic.auth.user.info"].split(":")[0], sr_credential['schema_registry_cluster_id'])
 
         # Log final summary
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
