@@ -166,8 +166,8 @@ class ThreadSafeTopicAnalyzer:
                     result['error'] = "Rate limit exceeded when retrieving 'RECEIVED BYTES' metric."
                     result['total_record_count'] = 0
                     result['avg_bytes_per_record'] = 0.0
-                    result['hot_partition_ingress'] = False
-                    result['hot_partition_egress'] = False
+                    result['hot_partition_ingress'] = 'no'
+                    result['hot_partition_egress'] = 'no'
                     break
                 logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'RECEIVED BYTES' metric for topic %s. Retrying %d of %d after %d seconds...",
                                 threading.current_thread().ident, topic_name, retry, max_retries, rate_limits['reset_in_seconds'])
@@ -179,8 +179,8 @@ class ThreadSafeTopicAnalyzer:
                 result['error'] = error_message
                 result['total_record_count'] = 0
                 result['avg_bytes_per_record'] = 0.0
-                result['hot_partition_ingress'] = False
-                result['hot_partition_egress'] = False
+                result['hot_partition_ingress'] = 'no'
+                result['hot_partition_egress'] = 'no'
                 break
             elif http_status_code == HttpStatus.OK:
                 proceed = True
@@ -204,8 +204,8 @@ class ThreadSafeTopicAnalyzer:
                         result['error'] = "Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric."
                         result['total_record_count'] = 0
                         result['avg_bytes_per_record'] = 0.0
-                        result['hot_partition_ingress'] = False
-                        result['hot_partition_egress'] = False
+                        result['hot_partition_ingress'] = 'no'
+                        result['hot_partition_egress'] = 'no'
                         break
                     logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'RECEIVED RECORDS' metric for topic %s. Retrying %d of %d after %d seconds...",
                                     threading.current_thread().ident, topic_name, retry, max_retries, rate_limits['reset_in_seconds'])
@@ -217,8 +217,8 @@ class ThreadSafeTopicAnalyzer:
                     result['error'] = error_message
                     result['total_record_count'] = 0
                     result['avg_bytes_per_record'] = 0.0
-                    result['hot_partition_ingress'] = False
-                    result['hot_partition_egress'] = False
+                    result['hot_partition_ingress'] = 'no'
+                    result['hot_partition_egress'] = 'no'
                     break
                 elif http_status_code == HttpStatus.OK:
                     record_count = record_query_result.get('sum_total', 0)
@@ -245,10 +245,10 @@ class ThreadSafeTopicAnalyzer:
                     break
 
         if proceed and record_count == 0:
-                logging.info("[Thread-%d] No records available in topic '%s' for hot partition analysis.", threading.current_thread().ident, topic_name)
-                result['hot_partition_ingress'] = False
-                result['hot_partition_egress'] = False
-                return result
+            logging.info("[Thread-%d] No records available in topic '%s' for hot partition analysis.", threading.current_thread().ident, topic_name)
+            result['hot_partition_ingress'] = 'no'
+            result['hot_partition_egress'] = 'no'
+            return result
         elif proceed and record_count > 0:
             retry = 0
             max_retries = DEFAULT_RESTFUL_API_MAX_RETRIES
@@ -272,8 +272,8 @@ class ThreadSafeTopicAnalyzer:
                         result['error'] = "Rate limit exceeded when retrieving 'HOT_PARTITION_INGRESS' metric."
                         result['total_record_count'] = 0
                         result['avg_bytes_per_record'] = 0.0
-                        result['hot_partition_ingress'] = False
-                        result['hot_partition_egress'] = False
+                        result['hot_partition_ingress'] = 'no'
+                        result['hot_partition_egress'] = 'no'
                         break
                     logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'HOT_PARTITION_INGRESS' metric for topic %s. Retrying %d of %d after %d seconds...",
                                     threading.current_thread().ident, topic_name, retry, max_retries, rate_limits['reset_in_seconds'])
@@ -285,11 +285,11 @@ class ThreadSafeTopicAnalyzer:
                     result['error'] = error_message
                     result['total_record_count'] = 0
                     result['avg_bytes_per_record'] = 0.0
-                    result['hot_partition_ingress'] = False
-                    result['hot_partition_egress'] = False
+                    result['hot_partition_ingress'] = 'no'
+                    result['hot_partition_egress'] = 'no'
                     break
                 elif http_status_code == HttpStatus.OK:
-                    result['hot_partition_ingress'] = is_partition_hot
+                    result['hot_partition_ingress'] = 'yes' if is_partition_hot else 'no'
                     if is_partition_hot:
                         logging.info("[Thread-%d] Confluent Metrics API - Topic %s is identified as a hot topic by ingress throughput.",
                                      threading.current_thread().ident, topic_name)
@@ -322,8 +322,8 @@ class ThreadSafeTopicAnalyzer:
                             result['error'] = "Rate limit exceeded when retrieving 'HOT_PARTITION_EGRESS' metric."
                             result['total_record_count'] = 0
                             result['avg_bytes_per_record'] = 0.0
-                            result['hot_partition_ingress'] = False
-                            result['hot_partition_egress'] = False
+                            result['hot_partition_ingress'] = 'no'
+                            result['hot_partition_egress'] = 'no'
                             break
                         logging.warning("[Thread-%d] Rate limit exceeded when retrieving 'HOT_PARTITION_EGRESS' metric for topic %s. Retrying %d of %d after %d seconds...",
                                         threading.current_thread().ident, topic_name, retry, max_retries, rate_limits['reset_in_seconds'])
@@ -335,8 +335,8 @@ class ThreadSafeTopicAnalyzer:
                         result['error'] = error_message
                         result['total_record_count'] = 0
                         result['avg_bytes_per_record'] = 0.0
-                        result['hot_partition_ingress'] = False
-                        result['hot_partition_egress'] = False
+                        result['hot_partition_ingress'] = 'no'
+                        result['hot_partition_egress'] = 'no'
                         break
                     elif http_status_code == HttpStatus.OK:
                         result['hot_partition_egress'] = is_partition_hot
