@@ -251,9 +251,9 @@ def main():
         for sr_credential in sr_credentials.values():
             http_status_code, error_message = iam_client.delete_api_key(api_key=sr_credential["basic.auth.user.info"].split(":")[0])
             if http_status_code != HttpStatus.NO_CONTENT:
-                logging.warning("FAILED TO DELETE SCHEMA REGISTRY API KEY %s FOR SCHEMA REGISTRY %s BECAUSE THE FOLLOWING ERROR OCCURRED: %s.", sr_credential["basic.auth.user.info"].split(":")[0], sr_credential['id'], error_message)
+                logging.warning("FAILED TO DELETE SCHEMA REGISTRY API KEY %s FOR SCHEMA REGISTRY %s BECAUSE THE FOLLOWING ERROR OCCURRED: %s.", sr_credential["basic.auth.user.info"].split(":")[0], sr_credential['schema_registry_cluster_id'], error_message)
             else:
-                logging.info("Schema Registry API key %s for Schema Registry %s deleted successfully.", sr_credential["basic.auth.user.info"].split(":")[0], sr_credential['id'])
+                logging.info("Schema Registry API key %s for Schema Registry %s deleted successfully.", sr_credential["basic.auth.user.info"].split(":")[0], sr_credential['schema_registry_cluster_id'])
 
         # Log final summary
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
