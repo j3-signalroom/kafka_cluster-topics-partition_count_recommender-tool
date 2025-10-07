@@ -121,13 +121,14 @@ class ThreadSafeTopicAnalyzer:
             'is_internal': topic_name.startswith('_')
         }
 
-    def analyze_topic_with_metrics(self, metrics_config: Dict, topic_name: str, topic_info: Dict) -> Dict:
+    def analyze_topic_with_metrics(self, metrics_config: Dict, topic_name: str, topic_info: Dict, start_time_epoch: int) -> Dict:
         """Analyze a single topic using Metrics API.
 
         Args:
             metrics_config (Dict): Configuration dictionary for Metrics API client.
             topic_name (str): The name of the topic to analyze.
             topic_info (Dict): Metadata and retention info about the topic.
+            start_time_epoch (int): The start time in epoch milliseconds for sampling.
 
         Returns:
             Dict: Analysis results including partition count, compaction status,
@@ -240,10 +241,11 @@ class ThreadSafeTopicAnalyzer:
             retry = 0
 
             while retry < max_retries:
-                # Calculate the ISO 8601 formatted start and end times within a rolling window for the last 1 day
-                rolling_days_start = topic_info['utc_now'] - timedelta(days=topic_info['sampling_days_based_on_retention_days'])
+                # Calculate the ISO 8601 formatted start timestamp of the rolling window
+                utc_now = datetime.fromtimestamp(start_time_epoch)
+                rolling_days_start = utc_now - timedelta(days=topic_info['sampling_days_based_on_retention_days'])
                 iso_start_time = rolling_days_start.strftime('%Y-%m-%dT%H:%M:%S')
-                iso_end_time = topic_info['utc_now'].strftime('%Y-%m-%dT%H:%M:%S')
+                iso_end_time = utc_now.strftime('%Y-%m-%dT%H:%M:%S')
                 query_start_time =  datetime.fromisoformat(iso_start_time.replace('Z', '+00:00'))
                 query_end_time = datetime.fromisoformat(iso_end_time.replace('Z', '+00:00'))
 
