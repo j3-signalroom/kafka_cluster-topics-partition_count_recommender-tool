@@ -214,7 +214,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
                 progress = (self.completed_topics / self.total_topics) * 100
                 logging.info("Progress: %d of %d (%.1f%%) topics completed", self.completed_topics, self.total_topics, progress)
 
-        def analyze_topic_worker(topic_name: str, topic_info: Dict) -> Dict:
+        def analyze_topic_worker(topic_name: str, topic_info: Dict, start_time_epoch: int) -> Dict:
             """Worker function to analyze a single topic.
             
             Args:
@@ -239,7 +239,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
                     # Use sample records approach
 
                     # Calculate the ISO 8601 formatted start timestamp of the rolling window
-                    rolling_start = topic_info['utc_now'] - timedelta(days=topic_info['sampling_days_based_on_retention_days'])
+                    rolling_start = start_time_epoch - timedelta(days=topic_info['sampling_days_based_on_retention_days'])
                     iso_start_time = datetime.fromisoformat(rolling_start.strftime('%Y-%m-%dT%H:%M:%S+00:00'))
                     start_time_epoch_ms = int(rolling_start.timestamp() * 1000)
 
@@ -260,7 +260,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
                     
                 else:
                     # Use Metrics API approach
-                    result = thread_analyzer.analyze_topic_with_metrics(metrics_config, topic_name, topic_info)
+                    result = thread_analyzer.analyze_topic_with_metrics(metrics_config, topic_name, topic_info, start_time_epoch)
                 
                 return result
                 
@@ -282,7 +282,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
         with ThreadPoolExecutor(max_workers=max_workers_per_cluster) as executor:
             # Submit all tasks
             future_to_topic = {
-                executor.submit(analyze_topic_worker, topic_name, topic_info): topic_name
+                executor.submit(analyze_topic_worker, topic_name, topic_info, analysis_start_time_epoch): topic_name
                 for topic_name, topic_info in topics_to_analyze.items()
             }
             
@@ -308,7 +308,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
                     update_progress()
                     
                 except Exception as e:
-                    logging.error("Error processing topic %s: %s", topic_name, e)
+                    logging.warning("Failed processing topic %s, because of %s", topic_name, e)
                     update_progress()
 
         # Calculate summary statistics

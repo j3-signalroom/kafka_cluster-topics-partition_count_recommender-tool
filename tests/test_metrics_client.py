@@ -47,7 +47,7 @@ class TestMetricsClient:
     def test_get_topic_received_total_bytes(self, metrics_client, kafka_cluster_id, kafka_topic_name):
         """Test the get_topic_total() function for getting the total bytes."""
 
-        # Calculate the ISO 8601 formatted start and end times within a rolling window for the last 1 day
+        # Calculate the ISO 8601 formatted start timestamp of the rolling window
         utc_now = datetime.now(timezone.utc)
         seven_days_ago = utc_now - timedelta(days=7)
         iso_start_time = seven_days_ago.strftime('%Y-%m-%dT%H:%M:%S')
@@ -71,7 +71,7 @@ class TestMetricsClient:
     def test_get_topic_received_total_records(self, metrics_client, kafka_cluster_id, kafka_topic_name):
         """Test the get_topic_total() function for getting the total records."""
 
-        # Calculate the ISO 8601 formatted start and end times within a rolling window for the last 1 day
+        # Calculate the ISO 8601 formatted start timestamp of the rolling window
         utc_now = datetime.now(timezone.utc)
         seven_days_ago = utc_now - timedelta(days=7)
         iso_start_time = seven_days_ago.strftime('%Y-%m-%dT%H:%M:%S')
@@ -174,7 +174,7 @@ class TestMetricsClient:
         """Test the is_topic_partition_hot() function for checking if a topic partition is hot
         by ingress throughput."""
 
-        # Calculate the ISO 8601 formatted start and end times within a rolling window for the last 1 day
+        # Calculate the ISO 8601 formatted start timestamp of the rolling window
         utc_now = datetime.now(timezone.utc)
         seven_days_ago = utc_now - timedelta(days=7)
         iso_start_time = seven_days_ago.strftime('%Y-%m-%dT%H:%M:%S')
@@ -199,7 +199,7 @@ class TestMetricsClient:
         """Test the is_topic_partition_hot() function for checking if a topic partition is hot
         by egress throughput."""
 
-        # Calculate the ISO 8601 formatted start and end times within a rolling window for the last 1 day
+        # Calculate the ISO 8601 formatted start timestamp of the rolling window
         utc_now = datetime.now(timezone.utc)
         seven_days_ago = utc_now - timedelta(days=7)
         iso_start_time = seven_days_ago.strftime('%Y-%m-%dT%H:%M:%S')
