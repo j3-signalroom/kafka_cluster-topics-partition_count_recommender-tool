@@ -1,5 +1,5 @@
 from typing import Dict, List, Tuple
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import time
 import logging
 import threading
@@ -241,10 +241,9 @@ class ThreadSafeTopicAnalyzer:
 
             while retry < max_retries:
                 # Calculate the ISO 8601 formatted start and end times within a rolling window for the last 1 day
-                utc_now = datetime.now(timezone.utc)
-                one_day_ago = utc_now - timedelta(days=topic_info['sampling_days_based_on_retention_days'])
-                iso_start_time = one_day_ago.strftime('%Y-%m-%dT%H:%M:%S')
-                iso_end_time = utc_now.strftime('%Y-%m-%dT%H:%M:%S')
+                rolling_days_start = topic_info['utc_now'] - timedelta(days=topic_info['sampling_days_based_on_retention_days'])
+                iso_start_time = rolling_days_start.strftime('%Y-%m-%dT%H:%M:%S')
+                iso_end_time = topic_info['utc_now'].strftime('%Y-%m-%dT%H:%M:%S')
                 query_start_time =  datetime.fromisoformat(iso_start_time.replace('Z', '+00:00'))
                 query_end_time = datetime.fromisoformat(iso_end_time.replace('Z', '+00:00'))
 
