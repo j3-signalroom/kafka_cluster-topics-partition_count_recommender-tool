@@ -1,5 +1,5 @@
 import csv
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import time
 from typing import Dict, List
 from confluent_kafka.admin import AdminClient, ConfigResource
@@ -105,7 +105,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
                            kafka_writer_topic_name: str,
                            kafka_writer_topic_partition_count: int,
                            kafka_writer_topic_replication_factor: int,
-                           kafka_writer_topic_data_retention_in_days: int) -> bool:
+                           kafka_writer_topic_data_retention_in_days: int,
+                           utc_now: datetime) -> bool:
         """Analyze all topics in the Kafka cluster.
         
         Args:
@@ -129,6 +130,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
             kafka_writer_topic_partition_count (int): The number of partitions for the Kafka writer topic.
             kafka_writer_topic_replication_factor (int): The replication factor for the Kafka writer topic.
             kafka_writer_topic_data_retention_in_days (int): The data retention period for the Kafka writer topic in days.
+            utc_now (datetime): Current UTC datetime for consistent time references.
 
         Returns:
             bool: True if analysis was successful, False otherwise.
@@ -139,7 +141,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
             return []
 
         # Start analysis
-        analysis_start_time_epoch = time.time()
+        analysis_start_time_epoch = int(utc_now.timestamp())
         self.total_topics = len(topics_to_analyze)
 
         # Log initial analysis parameters
@@ -237,8 +239,7 @@ class ThreadSafeKafkaTopicsAnalyzer:
                     # Use sample records approach
 
                     # Calculate the ISO 8601 formatted start timestamp of the rolling window
-                    utc_now = datetime.now(timezone.utc)
-                    rolling_start = utc_now - timedelta(days=topic_info['sampling_days_based_on_retention_days'])
+                    rolling_start = topic_info['utc_now'] - timedelta(days=topic_info['sampling_days_based_on_retention_days'])
                     iso_start_time = datetime.fromisoformat(rolling_start.strftime('%Y-%m-%dT%H:%M:%S+00:00'))
                     start_time_epoch_ms = int(rolling_start.timestamp() * 1000)
 

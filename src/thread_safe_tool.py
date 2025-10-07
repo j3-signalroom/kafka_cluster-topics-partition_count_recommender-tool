@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import logging
 import os
 from typing import Dict
@@ -199,7 +200,8 @@ def main():
         'kafka_writer_topic_name': kafka_writer_topic_name,
         'kafka_writer_topic_partition_count': kafka_writer_topic_partition_count,
         'kafka_writer_topic_replication_factor': kafka_writer_topic_replication_factor,
-        'kafka_writer_topic_data_retention_in_days': kafka_writer_topic_data_retention_in_days
+        'kafka_writer_topic_data_retention_in_days': kafka_writer_topic_data_retention_in_days,
+        'utc_now': datetime.now(timezone.utc)
     }
 
     logging.info("=" * DEFAULT_CHARACTER_REPEAT)
