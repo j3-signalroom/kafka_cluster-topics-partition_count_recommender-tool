@@ -1,6 +1,6 @@
 [project]
 name = "kafka_cluster-topics-partition_count_recommender-tool"
-version = "0.12.00.000"
+version = "0.12.04.000"
 description = "Kafka Cluster Topics Partition Count Recommender Tool"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -8,7 +8,7 @@ dependencies = [
     "authlib>=1.6.5",
     "aws-clients-python-lib>=0.10.0.0",
     "cachetools>=6.2.0",
-    "cc-clients-python-lib==0.30.1.0",
+    "cc-clients-python-lib==0.30.3.0",
     "confluent-kafka>=2.11.1",
     "dotenv>=0.9.9",
     "jsonschema>=4.25.1",

@@ -51,14 +51,14 @@ class TestIamClient:
 
         environments_with_kafka_clusters = {}
 
-        http_status_code, error_message, environments = environment_client.get_environment_list()
+        http_status_code, error_message, environments = environment_client.get_environments()
         try:
             assert http_status_code == HttpStatus.OK, f"HTTP Status Code: {http_status_code}"
 
             logger.info("Environments: %d", len(environments))
 
-            for environment in environments:
-                http_status_code, error_message, kafka_clusters = environment_client.get_kafka_cluster_list(environment_id=environment["id"])
+            for environment in environments.values():
+                http_status_code, error_message, kafka_clusters = environment_client.get_kafka_clusters(environment_id=environment["id"])
         
                 try:
                     assert http_status_code == HttpStatus.OK, f"HTTP Status Code: {http_status_code}"
@@ -77,7 +77,7 @@ class TestIamClient:
 
         for _, kafka_clusters in environments_with_kafka_clusters.items():
             kafka_cluster_count = len(kafka_clusters)
-            for index, kafka_cluster in enumerate(kafka_clusters):
+            for index, kafka_cluster in enumerate(kafka_clusters.values()):
                 http_status_code, error_message, api_key_pair = iam_client.create_api_key(resource_id=kafka_cluster["id"], 
                                                                                           principal_id=principal_id,
                                                                                           display_name=f"Test {environment['display_name']} Kafka API Key",

@@ -45,7 +45,7 @@ class TestSchemaRegistryClient:
     def test_getting_all_schema_registry_clusters(self, sr_client, environment_client):
         """Test the get_schema_registry_cluster_list() function."""
 
-        http_status_code, error_message, environments = environment_client.get_environment_list()
+        http_status_code, error_message, environments = environment_client.get_environments()
         try:
             assert http_status_code == HttpStatus.OK, f"HTTP Status Code: {http_status_code}"
 

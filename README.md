@@ -627,9 +627,9 @@ sequenceDiagram
 
     alt Use Confluent Cloud API Key
         Main->>EC: Create EnvironmentClient
-        Main->>EC: get_environment_list()
+        Main->>EC: get_environments()
         EC-->>Main: Return environments
-        Main->>EC: get_kafka_cluster_list(env_id)
+        Main->>EC: get_kafka_clusters(env_id)
         EC-->>Main: Return kafka clusters
         loop For each cluster
             Main->>EC: create_api_key(kafka_cluster_id, principal_id)

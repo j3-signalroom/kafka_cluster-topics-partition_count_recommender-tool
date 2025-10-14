@@ -72,7 +72,7 @@ def fetch_kafka_credentials_via_confluent_cloud_api_key(principal_id: str,
     environment_client = EnvironmentClient(environment_config=environment_config)
     iam_client = IamClient(iam_config=environment_config)
 
-    http_status_code, error_message, environments = environment_client.get_environment_list()
+    http_status_code, error_message, environments = environment_client.get_environments()
  
     if http_status_code != HttpStatus.OK:
         logger.error("FAILED TO RETRIEVE KAFKA CREDENTIALS FROM CONFLUENT CLOUD BECAUSE THE FOLLOWING ERROR OCCURRED: %s.", error_message)
@@ -85,7 +85,7 @@ def fetch_kafka_credentials_via_confluent_cloud_api_key(principal_id: str,
 
         # Retrieve Kafka cluster credentials for each environment
         for environment in environments:
-            http_status_code, error_message, kafka_clusters = environment_client.get_kafka_cluster_list(environment_id=environment.get("id"))
+            http_status_code, error_message, kafka_clusters = environment_client.get_kafka_clusters(environment_id=environment.get("id"))
 
             if http_status_code != HttpStatus.OK:
                 logger.error("FAILED TO RETRIEVE KAFKA CLUSTER LIST FOR ENVIRONMENT %s FROM CONFLUENT CLOUD BECAUSE THE FOLLOWING ERROR OCCURRED: %s.", environment.get('id'), error_message)
@@ -158,7 +158,7 @@ def fetch_schema_registry_via_confluent_cloud_api_key(principal_id: str,
     iam_client = IamClient(iam_config=resource_config)
 
     # Retrieve the list of environments
-    http_status_code, error_message, environments = environment_client.get_environment_list()
+    http_status_code, error_message, environments = environment_client.get_environments()
     if http_status_code != HttpStatus.OK:
         logger.error("FAILED TO RETRIEVE SCHEMA REGISTRY CREDENTIALS FROM CONFLUENT CLOUD BECAUSE THE FOLLOWING ERROR OCCURRED: %s.", error_message)
         return {}

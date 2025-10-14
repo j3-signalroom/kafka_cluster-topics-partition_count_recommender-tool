@@ -135,7 +135,7 @@ wheels = [
 
 [[package]]
 name = "cc-clients-python-lib"
-version = "0.30.1.0"
+version = "0.30.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "attrs" },
@@ -152,9 +152,9 @@ dependencies = [
     { name = "urllib3" },
     { name = "wheel" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1d/2a/5411bc991095a484720f134289a76b6de626e652ee4399b74f1bdac337f2/cc_clients_python_lib-0.30.1.0.tar.gz", hash = "sha256:22e02d868b49d1c96e082080e132497f795369b7f1af68207f8308825b8fa234", size = 2796499 }
+sdist = { url = "https://files.pythonhosted.org/packages/0c/a5/20162f901bbb75d7521380bf7a32262fc2ebfca300a2bb3f32681403993c/cc_clients_python_lib-0.30.3.0.tar.gz", hash = "sha256:376960beeecf63bf28bf05f4abd9d9dbb8abe2e2517ed5478242276247fe4dc9", size = 2797427 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cd/c2/0d281f38393cc8efc3b6f552ae7993103255918f8ad3cc848f60daec5b31/cc_clients_python_lib-0.30.1.0-py3-none-any.whl", hash = "sha256:015812d13e85ba74fa9f465afb0530e1a3115914d9202753bbfd3024cc9e60bd", size = 384786 },
+    { url = "https://files.pythonhosted.org/packages/73/98/6b5e17d67a16e1bdd18e7bd7d78416077c2bb962d6afaaf3dc811c16c122/cc_clients_python_lib-0.30.3.0-py3-none-any.whl", hash = "sha256:9edc24bef8c8b83783fb238f014d7893484185c320804e4a01fb3eba11d6a269", size = 384791 },
 ]
 
 [[package]]
@@ -519,7 +519,7 @@ wheels = [
 
 [[package]]
 name = "kafka-cluster-topics-partition-count-recommender-tool"
-version = "0.12.0.0"
+version = "0.12.4.0"
 source = { virtual = "." }
 dependencies = [
     { name = "authlib" },
@@ -539,7 +539,7 @@ requires-dist = [
     { name = "authlib", specifier = ">=1.6.5" },
     { name = "aws-clients-python-lib", specifier = ">=0.10.0.0" },
     { name = "cachetools", specifier = ">=6.2.0" },
-    { name = "cc-clients-python-lib", specifier = "==0.30.1.0" },
+    { name = "cc-clients-python-lib", specifier = "==0.30.3.0" },
     { name = "confluent-kafka", specifier = ">=2.11.1" },
     { name = "dotenv", specifier = ">=0.9.9" },
     { name = "jsonschema", specifier = ">=4.25.1" },
