@@ -32,22 +32,22 @@ class TestEnvironmentClient:
     """Test Suite for the EnvironmentClient class."""
 
     def test_get_all_environments_with_kafka_clusters(self, environment_client):
-        """Test the get_environment_list() and get_kafka_cluster_list() functions."""
+        """Test the get_environments() and get_kafka_clusters() functions."""
 
-        http_status_code, error_message, environments = environment_client.get_environment_list()
+        http_status_code, error_message, environments = environment_client.get_environments()
         try:
             assert http_status_code == HttpStatus.OK, f"HTTP Status Code: {http_status_code}"
 
-            for environment_index, environment in enumerate(environments):
+            for environment_index, environment in enumerate(environments.values()):
                 beautified = json.dumps(environment, indent=4, sort_keys=True)
                 logger.info("%d of %d Environment: %s", environment_index + 1, len(environments), beautified)
 
-                http_status_code, error_message, kafka_clusters = environment_client.get_kafka_cluster_list(environment_id=environment["id"])
+                http_status_code, error_message, kafka_clusters = environment_client.get_kafka_clusters(environment_id=environment["id"])
         
                 try:
                     assert http_status_code == HttpStatus.OK, f"HTTP Status Code: {http_status_code}"
 
-                    for kafka_cluster_index, kafka_cluster in enumerate(kafka_clusters):
+                    for kafka_cluster_index, kafka_cluster in enumerate(kafka_clusters.values()):
                         beautified = json.dumps(kafka_cluster, indent=4, sort_keys=True)
                         logger.info("Environment '%s' %d of %d Kafka Cluster: %s", environment["display_name"], kafka_cluster_index + 1, len(kafka_clusters), beautified)
                 except AssertionError as e:
