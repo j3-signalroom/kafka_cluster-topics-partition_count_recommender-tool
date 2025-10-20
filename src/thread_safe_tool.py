@@ -168,9 +168,9 @@ def main():
         if use_confluent_cloud_api_key_to_fetch_resource_credentials:
             # Read the Schema Registry credentials using Confluent Cloud API key
             sr_credentials = fetch_schema_registry_via_confluent_cloud_api_key(principal_id, 
-                                                                            metrics_config, 
-                                                                            use_private_schema_registry, 
-                                                                            environment_filter)
+                                                                               metrics_config, 
+                                                                               use_private_schema_registry, 
+                                                                               environment_filter)
         else:
             # Read the Schema Registry credentials from the environment variable or AWS Secrets Manager
             sr_credentials = fetch_schema_registry_credentials_via_env_file(use_aws_secrets_manager)
@@ -223,7 +223,7 @@ def main():
     if len(kafka_credentials) == 1:
         # Single Kafka cluster.  No need for cluster-level threading
         if use_kafka_writer:
-            success = _analyze_kafka_cluster(kafka_credentials[0], config, sr_credential=sr_credentials[0])
+            success = _analyze_kafka_cluster(kafka_credentials[0], config, sr_credential=sr_credentials[kafka_credentials[0]["environment_id"]])
         else:
             success = _analyze_kafka_cluster(kafka_credentials[0], config)
     
