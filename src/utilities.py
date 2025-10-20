@@ -60,7 +60,7 @@ def setup_logging(log_file: str = DEFAULT_TOOL_LOG_FILE) -> logging.Logger:
     return logging.getLogger()
 
 
-def get_app_versionsetup() -> str:
+def get_app_version_number() -> str:
     """Retrieve the application version string from pyproject.toml.
 
     Return(s):
