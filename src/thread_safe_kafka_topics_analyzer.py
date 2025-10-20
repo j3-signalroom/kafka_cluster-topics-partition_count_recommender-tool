@@ -239,7 +239,8 @@ class ThreadSafeKafkaTopicsAnalyzer:
                     # Use sample records approach
 
                     # Calculate the ISO 8601 formatted start timestamp of the rolling window
-                    rolling_start = start_time_epoch - timedelta(days=topic_info['sampling_days_based_on_retention_days'])
+                    logging.info("Calculating rolling start time for topic %s based on sampling days %d", topic_name, topic_info['sampling_days_based_on_retention_days'])
+                    rolling_start = datetime.fromtimestamp(start_time_epoch) - timedelta(days=topic_info['sampling_days_based_on_retention_days'])
                     iso_start_time = datetime.fromisoformat(rolling_start.strftime('%Y-%m-%dT%H:%M:%S+00:00'))
                     start_time_epoch_ms = int(rolling_start.timestamp() * 1000)
 

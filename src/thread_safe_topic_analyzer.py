@@ -68,8 +68,7 @@ class ThreadSafeTopicAnalyzer:
         topic_metadata = topic_info['metadata']
         sampling_days = topic_info['sampling_days_based_on_retention_days']
 
-        logging.info("[Thread-%d] Analyzing topic '%s' with %d-day rolling window (from %s)",
-                     threading.current_thread().ident, topic_name, sampling_days, iso_start_time.isoformat())
+        logging.info("[Thread-%d] Analyzing topic '%s' with %d-day rolling window (from %s)", threading.current_thread().ident, topic_name, sampling_days, iso_start_time.isoformat())
 
         partitions = list(topic_metadata.partitions.keys())
         partition_count = len(partitions)
