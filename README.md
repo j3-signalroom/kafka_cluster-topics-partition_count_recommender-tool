@@ -654,7 +654,10 @@ The tool automatically generates two comprehensive CSV reports for each Kafka Cl
 
 #### **1.4.2 Detail Results Produced to Kafka**
 
-<TO BE ADDED IN FUTURE RELEASE>
+If you enable the Kafka Writer by setting the `ENABLE_KAFKA_WRITER` environment variable to True and `KAFKA_WRITER_TOPIC_NAME` to a valid Kafka topic (e.g., `_j3.partition_recommender.results`), the tool will send detailed analysis results to a specified Kafka topic within each Kafka cluster being analyzed. This feature supports real-time monitoring and integration with other Kafka-based systems. Below are screenshots of the key and value schemas for the Kafka topic `_j3.partition_recommender.results`:
+
+![__j3.partition_recommender.results-key](.blog/images/__j3.partition_recommender.results-key.png)
+![__j3.partition_recommender.results-value](.blog/images/__j3.partition_recommender.results-value.png)
 
 ## **2.0 How the tool calculates the recommended partition count**
 The tool uses the Kafka `AdminClient` to retrieve all Kafka Topics (based on the `TOPIC_FILTER` specified) stored in your Kafka Cluster, including the original partition count per topic. Then, it iterates through each Kafka Topic, calling the Confluent Cloud Metrics RESTful API to retrieve the topic’s average (i.e., the _Consumer Throughput_) and peak consumption in bytes over a rolling seven-day period. Next, it calculates the required throughput by multiplying the peak consumption by the `REQUIRED_CONSUMPTION_THROUGHPUT_FACTOR` (i.e., the _Required Throughput_). Finally, it divides the required throughput by the consumer throughput and rounds the result to the nearest whole number to determine the optimal number of partitions.
