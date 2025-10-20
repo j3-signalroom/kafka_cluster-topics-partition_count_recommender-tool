@@ -73,6 +73,6 @@ def get_app_version_number() -> str:
             config = tomllib.load(f)
 
         # Extract version
-        return config.get("tool", {}).get("poetry", {}).get("version", "0.0.0")
+        return config.get("project", {}).get("version", "0.0.0")
     else:
         return "0.0.0"

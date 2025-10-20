@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
 
 from thread_safe_kafka_topics_analyzer import ThreadSafeKafkaTopicsAnalyzer
-from utilities import setup_logging
+from utilities import setup_logging, get_app_version_number
 from cc_clients_python_lib.iam_client import IamClient
 from cc_clients_python_lib.http_status import HttpStatus
 from confluent_credentials import (fetch_kafka_credentials_via_confluent_cloud_api_key,
@@ -207,6 +207,7 @@ def main():
     logging.info("=" * DEFAULT_CHARACTER_REPEAT)
     logging.info("MULTITHREADED KAFKA CLUSTER ANALYSIS STARTING")
     logging.info("-" * DEFAULT_CHARACTER_REPEAT)
+    logging.info("Tool version number: %s", get_app_version_number())
     logging.info("Number of Kafka clusters to analyze: %d", len(kafka_credentials))
     logging.info("Max concurrent Kafka clusters: %d", max_cluster_workers)
     logging.info("Max concurrent topics per cluster: %d", max_workers_per_cluster)
@@ -280,6 +281,7 @@ def main():
         logging.info("=" * DEFAULT_CHARACTER_REPEAT)
         logging.info("MULTITHREADED ANALYSIS SUMMARY")
         logging.info("-" * DEFAULT_CHARACTER_REPEAT)
+        logging.info("Tool version number: %s", get_app_version_number())
         logging.info("Total Kafka clusters analyzed: %d", len(kafka_credentials))
         logging.info("Successful Kafka cluster analyses: %d", successful_clusters)
         logging.info("Failed Kafka cluster analyses: %d", failed_clusters)
