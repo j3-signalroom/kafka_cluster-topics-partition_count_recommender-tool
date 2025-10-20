@@ -58,3 +58,21 @@ def setup_logging(log_file: str = DEFAULT_TOOL_LOG_FILE) -> logging.Logger:
         )
 
     return logging.getLogger()
+
+
+def get_app_version_number() -> str:
+    """Retrieve the application version string from pyproject.toml.
+
+    Return(s):
+        str: The application version string.
+    """
+    pyproject_path = Path("pyproject.toml")
+
+    if pyproject_path.exists():
+        with open(pyproject_path, "rb") as f:
+            config = tomllib.load(f)
+
+        # Extract version
+        return config.get("project", {}).get("version", "0.0.0")
+    else:
+        return "0.0.0"
