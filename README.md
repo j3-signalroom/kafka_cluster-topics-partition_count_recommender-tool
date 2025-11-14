@@ -143,7 +143,11 @@ The service account needs to have [OrganizationAdmin](https://docs.confluent.io/
 6. Make note of the API key and secret in the output, which you will assign to the `confluent_cloud_api_key` and `confluent_cloud_api_secret` environment variables in the `.env` file. Alternatively, you can securely store and retrieve these credentials using AWS Secrets Manager.
 
 #### **1.2.2 Create the `.env` file**
-Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values:
+Create the `.env` file and add the following environment variables, filling them with your Confluent Cloud credentials and other required values.
+
+<details>
+<summary>Example `.env` file content</summary>
+
 ```shell
 # Set the flag to `True` to use the Confluent Cloud API key for fetching Kafka
 # credentials; otherwise, set it to `False` to reference `KAFKA_CREDENTIALS` or
@@ -209,6 +213,8 @@ KAFKA_WRITER_TOPIC_PARTITION_COUNT=<YOUR_KAFKA_WRITER_TOPIC_PARTITION_COUNT>
 KAFKA_WRITER_TOPIC_REPLICATION_FACTOR=<YOUR_KAFKA_WRITER_TOPIC_REPLICATION_FACTOR>
 KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS=<YOUR_KAFKA_WRITER_TOPIC_DATA_RETENTION_IN_DAYS>
 ```
+
+</details>
 
 The environment variables are defined as follows:
 
@@ -277,7 +283,10 @@ Then enter the following command below to run the tool:
 uv run python src/thread_safe_tool.py
 ```
 
-If `USE_SAMPLE_RECORDS` environment variable is set to `True`, the tool will sample records from each topic to calculate the average record size in bytes.  For example, below is a screenshot of the tool running successfully:
+If `USE_SAMPLE_RECORDS` environment variable is set to `True`, the tool will sample records from each topic to calculate the average record size in bytes.
+
+<details>
+<summary>Example log of the tool running successfully sampling records</summary>
 
 ```log
 2025-10-20 07:28:22 - INFO - fetch_confluent_cloud_credential_via_env_file - Retrieving the Confluent Cloud credentials from the .env file.
@@ -394,7 +403,12 @@ If `USE_SAMPLE_RECORDS` environment variable is set to `True`, the tool will sam
 2025-10-20 07:31:22 - INFO - main - SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.
 ```
 
-If `USE_SAMPLE_RECORDS` is set to `False`, the tool will use the Confluent Cloud Metrics API to retrieve the average and peak consumption in bytes over a rolling seven-day period.  For example, below is a screenshot of the tool running successfully:
+</details>
+
+If `USE_SAMPLE_RECORDS` is set to `False`, the tool will use the Confluent Cloud Metrics API to retrieve the average and peak consumption in bytes over a rolling seven-day period.  
+
+<details>
+<summary>Example log of the tool running successfully using the Metrics API</summary>
 
 ```log
 2025-10-20 06:37:47 - INFO - fetch_confluent_cloud_credential_via_env_file - Retrieving the Confluent Cloud credentials from the .env file.
@@ -527,7 +541,9 @@ If `USE_SAMPLE_RECORDS` is set to `False`, the tool will use the Confluent Cloud
 2025-10-20 06:38:48 - INFO - __log_summary_stats - ====================================================================================================
 2025-10-20 06:38:48 - INFO - _analyze_kafka_cluster - KAFKA CLUSTER lkc-5py812 TOPIC ANALYSIS COMPLETED SUCCESSFULLY.
 2025-10-20 06:38:49 - INFO - _analyze_kafka_cluster - Kafka API key RMW7B3RB4J4WWXEE for Kafka Cluster lkc-5py812 deleted successfully.
-2025-10-20 06:38:49 - INFO - main - SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.```
+2025-10-20 06:38:49 - INFO - main - SINGLE KAFKA CLUSTER ANALYSIS COMPLETED SUCCESSFULLY.
+```
+</details>
 
 #### **1.3.1 Did you notice we prefix `uv run` to `python src/thread_safe_tool.py`?**
 You maybe asking yourself why.  Well, `uv` is an incredibly fast Python package installer and dependency resolver, written in [**Rust**](https://github.blog/developer-skills/programming-languages-and-frameworks/why-rust-is-the-most-admired-language-among-developers/), and designed to seamlessly replace `pip`, `pipx`, `poetry`, `pyenv`, `twine`, `virtualenv`, and more in your workflows. By prefixing `uv run` to a command, you're ensuring that the command runs in an optimal Python environment.
